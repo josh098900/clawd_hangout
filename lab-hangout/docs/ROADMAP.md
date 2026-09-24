@@ -67,6 +67,22 @@ Guiding rules (from what already works):
 - [x] FOLLOW a player from their card (through doors too); HIGH FIVE by waving next to someone who's waving
 - [x] Cinema schedule: two films (A CRITTER IN SPACE, DRAGON NIGHT) take turns by the hour; the Square's marquee shows what's on
 
+## Phase 7 — The big plan (one step at a time: see docs/PLAN.md)
+- [ ] 1. Halloween (1 Oct to 1 Nov): decorations, trick-or-treat, haunted Crypt, BOO, costumes
+- [ ] 2. Garden plots on the Rooftop (real-time growth, friends can water)
+- [ ] 3. The Subway (trains on the shared clock)
+- [ ] 4. The Park (boats, kites, ducks, sandbox)
+- [ ] 5. Daily quests and badges
+- [ ] 6. Hourly fishing contest
+- [ ] 7. Group dances and shared weather
+- [ ] 8. The Diner (co-op cooking)
+- [ ] 9. The Kart Track and the tank duel
+- [ ] 10. Your own apartment
+- [ ] 11. The Space Station
+- [ ] 12. Karaoke on the Stage
+- [ ] 13. The photo wall (moderated)
+- [ ] 14. Winter (December)
+
 ## Before any public launch
 - [x] Permission from Anthropic for Clawd
 - [x] Permission + credit from the "Claw'd Labs, Part 0" film's creator for the sets/palette
