@@ -4,8 +4,8 @@ A multiplayer pixel hangout. Pick a colour, a hat and an outfit for your little 
 (or Clawd), then walk around **the Lab**, **the Square**, **the Cinema** and **the Dev Den**, chat in speech
 bubbles and emote with everyone else who's online.
 
-Nine rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
-**the Crypt**, **the Stage**, **the Pier** and **the Arcade**. Things to do: sit on sofas, benches, cinema seats
+Eleven rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
+**the Crypt**, **the Stage**, **the Pier**, **the Arcade**, **the Subway station** and **the train**. Things to do: sit on sofas, benches, cinema seats
 and hammocks; get coffee, popcorn, soda and marshmallows (roast them on the bonfire); draw on
 the Lab's shared whiteboard; play SLOP INVADERS on the arcade cabinet; change the jukebox
 track for the whole room; dance, plonk down on the floor or pick from the emote wheel; feed
@@ -19,6 +19,9 @@ while everyone watches it live on the cabinet, and check your collection at the 
 Start a round of **hide and seek** across every room from the sign on the Square. Click a player
 to FOLLOW them (even through doors); wave next to someone who's waving for a HIGH FIVE.
 Decorate your own desk in the Dev Den (the DESK STUFF shelf).
+Down the green-railed stairs on the Square is **the Subway**: a train pulls in every two minutes
+(everyone sees the same train), you board through its open doors and ride together past the
+city skyline. The Park stop opens soon.
 Up on the Rooftop is the **community garden**: buy a seed, plant it in a free bed, and it grows
 in real time over hours. Anyone can water anyone's plant (and gets a token for helping), a plant
 left dry for a day wilts, and you harvest it for tokens (sometimes with a rare glowing moonflower

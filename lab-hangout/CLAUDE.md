@@ -56,7 +56,7 @@ src/
     renderer.ts        world canvas + half-res glow canvas -> screen, integer scaling, camera
     input.ts           keys + click/tap-to-walk
   world/
-    room.ts            Room/Door/Prop/Spot types, walkable()
+    room.ts            Room/Door/Prop/Spot types, walkable(); doors with `route` open only sometimes (doorDest())
     lab.ts             THE LAB set (960x680), props, animated bits
     plaza.ts           THE SQUARE set (1200x780), voxel installations, lamps, benches, cinema front, day/night (wall clock)
     cinema.ts          THE CINEMA set (1100x720): lobby, concession stand, photo booth, screen + the 80 s film, seats
@@ -70,6 +70,9 @@ src/
                        doors, the haunted Crypt's candle puzzle; installHalloween() appends the spots at runtime
     garden.ts          the Rooftop's community garden (8 beds at its right end): SEEDS, growth() (same sums as the
                        server), plant sprites per seed + stage, GARDEN.plots (fetched every 15 s while on the roof)
+    subway.ts          THE SUBWAY: the timetable (train(), all from the wall clock), SQUARE STATION (1300x700) with
+                       the train pulling in, and THE TRAIN carriage (1000x650) with the view going by; STATIONS
+                       lists the stops (room: null = OPENING SOON, doors stay shut)
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine

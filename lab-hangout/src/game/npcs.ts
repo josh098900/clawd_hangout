@@ -118,6 +118,15 @@ const DEFS: NpcDef[] = [
     chat: ['welcome to the arcade!', 'the claw costs 3 tokens', 'coins spawn on the Square every 5 minutes', 'got a dupe? you get a token back', 'pong is first to 5', 'check your collection at the prize counter', 'the MUSIC cabinet changes the tune'],
   },
   {
+    id: 'npc-roxy', name: 'ROXY', room: 'subway', speed: 30,
+    look: { c: 5, hat: 3, face: 3, fit: 4, sp: 0 },
+    stops: [
+      { x: 700, y: 630, wait: 50, pose: 1, say: ['this one is called SUBWAY SERENADE', 'tips welcome! (i take smiles)', 'la la la... mind the gap...'] },
+      { x: 1100, y: 600, wait: 10, say: ['snack break', 'the red machine never runs out of crisps'] },
+    ],
+    chat: ['hop on the next train!', 'the ride past the city is the best bit', 'the Park station is opening soon, they say', 'stand behind the yellow line', 'i busk here every day. the acoustics!', 'the board says when the next train is'],
+  },
+  {
     id: 'npc-spin', name: 'DJ SPIN', room: 'stage', speed: 34,
     look: { c: 3, hat: 3, face: 3, fit: 0, sp: 1 },
     stops: [

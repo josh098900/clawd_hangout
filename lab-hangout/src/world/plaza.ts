@@ -17,6 +17,8 @@ const LABDOOR = { x: 40, y: 488, w: 44, h: 72 };
 const CINE = { x0: 380, x1: 508, top: 432, door: { x: 426, y: 506, w: 36, h: 54 } };
 /** The Arcade stairwell (top edge centre), down in the front-left of the Square. */
 const ARC = { x: 186, y: 680 };
+/** The Subway entrance (top edge centre), front middle-right of the Square. */
+const SUB = { x: 760, y: 682 };
 
 /**
  * Day/night on a 20-minute loop of the WALL clock, so every player sees the same sky.
@@ -120,6 +122,12 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     r(ARC.x - 28, ARC.y - 2, 56, 2, [90, 94, 110]); for (const sx of [ARC.x - 28, ARC.x + 26]) { r(sx, ARC.y - 12, 2, 38, K.STEEL_POST); r(sx, ARC.y - 12, 2, 1, [140, 150, 180]); }
     r(ARC.x - 28, ARC.y - 12, 56, 2, K.STEEL_POST);
     r(ARC.x + 40, ARC.y - 42, 2, 70, K.STEEL_POST); r(ARC.x + 14, ARC.y - 60, 56, 18, [30, 20, 50]); r(ARC.x + 14, ARC.y - 60, 56, 1, [90, 60, 140]);
+    // the Subway: green railings round a stairwell, and a lamp-topped SUBWAY sign
+    const G_: RGB = [40, 120, 90];
+    r(SUB.x - 26, SUB.y, 52, 26, [14, 16, 20]); for (let k = 0; k < 5; k++) r(SUB.x - 22 + k, SUB.y + 3 + k * 5, 44 - k * 2, 2, [110, 112, 120]);
+    r(SUB.x - 28, SUB.y - 2, 56, 2, [90, 94, 110]); for (const sx of [SUB.x - 28, SUB.x + 26]) { r(sx, SUB.y - 14, 2, 40, G_); r(sx, SUB.y - 14, 2, 1, [110, 190, 150]); }
+    r(SUB.x - 28, SUB.y - 14, 56, 2, G_);
+    r(SUB.x + 40, SUB.y - 50, 2, 76, G_); r(SUB.x + 16, SUB.y - 64, 50, 14, G_); r(SUB.x + 16, SUB.y - 64, 50, 1, [110, 190, 150]); txt('SUBWAY', SUB.x + 41 - tw('SUBWAY') / 2, SUB.y - 60, [240, 250, 240]);
   });
 }
 
@@ -132,6 +140,8 @@ function drawBack(a: number): void {
   // the ARCADE sign blinks through the colours, and the stairwell glows
   lit(() => { const s = 'ARCADE'; let x = ARC.x + 42 - tw(s) / 2; for (let i = 0; i < s.length; i++) { txt(s[i], x, ARC.y - 56, CONFETTI[(i + Math.floor(a * 3)) % CONFETTI.length]); x += tw(s[i]) + 1; } const ac: RGB = (a % 1) < 0.5 ? K.GOLD : [120, 90, 40]; for (let k = 0; k < 3; k++) r(ARC.x + 40 - 2 + k, ARC.y - 50 + k, 5 - k * 2, 1, ac); });
   G(ARC.x + 14, ARC.y - 60, 56, 18, [255, 120, 220], 0.22); G(ARC.x - 26, ARC.y, 52, 26, [200, 120, 255], 0.14 + 0.06 * Math.sin(a * 3));
+  // the Subway sign's lamp, and a draught of warm light up the stairs when a train is in
+  lit(() => r(SUB.x + 38, SUB.y - 70, 6, 5, [255, 240, 200])); Gd(SUB.x + 41, SUB.y - 68, 10, [255, 240, 200], 0.4); G(SUB.x - 26, SUB.y, 52, 26, [255, 230, 180], 0.08);
   // something glows green down the Crypt grate
   G(1098, 682, 44, 18, [124, 242, 208], 0.12 + 0.08 * Math.sin(a * 2)); lit(() => { for (let x = 1104; x < 1138; x += 5) if ((a * 2 + x * 0.3) % 3 < 0.6) r(x + 1, 690, 1, 2, [124, 242, 208]); });
   // cinema marquee: chasing bulbs around the board, and tonight's film
@@ -245,6 +255,7 @@ export function makePlaza(): Room {
       { x0: 604, y0: 598, x1: 616, y1: 606 },
       { x0: 654, y0: 582, x1: 666, y1: 590 }, // tag sign
       { x0: 106, y0: 606, x1: 118, y1: 614 }, // hide & seek sign
+      { x0: 730, y0: 668, x1: 736, y1: 712 }, { x0: 784, y0: 668, x1: 790, y1: 712 }, { x0: 798, y0: 666, x1: 804, y1: 674 }, // subway railings + sign post
       { x0: 156, y0: 668, x1: 162, y1: 712 }, { x0: 210, y0: 668, x1: 216, y1: 712 }, { x0: 224, y0: 668, x1: 230, y1: 676 }, // stairwell railings + sign post
     ],
     doors: [
@@ -252,6 +263,7 @@ export function makePlaza(): Room {
       { trigger: { x0: 1184, y0: 600, x1: 1194, y1: 712 }, edge: true, to: 'pier', arrive: { x: 40, y: 620 }, label: 'PIER', area: { x0: 1168, y0: 580, x1: 1200, y1: 712 } },
       { trigger: { x0: 578, y0: 570, x1: 608, y1: 578 }, to: 'stage', arrive: { x: 40, y: 500 }, label: 'STAGE', area: { x0: 572, y0: 494, x1: 614, y1: 576 } },
       { trigger: { x0: 1102, y0: 684, x1: 1138, y1: 694 }, to: 'crypt', arrive: { x: 40, y: 470 }, label: 'CRYPT', area: { x0: 1096, y0: 648, x1: 1172, y1: 698 } },
+      { trigger: { x0: 742, y0: 686, x1: 778, y1: 702 }, edge: true, to: 'subway', arrive: { x: 60, y: 640 }, label: 'SUBWAY', area: { x0: 730, y0: 612, x1: 810, y1: 708 } },
       { trigger: { x0: 168, y0: 684, x1: 204, y1: 700 }, edge: true, to: 'arcade', arrive: { x: 90, y: 500 }, label: 'ARCADE', area: { x0: 158, y0: 618, x1: 256, y1: 706 } },
       { trigger: { x0: 426, y0: 570, x1: 462, y1: 578 }, to: 'cinema', arrive: { x: 62, y: 462 }, label: 'CINEMA', area: { x0: 420, y0: 500, x1: 468, y1: 576 } },
     ],

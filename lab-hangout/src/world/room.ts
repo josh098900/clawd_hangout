@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -17,7 +17,17 @@ export interface Door {
   area: Rect;
   /** An open edge of the set (walk into it from any direction), not a door you walk up into. */
   edge?: boolean;
+  /**
+   * A door that's only sometimes open, or leads to different places (the Subway's train doors):
+   * where it goes right now, or null while it's shut. Overrides `to`/`arrive`.
+   */
+  route?: () => { to: RoomId; arrive: { x: number; y: number }; label?: string } | null;
 }
+/** Where a door leads right now (null = shut). */
+export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number }; label: string } | null => {
+  if (!d.route) return { to: d.to, arrive: d.arrive, label: d.label };
+  const r = d.route(); return r ? { ...r, label: r.label ?? d.label } : null;
+};
 
 /**
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`

@@ -18,6 +18,7 @@ import { makeStage, stageNote, INST_COL } from './world/stage';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, ARCADE_INFO, PONG_SPOTS, pongSeen } from './world/arcade';
+import { makeSubway, makeTrain, train } from './world/subway';
 import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
@@ -36,7 +37,7 @@ import { openStars } from './ui/stars';
 import { makePlaza, COINS, dayness } from './world/plaza';
 import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
-import { inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
+import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
 import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
@@ -73,7 +74,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeSubway(), train: makeTrain() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -117,7 +118,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -338,9 +339,10 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   switching = false;
 }
 function goThrough(d: Door): void {
-  if (switching || doorCooldown > 0) return;
+  const dest = doorDest(d);
+  if (switching || doorCooldown > 0 || !dest) return;
   SFX.door();
-  void enterRoom(d.to, d.arrive);
+  void enterRoom(dest.to, dest.arrive);
 }
 
 // ---------- chat + emotes ----------
@@ -570,6 +572,19 @@ function tendBed(n: number): void {
   }
   if (plantState(p).wet) { toast(plantLine(p, false), 3500); return; }
   waterBed(n);
+}
+
+// ---------- the Subway (world/subway.ts): sounds that follow the clock-run train ----------
+let trainKey = '', lastClack = 0;
+function subwaySounds(): void {
+  const tr = train(), key = tr.at + tr.phase, t = now();
+  if (key !== trainKey) {
+    const first = trainKey === ''; trainKey = key;
+    if (!first && tr.phase === 'open' && (room.id === 'train' || tr.at === 0)) SFX.dingdong();
+    if (!first && tr.phase === 'out' && (room.id === 'train' || tr.at === 0)) { SFX.blip(); if (room.id === 'subway' && tr.at === 0) toast('Doors closing! Next train in about a minute', 2500); }
+    if (!first && room.id === 'train' && tr.phase === 'in') toast('Now arriving: ' + (['SQUARE', 'PARK'][tr.at] ?? ''), 2500);
+  }
+  if (room.id === 'train' && tr.phase === 'ride' && t - lastClack > 0.55) { lastClack = t; SFX.clack(); }
 }
 
 // ---------- Halloween (world/halloween.ts) ----------
@@ -931,7 +946,7 @@ function updateMe(dt: number): void {
   if (input.tap) {
     const [wx, wy] = R.toWorld(input.tap.x, input.tap.y);
     input.tap = null;
-    const d = room.doors.find((dd) => inside(dd.area, wx, wy)) ?? null;
+    const d = room.doors.find((dd) => inside(dd.area, wx, wy) && doorDest(dd)) ?? null;
     let npc: Npc | null = null, spot = -1;
     const tk = d ? null : (room.talkers ?? []).find((q) => Math.abs(q.x - wx) < 10 && Math.abs(q.y - wy) < 10) ?? null;
     const hitBlob = d ? null : slopTarget(wx, wy, 16);
@@ -1017,7 +1032,7 @@ function updateMe(dt: number): void {
     }
   }
   // walking "up" into a door
-  for (const d of room.doors) if (inside(d.trigger, me.x, me.y) && (d.edge || vy < -0.3)) goThrough(d);
+  for (const d of room.doors) if (inside(d.trigger, me.x, me.y) && (d.edge || vy < -0.3) && doorDest(d)) goThrough(d);
   const was = me.moving;
   me.moving = moved > 0.01;
   if (me.moving && me.pose && me.pose !== POSE_GHOST) { me.pose = 0; forceSend = true; }
@@ -1086,12 +1101,13 @@ function showStrip(frames: HTMLCanvasElement[]): void {
 // ---------- render ----------
 function drawDoorHints(a: number): void {
   for (const d of room.doors) {
+    const dest = doorDest(d); if (!dest) continue;
     const cx = (d.trigger.x0 + d.trigger.x1) / 2, dist = Math.hypot(me.x - cx, me.y - d.trigger.y0);
     if (dist > 70) continue;
     const k = 1 - seg(dist, 40, 70), bob = Math.round(Math.abs(Math.sin(a * 5)) * 3), y = d.area.y0 - 12 - bob;
     PX.ctx.globalAlpha = k;
     lit(() => { for (let j = 0; j < 4; j++) r(Math.round(cx) - j, y + j, 1 + j * 2, 1, [255, 214, 90]); r(Math.round(cx) - 1, y + 4, 3, 3, [255, 214, 90]); });
-    txtOutlined(d.label, Math.round(cx - tw(d.label) / 2 + (cx < 60 ? 22 : 0)), y - 9, [255, 236, 170]);
+    txtOutlined(dest.label, Math.round(cx - tw(dest.label) / 2 + (cx < 60 ? 22 : 0)), y - 9, [255, 236, 170]);
     PX.ctx.globalAlpha = 1;
     Gd(cx, y + 3, 6, [255, 214, 90], 0.4 * k);
   }
@@ -1224,6 +1240,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
+    if (room.id === 'subway' || room.id === 'train') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);
@@ -1353,6 +1370,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     state: (v: StateVal) => setState(v), blocks: () => blockCenters(), game: (k: 'chairs' | 'tag') => startGame(k), gameState: () => gameNow(), bots: () => bots?.debug(), hv: () => hostView(), others: () => [...others.values()].map((o) => [o.id, o.use, Math.round(o.x), Math.round(o.y)]),
     follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
     spots: () => room.spots.map((sp) => ({ kind: sp.kind, n: sp.n })), candleOrder: () => candleOrder(),
+    doorsOpen: () => room.doors.map((d) => !!doorDest(d)),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };
 }
