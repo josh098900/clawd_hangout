@@ -10,31 +10,34 @@ import { PX, mk, r, M, shade, outline, withCtx, lit } from '../engine/pixel';
 export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** 0 none, 1 pigeon, 2 cat, 3 crab, 4 duck, 5 ghost */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
 /** Things you can put on your desk in the Dev Den (bit i = item i). */
 export const DESK_ITEMS = ['2ND MONITOR', 'PLANT', 'MUG', 'LAVA LAMP', 'FAIRY LIGHTS', 'DRAGON FIGURE', 'STICKERS'] as const;
-export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST'] as const;
+export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT'] as const;
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO'] as const;
-export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE'] as const;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD'] as const;
+export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK'] as const;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
  * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
-export const CLAW: [string, number][] = [
+export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
   ['hat:7', 6], ['hat:9', 6], ['face:5', 6], ['pet:2', 6],
   ['hat:8', 3], ['fit:5', 3], ['pet:5', 3],
   ['hat:10', 1],
+  // Halloween (October only): also the prize for knocking on all 8 trick-or-treat doors in a day
+  ['face:6', 10, 'halloween'], ['hat:11', 6, 'halloween'], ['face:7', 6, 'halloween'], ['fit:7', 6, 'halloween'],
+  ['fit:6', 3, 'halloween'], ['pet:6', 3, 'halloween'],
 ];
 export const RARITY = (item: string): string => { const w = CLAW.find(([k]) => k === item)?.[1] ?? 0; return w >= 10 ? 'COMMON' : w >= 6 ? 'UNCOMMON' : w >= 3 ? 'RARE' : w ? 'LEGENDARY' : 'SPECIAL'; };
 /** Is this item locked until earned? */
 export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + ':' + i; return k in EARNED || CLAW.some(([c]) => c === k); };
 /** How to get a locked item. */
-export const unlockHint = (slot: Slot, i: number): string => EARNED[slot + ':' + i] ?? 'CLAW MACHINE PRIZE';
+export const unlockHint = (slot: Slot, i: number): string => EARNED[slot + ':' + i] ?? (CLAW.find(([k]) => k === slot + ':' + i)?.[2] === 'halloween' ? 'HALLOWEEN: TRICK-OR-TREAT OR CLAW' : 'CLAW MACHINE PRIZE');
 /** Every collectable, for the collection counter. */
 export const COLLECTABLES = [...Object.keys(EARNED), ...CLAW.map(([k]) => k)];
 export function itemName(item: string): string {
@@ -42,11 +45,12 @@ export function itemName(item: string): string {
   const list = slot === 'hat' ? HATS : slot === 'face' ? FACES : slot === 'fit' ? FITS : slot === 'pet' ? PETS : null;
   return list?.[n] ?? item.toUpperCase();
 }
-/** A weighted pick from CLAW (LOCAL mode only; online the server rolls). */
-export function rollClaw(rand: () => number): string {
-  let u = rand() * CLAW.reduce((t, [, w]) => t + w, 0);
-  for (const [k, w] of CLAW) { if (u < w) return k; u -= w; }
-  return CLAW[0][0];
+/** A weighted pick from CLAW (LOCAL mode only; online the server rolls). Seasonal prizes only in their season. */
+export function rollClaw(rand: () => number, season: string | null = null): string {
+  const pool = CLAW.filter(([, , s]) => !s || s === season);
+  let u = rand() * pool.reduce((t, [, w]) => t + w, 0);
+  for (const [k, w] of pool) { if (u < w) return k; u -= w; }
+  return pool[0][0];
 }
 export const DEFAULT_LOOK: Look = { c: 0, hat: 0, face: 0, fit: 1, sp: 0 };
 
@@ -109,8 +113,8 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     // arms (behind body for rest; drawn later for raised)
     const arm = (side: -1 | 1, raised: boolean, sway: number) => {
       const ax = side < 0 ? -15 : 12;
-      const coat = look.fit === 1;
-      const c = coat ? K.COAT : body, cl = coat ? K.COAT_SH : lo;
+      const sl = SLEEVES[look.fit];
+      const c = sl ? sl[0] : body, cl = sl ? sl[1] : lo;
       if (raised) { R(ax + sway, -27, 3, 7, c); R(ax + sway + (side > 0 ? 2 : 0), -26, 1, 6, cl); R(ax + sway, -28, 3, 1, c); }
       else { R(ax, -15, 3, 6, c); R(side > 0 ? ax + 2 : ax, -14, 1, 5, cl); R(ax, -9, 3, 1, cl); }
     };
@@ -127,9 +131,10 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
         bulb = [bx, by];
       }
     }
-    if (look.fit === 5) { // cape, behind the body: flares out at the back as you walk
-      const cc: RGB = [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
-      for (let y = -14; y <= -2; y++) { const w = hwAt(Math.min(y, -4)) + 2 + Math.floor((y + 14) / 4); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -3 ? shade(cc, 0.7) : cc); }
+    if (look.fit === 5 || look.fit === 6) { // cape, behind the body: flares out at the back as you walk
+      const vamp = look.fit === 6, cc: RGB = vamp ? [34, 26, 44] : [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
+      for (let y = -14; y <= -2; y++) { const w = hwAt(Math.min(y, -4)) + 2 + Math.floor((y + 14) / 4); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -3 ? shade(cc, 0.7) : cc); if (vamp) { R(-w - (d > 0 ? fl : 0), y, 1, 1, [170, 20, 40]); R(w - 1 + (d > 0 ? 0 : fl), y, 1, 1, [170, 20, 40]); } }
+      if (vamp) for (const sx of [-1, 1]) { R(sx * 13 - (sx < 0 ? 2 : 0), -21, 3, 8, [34, 26, 44]); R(sx * 13 - (sx < 0 ? 1 : 0), -20, 1, 6, [170, 20, 40]); } // the tall collar
     }
     // body
     for (let y = TOP; y <= -4; y++) {
@@ -155,8 +160,12 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
       for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, y === -4 ? hd : hc); R(-hw, y, 1, 1, M(hc, [255, 255, 255], 0.25)); R(hw - 1, y, 1, 1, hd); }
       R(-hwAt(-14) - 1, -14, hwAt(-14) * 2 + 2, 1, hd); R(-5, -9, 10, 3, hd); R(-4, -9, 8, 1, shade(hc, 0.85));
       R(-2, -13, 1, 4, [236, 238, 250]); R(2, -13, 1, 3, [236, 238, 250]);
-    } else if (look.fit === 5) { // cape: collar + gold clasp
-      R(-hwAt(-13), -13, hwAt(-13) * 2, 1, [200, 40, 60]); R(-2, -13, 4, 2, [255, 214, 90]); R(-1, -13, 1, 1, [255, 244, 190]);
+    } else if (look.fit === 5 || look.fit === 6) { // cape: collar + gold clasp (the vampire's is black with a red gem)
+      R(-hwAt(-13), -13, hwAt(-13) * 2, 1, look.fit === 6 ? [34, 26, 44] : [200, 40, 60]); R(-2, -13, 4, 2, [255, 214, 90]); R(-1, -13, 1, 1, look.fit === 6 ? [230, 40, 60] : [255, 244, 190]);
+    } else if (look.fit === 7) { // skeleton suit: black with white bones
+      const sk: RGB = [30, 28, 40], bn: RGB = [236, 232, 220];
+      for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, sk); }
+      R(0, -13, 1, 8, bn); for (const y of [-12, -10, -8]) { R(-6, y, 5, 1, bn); R(2, y, 5, 1, bn); } R(-3, -5, 7, 1, bn); R(-4, -4, 2, 1, bn); R(3, -4, 2, 1, bn);
     } else if (look.fit === 2) { // scarf
       const sc: RGB = [220, 64, 76], st: RGB = [255, 210, 120];
       for (let y = -13; y <= -11; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, sc); }
@@ -221,9 +230,11 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 }
 
 /** Hats that hide the critter's antenna. */
-const COVERS = new Set([2, 6, 7, 8, 9]);
+const COVERS = new Set([2, 6, 7, 8, 9, 11, 12]);
+/** Sleeve colours (main, shade) for outfits with sleeves. */
+const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]] };
 /** How far each prize hat (6..10) rises above its brim row. */
-const HAT_TALL = [14, 10, 17, 13, 16];
+const HAT_TALL = [14, 10, 17, 13, 16, 16, 9];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
 
 /** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
@@ -253,14 +264,37 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
     R(-12, b, 24, 2, tc); R(-12, b, 24, 1, tl);
     return null;
   }
+  if (hat === 11) { // witch hat: wide brim, bent cone, purple band, gold buckle
+    const wc: RGB = [36, 28, 50], wl: RGB = [70, 56, 96];
+    R(-14, b, 28, 2, wc); R(-14, b, 28, 1, wl);
+    for (let j = 1; j < 15; j++) { const w = Math.max(2, Math.round(14 * (1 - j / 15))), sh = j > 9 ? -d * (j - 9) : 0; R(sh - Math.floor(w / 2), b - j, w, 1, wc); R(sh - Math.floor(w / 2), b - j, 1, 1, wl); }
+    R(-7, b - 2, 14, 2, [123, 97, 255]); R(-2, b - 3, 4, 4, [255, 214, 90]); R(-1, b - 2, 2, 2, wc);
+    return null;
+  }
+  if (hat === 12) { // pumpkin head: a carved jack-o'-lantern over the whole head, candle-lit face
+    const o: RGB = [240, 130, 40], od: RGB = [196, 92, 26], cy = b + 4;
+    for (let y = -10; y <= 10; y++) { const w = Math.round(14 * Math.sqrt(Math.max(0, 1 - (y * y) / 110))); if (w > 0) R(-w, cy + y, w * 2, 1, y > 6 ? od : o); }
+    for (const rx of [-6, 0, 6]) R(rx, cy - 9, 1, 18, od);
+    R(-1, cy - 13, 3, 4, [80, 140, 60]); R(1, cy - 14, 2, 1, [110, 170, 80]);
+    lit(() => { const f: RGB = [255, 220, 90]; for (const ex of [-7 + d, 3 + d]) { R(ex, cy - 4, 4, 1, f); R(ex + 1, cy - 5, 2, 1, f); } R(-6 + d, cy + 3, 12, 2, f); R(-4 + d, cy + 5, 2, 1, f); R(2 + d, cy + 5, 2, 1, f); R(-2 + d, cy + 2, 2, 1, od); });
+    return null;
+  }
   // halo: a glowing gold ring bobbing over the head
   const y = b - 15 + Math.round(Math.sin(P.ant * 0.7 + P.wave) * 0.6), g: RGB = [255, 236, 140];
   lit(() => { R(-5, y, 10, 1, g); R(-8, y + 1, 3, 1, g); R(5, y + 1, 3, 1, g); R(-5, y + 2, 10, 1, [255, 214, 90]); });
   return [0, y + 1];
 }
 
-/** The claw machine face items: 4 mustache, 5 monocle (around the second eye). */
+/** The prize face items: 4 mustache, 5 monocle (around the second eye), 6 fangs, 7 skull mask. */
 function extraFace(R: Rect, face: number, ex: number[], ey: number, mx: number, my: number): void {
+  if (face === 6) { R(mx - 2, my + 2, 1, 2, K.WHITE); R(mx + 1, my + 2, 1, 2, K.WHITE); return; }
+  if (face === 7) {
+    const w: RGB = [236, 232, 220], x0 = ex[0] - 3, x1 = ex[1] + 6;
+    R(x0 + 1, ey - 3, x1 - x0 - 2, 1, w); R(x0, ey - 2, x1 - x0, 9, w); R(x0 + 2, ey + 7, x1 - x0 - 4, 2, w);
+    for (const x of ex) R(x - 1, ey - 1, 5, 4, [20, 16, 28]);
+    R(mx - 1, ey + 4, 2, 2, [20, 16, 28]); for (let k = 0; k < 4; k++) R(x0 + 3 + k * 3 + (x1 - x0 - 16) / 2, ey + 7, 1, 2, [120, 116, 110]);
+    return;
+  }
   if (face === 4) { const c: RGB = [92, 58, 40]; R(mx - 5, my, 4, 2, c); R(mx + 2, my, 4, 2, c); R(mx - 1, my, 3, 1, c); R(mx - 6, my - 1, 1, 1, c); R(mx + 6, my - 1, 1, 1, c); R(mx - 4, my, 2, 1, [130, 88, 62]); return; }
   const x = ex[1], g: RGB = [255, 214, 90];
   R(x - 2, ey - 2, 7, 1, g); R(x - 2, ey + 4, 7, 1, g); R(x - 2, ey - 2, 1, 7, g); R(x + 4, ey - 2, 1, 7, g); R(x - 1, ey - 1, 1, 1, K.WHITE);
@@ -295,9 +329,10 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       const up = P.lift === (i % 2 ? 2 : 1) ? 2 : 0;
       R(lx, -6, 3, 6 - up, body); R(lx + 2, -6, 1, 6 - up, lo); R(lx, -1 - up, 3, 1, lo2);
     });
-    if (look.fit === 5) { // cape behind the block
-      const cc: RGB = [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
-      for (let y = -18; y <= -3; y++) { const w = 14 + Math.floor((y + 18) / 5); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -4 ? shade(cc, 0.7) : cc); }
+    if (look.fit === 5 || look.fit === 6) { // cape behind the block
+      const vamp = look.fit === 6, cc: RGB = vamp ? [34, 26, 44] : [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
+      for (let y = -18; y <= -3; y++) { const w = 14 + Math.floor((y + 18) / 5); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -4 ? shade(cc, 0.7) : cc); if (vamp) { R(-w - (d > 0 ? fl : 0), y, 1, 1, [170, 20, 40]); R(w - 1 + (d > 0 ? 0 : fl), y, 1, 1, [170, 20, 40]); } }
+      if (vamp) for (const sx of [-1, 1]) { R(sx * 14 - (sx < 0 ? 2 : 0), -29, 3, 10, [34, 26, 44]); R(sx * 14 - (sx < 0 ? 1 : 0), -28, 1, 8, [170, 20, 40]); }
     }
     // body
     R(-12, -24, 24, 18, body); R(-12, -24, 24, 1, hi); R(-12, -23, 1, 16, hi);
@@ -320,8 +355,11 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       const hc: RGB = [80, 110, 210], hd = shade(hc, 0.72);
       for (let y = -15; y <= -5; y++) { R(-13, y, 26, 1, y === -5 ? hd : hc); R(-13, y, 1, 1, M(hc, [255, 255, 255], 0.25)); R(12, y, 1, 1, hd); }
       R(-6, -11, 12, 3, hd); R(-5, -11, 10, 1, shade(hc, 0.85)); R(-2, -15, 1, 4, [236, 238, 250]); R(2, -15, 1, 3, [236, 238, 250]);
-    } else if (look.fit === 5) { // cape collar + clasp
-      R(-12, -16, 24, 1, [200, 40, 60]); R(-2, -16, 4, 2, [255, 214, 90]); R(-1, -16, 1, 1, [255, 244, 190]);
+    } else if (look.fit === 5 || look.fit === 6) { // cape collar + clasp
+      R(-12, -16, 24, 1, look.fit === 6 ? [34, 26, 44] : [200, 40, 60]); R(-2, -16, 4, 2, [255, 214, 90]); R(-1, -16, 1, 1, look.fit === 6 ? [230, 40, 60] : [255, 244, 190]);
+    } else if (look.fit === 7) { // skeleton suit
+      const sk: RGB = [30, 28, 40], bn: RGB = [236, 232, 220];
+      R(-13, -15, 26, 11, sk); R(0, -15, 1, 8, bn); for (const y of [-14, -12, -10]) { R(-7, y, 6, 1, bn); R(2, y, 6, 1, bn); } R(-3, -7, 7, 1, bn); R(-4, -6, 2, 1, bn); R(3, -6, 2, 1, bn);
     } else if (look.fit === 2) { // scarf: a band under the eyes with a fluttering tail
       const sc: RGB = [220, 64, 76], st: RGB = [255, 210, 120];
       R(-13, -16, 26, 3, sc); for (let x = -11; x < 12; x += 5) R(x, -16, 2, 3, st);
@@ -331,7 +369,7 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       const bc: RGB = [123, 97, 255];
       R(-4, -16, 3, 3, bc); R(2, -16, 3, 3, bc); R(-1, -15, 3, 2, shade(bc, 0.75)); R(-4, -16, 1, 1, M(bc, [255, 255, 255], 0.4));
     }
-    const sleeve: [RGB, RGB] | null = look.fit === 1 ? [K.COAT, K.COAT_SH] : look.fit === 4 ? [[80, 110, 210], shade([80, 110, 210], 0.72)] : null;
+    const sleeve = SLEEVES[look.fit] ?? null;
     const arm2 = (side: -1 | 1, raised: boolean, sway: number) => {
       if (!sleeve) return arm(side, raised, sway);
       const ax = (side < 0 ? (raised ? -17 : -18) : (raised ? 11 : 12)) + sway, ay = raised ? -27 : -18;

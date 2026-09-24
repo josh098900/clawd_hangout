@@ -106,6 +106,13 @@ export class SupabaseTransport implements Transport {
     if (error) throw new Error(error.message);
     return (data ?? []).map((r) => String(r.item));
   }
+  async season(): Promise<string | null> { const { data, error } = await this.sb.rpc('current_season'); if (error) throw new Error(error.message); return typeof data === 'string' ? data : null; }
+  async trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }> {
+    const { data, error } = await this.sb.rpc('trick_or_treat', { door });
+    if (error) throw new Error(error.message);
+    const o = (data ?? {}) as Record<string, unknown>;
+    return { tokens: Number(o.tokens) || 0, trick: o.trick === true, visited: Number(o.visited) || 0, prize: typeof o.prize === 'string' ? o.prize : null };
+  }
   async playClaw(): Promise<ClawResult> {
     const { data, error } = await this.sb.rpc('play_claw');
     if (error) throw new Error(error.message);

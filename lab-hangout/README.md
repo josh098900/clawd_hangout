@@ -19,6 +19,10 @@ while everyone watches it live on the cabinet, and check your collection at the 
 Start a round of **hide and seek** across every room from the sign on the Square. Click a player
 to FOLLOW them (even through doors); wave next to someone who's waving for a HIGH FIVE.
 Decorate your own desk in the Dev Den (the DESK STUFF shelf).
+Every October it's **Halloween**: pumpkins, cobwebs, bats and fog everywhere; knock on the 8
+pumpkin doors around the world for tokens (or a trick that turns you into a ghost), and all 8 in a
+day wins a costume; light the haunted Crypt's candles in the old scroll's order for the pumpkin
+head; BOO the ghost tells spooky stories on the Square.
 Click the HERE/ONLINE pill to see who's online in every room and join them. Upstairs in the Dev Den:
 code at a desk (a typing game that makes commits), break the build and fix it at the server
 rack, hit DEPLOY, move notes on the kanban board, talk to the rubber duck, and work along
@@ -91,6 +95,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
    Realtime channels, so push the matching game build straight after running it** (players on an
    old build can't join rooms until they reload).
 6. `supabase/migrations/0006_arcade.sql`: the claw machine
+7. `supabase/migrations/0007_halloween.sql`: seasons, trick-or-treat, October-only claw prizes
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`
@@ -157,6 +162,10 @@ Moderation, from the SQL editor:
 - Add a filtered word: `insert into private.banned_words values ('regex');`
 - Chat log: `select * from private.chat_log order by at desc limit 100;`
 - Claw odds: `update private.claw_prizes set weight = 2 where item = 'hat:10';`
+- Seasons switch on by date (October = Halloween). To preview one early for everyone:
+  `select public.set_season('halloween');`, and `select public.set_season(null);` to go back to
+  the date (don't forget, or it stays Halloween into November). `?season=halloween` in the URL
+  previews the decorations in your own browser only.
 - Public launch: `select public.set_world_open(true);` lets everyone in without a code.
 
 ## Deploying

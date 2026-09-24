@@ -65,6 +65,9 @@ src/
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
     stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights
     pier.ts            THE PIER (1300x720): beach, pier + fishing, bonfire + marshmallows, lighthouse, day/night
+    season.ts          which season it is ('halloween' / 'winter' / null): server's current_season(), else the date
+    halloween.ts       October dressing over every room (pumpkins, webs, lights, bats, fog), the 8 trick-or-treat
+                       doors, the haunted Crypt's candle puzzle; installHalloween() appends the spots at runtime
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
@@ -109,7 +112,8 @@ src/
 supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0001 profiles · 0002 security (members, private channels, chat, reports) ·
                        0003 tokens · 0004 accounts (saves, inventory, guest->account merge) ·
-                       0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw)
+                       0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw) ·
+                       0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -145,6 +149,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | chat | RPC `send_chat(room, body)` → server filters, rate-limits (0.7 s / 12 a minute), logs, then broadcasts `chat` on `hangout-srv:<server>:<room>` | `{ id, text }` (≤80 chars) |
 | saves | table `saves` (read/write own, ≤16 KB object) | `{ unlocks, friends, feeds, hi, fish, stars }` |
 | prizes | RPC `play_claw()` (3 tokens, server rolls, dupes refund 1); table `inventory` read-own | `{ item, dupe, tokens }`, items are `'slot:index'` |
+| seasons | RPCs `current_season()`; owner `set_season(s)`; `trick_or_treat(door 0..7)` (1/door/day, 20% trick, all 8 = costume) | `{ tokens, trick, visited, prize }` |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
@@ -160,7 +165,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 `look = { c, hat, face, fit, sp, pet, desk }`, small integer indexes into `BODY`/`HATS`/`FACES`/`FITS`/`SPECIES`/`PETS`
 (`desk` is a bitmask of `DESK_ITEMS`)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
-`use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
+`pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when
 you move). Spot lists are append-only, like look options.
 

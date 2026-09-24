@@ -34,6 +34,12 @@ export const TRACKS: Track[] = [
     bass: 'C3 . C3 . G2 . C3 . C3 . G2 . C3 . G2 . E3 . E2 . C3 . A2 . B2 . A#2 A2 . . G2 .',
     drums: 'k h s h k h s h k h s h k h s s k h s h k h s h k h s h k s s s',
   },
+  {
+    name: 'MIDNIGHT CREEP', bpm: 96, wave: 'triangle',
+    lead: 'E4 . G4 . A#4 . A4 . G4 . E4 . D#4 - - . E4 . G4 . B4 . A#4 . A4 . G4 . E4 - - .',
+    bass: 'E2 . . E2 . . B1 . E2 . . E2 . . A#1 . E2 . . E2 . . B1 . C2 . . B1 . . A#1 .',
+    drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
+  },
 ];
 /** The Arcade's speakers: chiptunes (on by default, the MUSIC cabinet skips tracks). */
 export const CHIPTUNES: Track[] = [
@@ -48,6 +54,12 @@ export const CHIPTUNES: Track[] = [
     lead: 'A4 C5 E5 A5 G5 E5 C5 E5 F4 A4 C5 F5 E5 C5 A4 C5 G4 B4 D5 G5 F5 D5 B4 D5 E5 - D5 - C5 - B4 -',
     bass: 'A2 A2 A3 A2 A2 A2 A3 A2 F2 F2 F3 F2 F2 F2 F3 F2 G2 G2 G3 G2 G2 G2 G3 G2 E2 E2 E3 E2 E2 E2 E3 E2',
     drums: 'k h s h k h s h k h s h k h s s k h s h k h s h k h s h k s k s',
+  },
+  {
+    name: 'MIDNIGHT CREEP', bpm: 96, wave: 'triangle',
+    lead: 'E4 . G4 . A#4 . A4 . G4 . E4 . D#4 - - . E4 . G4 . B4 . A#4 . A4 . G4 . E4 - - .',
+    bass: 'E2 . . E2 . . B1 . E2 . . E2 . . A#1 . E2 . . E2 . . B1 . C2 . . B1 . . A#1 .',
+    drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
   },
 ];
 /** The Dev Den radio: slow, soft lo-fi loops. */

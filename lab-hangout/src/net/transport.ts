@@ -16,7 +16,7 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt). `pose` = 0 normal, 1 dancing, 2 sitting on the floor.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 32, HOLD_MAX = 6, POSE_MAX = 2;
+export const SPOTS_MAX = 40, HOLD_MAX = 6, POSE_MAX = 3;
 
 /**
  * Room state: small shared values that someone arriving later must also get. Each has a
@@ -117,6 +117,10 @@ export interface Transport {
   storeSave(d: object): Promise<void>;
   /** Prizes you own (server-owned; see game/save.ts). */
   inventory(): Promise<string[]>;
+  /** The season the server says it is ('halloween', 'winter' or null). */
+  season(): Promise<string | null>;
+  /** Knock on trick-or-treat door 0..7 (once each per day; the server pays). prize = costume for all 8 today. */
+  trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }>;
   /** Spend tokens on the claw machine; the server picks the prize. */
   playClaw(): Promise<ClawResult>;
   /** The world servers. `friendIds` = starred players to look for. */

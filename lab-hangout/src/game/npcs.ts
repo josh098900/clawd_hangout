@@ -8,6 +8,8 @@ import type { Look } from '../entities/critter';
 import { h1 } from '../engine/math';
 import { say } from '../ui/overlay';
 import type { Room, RoomId } from '../world/room';
+import { season } from '../world/season';
+import { POSE_GHOST } from '../entities/avatar';
 
 interface Stop {
   /** Walk here (ignored when `use` is set: then you walk to that spot's stand point). */
@@ -23,7 +25,7 @@ interface Stop {
   /** Dance (1) or sit on the floor (2) while waiting here. */
   pose?: number;
 }
-interface NpcDef { id: string; name: string; room: RoomId; look: Look; speed: number; stops: Stop[]; chat: string[]; /** pad the loop to exactly this long (s), to line up with a wall-clock cycle */ cycle?: number }
+interface NpcDef { id: string; name: string; room: RoomId; look: Look; speed: number; stops: Stop[]; chat: string[]; /** only around in this season (see world/season.ts) */ season?: string; /** always a sheet ghost */ ghost?: boolean; /** pad the loop to exactly this long (s), to line up with a wall-clock cycle */ cycle?: number }
 
 const DEFS: NpcDef[] = [
   {
@@ -82,6 +84,26 @@ const DEFS: NpcDef[] = [
       { x: 730, y: 560 },
     ],
     chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.'],
+  },
+  {
+    id: 'npc-boo', name: 'BOO', room: 'plaza', speed: 22, season: 'halloween', ghost: true,
+    look: { c: 7, hat: 0, face: 0, fit: 0, sp: 0 },
+    stops: [
+      { x: 1110, y: 640, wait: 14, say: ['...the grate is breathing again', 'something down there is lighting candles'] },
+      { x: 880, y: 620, wait: 10, say: ['the dragon blinked. i saw it', 'did you hear that? no? good.'] },
+      { x: 520, y: 600, wait: 12, say: ['the cinema smells of popcorn. and fear.', 'boo. sorry. habit.'] },
+      { x: 200, y: 640, wait: 12, say: ['knock on every door. every. single. one.', 'the lab never switches its lights off. why?'] },
+    ],
+    chat: [
+      'they say the third plate in the Crypt still clicks at midnight... when nobody stands on it',
+      'a critter once fed the pigeons after dark. now the pigeons follow HIM home',
+      'the cinema shows a film at 3am that nobody remembers watching. only the popcorn is gone',
+      'Old Salt swears the Moon Fish swims up to the pier at full moon. to look at you',
+      'never hum along to the Lab jukebox at night. it hums back',
+      'every lamp post on this Square was once a critter who stayed out too late. boo.',
+      'the old scroll in the Crypt changes its mind every day. light the candles in its order',
+      'knock on all 8 pumpkin doors in one night and something nice might follow you home',
+    ],
   },
   {
     id: 'npc-pixel', name: 'PIXEL', room: 'arcade', speed: 36,
@@ -167,7 +189,7 @@ export class Npcs {
     }
   }
 
-  inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id); }
+  inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season())); }
 
   /**
    * Put every NPC where the clock says. `taken(i)` = a player is using spot i in the NPC's room
@@ -190,7 +212,7 @@ export class Npcs {
       else if (av.moving) av.stopT = now;
       if (now < n.faceUntil) av.dir = n.faceDir;
       av.moving = moving; av.x = x; av.y = y; av.hold = hold;
-      const pose = !moving ? s.stop?.pose ?? 0 : 0; if (pose !== av.pose) { av.pose = pose; av.poseT0 = now; }
+      const pose = n.def.ghost ? POSE_GHOST : !moving ? s.stop?.pose ?? 0 : 0; if (pose !== av.pose) { av.pose = pose; av.poseT0 = now; }
       if (use !== av.use) { av.use = use; av.useT0 = now; }
       if (av.emote && now - av.emote.t0 > emoteDur(av.emote.kind)) av.emote = null;
       // arriving at a stop: say something (only if you're there to hear it)

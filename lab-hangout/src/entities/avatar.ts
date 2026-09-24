@@ -33,7 +33,7 @@ export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_
 export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1 };
 export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
-export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2;
+export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3;
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -264,13 +264,13 @@ function drawMug(cx: number, cy: number, col: RGB, handle: 1 | -1, a: number, se
  * cat, crab and duck scurry; the ghost just floats. They all catch up through doors and
  * pipe up now and then when you stand still.
  */
-const PET_SAY = ['', 'COO', 'MEOW', 'SNIP', 'QUACK', 'BOO'];
+const PET_SAY = ['', 'COO', 'MEOW', 'SNIP', 'QUACK', 'BOO', 'SQUEAK'];
 function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   const p = av.pet, dt = Math.min(0.1, Math.max(0, now - p.t)); p.t = now;
   const tx = av.x - av.dir * 20, ty = av.y + 3, d = Math.hypot(tx - p.x, ty - p.y);
   if (d > 300) { p.x = tx; p.y = ty; } // it teleported (a door): so does the pet
   const k = Math.min(1, dt * (d > 60 ? 5 : 3)); p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
-  const flies = kind === 1, ghost = kind === 5;
+  const flies = kind === 1, ghost = kind === 5 || kind === 6;
   const zT = ghost ? 9 + Math.sin(a * 2.2 + av.seed * 7) * 2 : d > 60 ? (flies ? 18 : Math.abs(Math.sin(a * 18)) * 4) : d > 4 ? Math.abs(Math.sin(a * 14)) * 2 : 0;
   p.z += (zT - p.z) * Math.min(1, dt * 8);
   if (Math.abs(tx - p.x) > 1) p.dir = tx > p.x ? 1 : -1;
@@ -298,6 +298,11 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
     R(-4, -5 - wd, 7, 4, c); R(-4, -5 - wd, 6, 1, [255, 240, 170]); R(-2, -4 - wd, 3, 2, dk); R(-5, -4 - wd, 1, 1, c);
     R(1, -9 - wd + peck, 4, 4, c); R(3, -8 - wd + peck, 1, 1, K.EYE); R(5, -7 - wd + peck, 2, 1, or);
     R(-2, -1, 2, 1, or); R(1, -1, 2, 1, or);
+  } else if (kind === 6) { // bat: always flapping, red eyes
+    const c: RGB = [62, 44, 84], up = Math.floor(a * 14 + av.seed * 5) % 2;
+    R(-2, -8, 5, 4, c); R(-1, -9, 1, 1, c); R(2, -9, 1, 1, c);
+    if (up) { R(-7, -11, 5, 2, c); R(3, -11, 5, 2, c); R(-8, -12, 2, 1, c); R(7, -12, 2, 1, c); } else { R(-7, -7, 5, 2, c); R(3, -7, 5, 2, c); R(-8, -5, 2, 1, c); R(7, -5, 2, 1, c); }
+    lit(() => { R(-1, -7, 1, 1, [255, 60, 70]); R(1, -7, 1, 1, [255, 60, 70]); });
   } else { // ghost: floats, see-through, faint glow
     const c: RGB = [232, 238, 255], sh: RGB = [170, 180, 222], wv = Math.floor(a * 6) % 2;
     Gd(x, y - 6, 9, [160, 190, 255], 0.3);
@@ -310,6 +315,16 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   if (still && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt(PET_SAY[kind] ?? '', x - 5, y - 16 - (ghost ? 6 : 0), [230, 230, 240]));
 }
 
+/** Halloween's "trick": a bedsheet ghost over the character, bobbing, hem waving. */
+function drawSheet(x: number, y: number, a: number, seed: number): void {
+  const bob = Math.round(Math.sin(a * 3 + seed * 7) * 1.5), X = Math.round(x), Y = Math.round(y) - 2 + bob, c: RGB = [238, 240, 252], sh: RGB = [190, 196, 226], wv = Math.floor(a * 5 + seed * 3) % 2;
+  alpha(0.94, () => {
+    for (let j = 0; j < 34; j++) { const yy = Y - 36 + j, hw = j < 10 ? Math.round(Math.sqrt(Math.max(0, 100 - (10 - j) * (10 - j))) * 1.25) : 13 + Math.floor((j - 10) / 8); r(X - hw, yy, hw * 2, 1, c); r(X - hw, yy, 1, 1, sh); r(X + hw - 2, yy, 2, 1, sh); }
+    for (let k = -14; k < 14; k += 4) r(X + k, Y - 2, 3, 1 + ((k / 4 + wv) & 1) * 2, c);
+  });
+  r(X - 6, Y - 26, 3, 4, [30, 24, 40]); r(X + 3, Y - 26, 3, 4, [30, 24, 40]); r(X - 2, Y - 19, 4, 3, [30, 24, 40]);
+}
+
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0): { headX: number; headY: number } {
   if (av.look.pet) drawPet(av, a, now, av.look.pet);
   const { P, hopY } = poseFor(av, a, now, using);
@@ -317,6 +332,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
   const sk = Math.max(0.4, 1 - hopY / 30);
   if (!lift) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
   const { TX, c } = stampCritter(av.look, P, av.x, av.y - lift - hopY, dim);
+  if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
   if (av.hold) {
     let [lx, ly] = c.hand;
     const em = av.emote;

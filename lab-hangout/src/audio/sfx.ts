@@ -68,6 +68,10 @@ export const SFX = {
   beep: () => { tone('square', 1200, 1200, 0.05, 0.02); tone('square', 900, 900, 0.06, 0.02, 0.07); },
   zap: () => tone('square', 1400, 500, 0.08, 0.03),
   boom: () => noise(500, 0.8, 0.25, 0.14, 0, 90),
+  /** a far-off wolf (Halloween nights) */
+  howl: () => { tone('sine', 420, 760, 0.5, 0.035); tone('sine', 760, 700, 1.1, 0.035, 0.5); tone('sine', 700, 380, 0.7, 0.03, 1.6); },
+  /** a ghostly laugh: the trick in trick-or-treat */
+  boo: () => { for (let i = 0; i < 4; i++) tone('triangle', 520 - i * 60, 380 - i * 50, 0.18, 0.05, i * 0.16); tone('sine', 240, 120, 0.8, 0.04, 0.6); },
   hurt: () => { tone('square', 300, 80, 0.3, 0.05); noise(300, 0.7, 0.3, 0.1); },
   pop: () => noise(rnd(1500, 2500), 4, 0.03, 0.05),
   pour: () => { noise(700, 1.5, 1.0, 0.05, 0, 1500); },

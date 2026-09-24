@@ -7,7 +7,7 @@ import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
 import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Provider, type ServerInfo } from './transport';
-import { rollClaw } from '../entities/critter';
+import { CLAW, rollClaw } from '../entities/critter';
 
 type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
@@ -73,9 +73,22 @@ export class LocalTransport implements Transport {
     return v;
   }
   async inventory(): Promise<string[]> { return this.inv(); }
+  /** LOCAL: October (or ?season=halloween) is Halloween. */
+  async season(): Promise<string | null> { const q = new URLSearchParams(location.search).get('season'); return q || (new Date().getUTCMonth() === 9 ? 'halloween' : new Date().getUTCMonth() === 11 ? 'winter' : null); }
+  async trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }> {
+    if ((await this.season()) !== 'halloween') throw new Error('trick-or-treating starts on 1 October');
+    const day = new Date().toISOString().slice(0, 10), key = 'labhangout.localTreats';
+    let st: { day: string; doors: number[] } = { day, doors: [] }; try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v?.day === day) st = v; } catch { /* ignore */ }
+    if (st.doors.includes(door)) throw new Error('you already knocked here today');
+    st.doors.push(door); try { localStorage.setItem(key, JSON.stringify(st)); } catch { /* ignore */ }
+    const trick = Math.random() < 0.2; if (!trick) this.wallet(this.wallet() + 1);
+    let prize: string | null = null;
+    if (st.doors.length === 8) { const left = CLAW.filter(([k, , s]) => s === 'halloween' && !this.inv().includes(k)); prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5'; if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize); }
+    return { tokens: this.wallet(), trick, visited: st.doors.length, prize };
+  }
   async playClaw(): Promise<ClawResult> {
     const bal = this.wallet(); if (bal < 3) throw new Error('you need 3 tokens');
-    const item = rollClaw(Math.random), dupe = this.inv().includes(item);
+    const item = rollClaw(Math.random, await this.season()), dupe = this.inv().includes(item);
     this.inv(item);
     return { item, dupe, tokens: this.wallet(bal - 3 + (dupe ? 1 : 0)) };
   }

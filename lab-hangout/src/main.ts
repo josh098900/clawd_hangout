@@ -22,6 +22,8 @@ import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
+import { setSeason, isHalloween } from './world/season';
+import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { catchFish } from './game/fish';
 import { makeCrypt, platesDown, setDown, blockCenters, resetBlocks, CRYPT_INFO, OPEN_FOR } from './world/crypt';
@@ -29,12 +31,12 @@ import { owns } from './ui/start';
 import { save } from './game/save';
 import { pickServer } from './ui/servers';
 import { openStars } from './ui/stars';
-import { makePlaza, COINS } from './world/plaza';
+import { makePlaza, COINS, dayness } from './world/plaza';
 import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
-import { DEFAULT_LOOK, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -471,6 +473,8 @@ function useSpot(i: number): void {
     toast(n < 0 ? 'Music off' : 'NOW PLAYING: ' + mu.tracks[n].name + (soundOn ? '' : ' (turn Sound on to hear it)'), 3200); SFX.blip();
     return;
   }
+  if (s.kind === 'treat') { knock(s.n ?? 0); return; }
+  if (s.kind === 'candle') { candle(s.n ?? 0); return; }
   if (s.kind === 'rack' && DEN_INFO.build.ok) { toast('All green. Nothing to fix!'); return; }
   if (s.kind === 'marsh') { me.hold = HOLD_MARSH; me.sips = 0; roast = 0; forceSend = true; SFX.pop(); toast('Hold it near the fire to toast it. Not too long!', 3500); return; }
   if (s.kind === 'chest' && !CRYPT_INFO.open) { toast('Sealed. Three stones must be pressed at once...', 3000); return; }
@@ -518,6 +522,39 @@ function useSpot(i: number): void {
     applyProfile(me.name, { ...me.look, hat: 5 });
     SFX.score(); lastEmoteAt = -9; emote('joy');
     toast(first ? 'You found the CROWN! It is yours now (Look menu)' : 'The crown suits you', 4000);
+  }
+}
+// ---------- Halloween (world/halloween.ts) ----------
+let ghostUntil = 0, knocking = false, lastHowl = -1;
+async function refreshSeason(): Promise<void> {
+  let s = params.get('season');
+  if (!s) { try { s = await net.season(); } catch { s = null; } }
+  setSeason(s);
+  if (isHalloween()) installHalloween(ROOMS);
+}
+/** Trick or treat at door n: the server pays (or tricks you into a ghost for a minute). */
+function knock(n: number): void {
+  if (knocking) return; knocking = true;
+  SFX.door(); me.dir = me.x < TREAT_DOORS[n].x ? 1 : -1;
+  net.trickOrTreat(n).then((r) => {
+    markKnocked(n); setTokens(r.tokens);
+    if (r.trick) { me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
+    else { SFX.chime(); floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
+    if (r.prize === 'tokens:5') toast('ALL 8 DOORS! You have every costume already, so +5 tokens', 5000);
+    else if (r.prize) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('ALL 8 DOORS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+  }).catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); if (/already/.test(m)) markKnocked(n); toast(m[0].toUpperCase() + m.slice(1), 3000); })
+    .finally(() => { knocking = false; });
+}
+/** The haunted Crypt's candles: today's order is on the old scroll. */
+function candle(n: number): void {
+  const res = lightCandle(n);
+  if (res === 'lit') return;
+  if (res === 'wrong') { SFX.boo(); toast('The candles gutter out... a cold laugh echoes. Check the scroll!', 3500); return; }
+  SFX.zap();
+  if (res === 'solved') {
+    SFX.score(); lastEmoteAt = -9; emote('joy');
+    const first = save.unlock('hat:12');
+    toast(first ? 'The crypt sighs... you earned the PUMPKIN HEAD! (Look menu)' : 'The candles burn bright. The crypt is pleased.', 5000);
   }
 }
 /** The SLOP INVADERS high score of the cabinet you're at (the Lab's or the Arcade's). */
@@ -935,7 +972,8 @@ function updateMe(dt: number): void {
   for (const d of room.doors) if (inside(d.trigger, me.x, me.y) && (d.edge || vy < -0.3)) goThrough(d);
   const was = me.moving;
   me.moving = moved > 0.01;
-  if (me.moving && me.pose) { me.pose = 0; forceSend = true; }
+  if (me.moving && me.pose && me.pose !== POSE_GHOST) { me.pose = 0; forceSend = true; }
+  if (me.pose === POSE_GHOST && now() > ghostUntil) { me.pose = 0; forceSend = true; toast('You are yourself again'); }
   if (Math.abs(vx) > 0.15) me.dir = vx > 0 ? 1 : -1;
   if (was && !me.moving) me.stopT = t;
   me.walkDist += moved;
@@ -1031,10 +1069,12 @@ function render(a: number, t: number): void {
   const dim = room.dimNow?.() ?? room.dim;
   PX.dim = dim;
   room.drawBack(a);
+  if (isHalloween()) halloweenBack(room.id, a);
   // tap marker
   if (tapFx) { const u = t - tapFx.t0; if (u > 0.5) tapFx = null; else lit(() => ring(Math.round(tapFx!.x), Math.round(tapFx!.y), Math.round(3 + u * 16), Math.round(1 + u * 5), [255, 236, 170])); }
   const items: { y: number; av?: Avatar; draw?: (a: number) => void }[] = room.props.map((p) => ({ y: p.y, draw: p.draw }));
   for (const d of ambient.items(room.id, t)) items.push(d);
+  if (isHalloween()) for (const p of halloweenProps(room.id)) items.push({ y: p.y, draw: p.draw });
   if (playing) items.push({ y: me.y, av: me });
   for (const av of others.values()) items.push({ y: av.y, av });
   for (const n of npcs.inRoom(room.id)) items.push({ y: n.av.y, av: n.av });
@@ -1056,6 +1096,7 @@ function render(a: number, t: number): void {
     else if (it.av) { const h = drawAvatar(it.av, a, t, dim, usingOf(it.av), liftOf(it.av)); heads.set(it.av.self ? net.selfId : it.av.id, R.toScreen(h.headX, h.headY)); }
   }
   for (const tk of room.talkers ?? []) heads.set(tk.id, R.toScreen(tk.x, tk.y - 4));
+  if (isHalloween()) halloweenFront(room.id, a);
   // lanterns: stacked faint discs give a soft falloff (one big disc reads as a flat circle)
   if (room.lantern) for (const it of items) if (it.av) { const ly = it.av.y - liftOf(it.av) - 16; for (let k = 0; k < 6; k++) Gd(it.av.x, ly, 10 + k * 9, room.lantern, 0.06); }
   for (const it of items) {
@@ -1134,6 +1175,7 @@ function frame(nowMs: number): void {
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t);
+    if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
@@ -1203,7 +1245,7 @@ async function boot(): Promise<void> {
     while (acct.kind === 'none') {
       const how = await start.chooseSignIn(mine);
       try {
-        if (how === 'guest') await net.signInGuest(captcha); else await net.loginWith(how);
+        if (how === 'guest') await net.signInGuest(net.mode === 'supabase' ? captcha : undefined); else await net.loginWith(how); // LOCAL mode has no server to check a CAPTCHA
         acct = net.account();
       } catch (e) { start.status(e instanceof Error ? e.message : String(e)); }
     }
@@ -1226,6 +1268,8 @@ async function boot(): Promise<void> {
   net.watchLobby(onLobby);
   net.watchWorld(onWorld);
   await save.attach(net.selfId, net);
+  await refreshSeason();
+  setInterval(() => void refreshSeason(), 600000);
   if (mergedSave) save.mergeIn(mergedSave);
   start.setAccount(net.account(), mine, {
     link: (p) => { localStorage.setItem('labhangout.linking', p); start.status('Off to ' + p + '...'); void net.linkWith(p).then(() => location.reload(), (e) => start.status(e instanceof Error ? e.message : String(e))); },
@@ -1258,6 +1302,8 @@ if (import.meta.env.DEV && params.has('debug')) {
     use: (i: number) => useSpot(i), pose: (p: number) => setPose(p), item: () => useItem(), feed: () => feed(),
     state: (v: StateVal) => setState(v), blocks: () => blockCenters(), game: (k: 'chairs' | 'tag') => startGame(k), gameState: () => gameNow(), bots: () => bots?.debug(), hv: () => hostView(), others: () => [...others.values()].map((o) => [o.id, o.use, Math.round(o.x), Math.round(o.y)]),
     follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
+    spots: () => room.spots.map((sp) => ({ kind: sp.kind, n: sp.n })), candleOrder: () => candleOrder(),
+    dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };
 }
 void boot();

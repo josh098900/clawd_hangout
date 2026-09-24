@@ -23,7 +23,7 @@ export interface Door {
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -40,6 +40,8 @@ export interface Spot {
   game?: 'chairs' | 'tag' | 'hide';
   /** For 'instrument' spots: 0 keys, 1 drums, 2 bass, 3 mic. */
   inst?: number;
+  /** Which one, for numbered spots ('treat' doors 0..7, 'candle' 0..3). */
+  n?: number;
 }
 
 /** A non-walking character you can talk to (the Dev Den's rubber duck). Bubbles anchor at (x, y). */
