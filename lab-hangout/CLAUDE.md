@@ -61,13 +61,15 @@ src/
     plaza.ts           THE SQUARE set (1200x780), voxel installations, lamps, benches, cinema front, day/night (wall clock)
     cinema.ts          THE CINEMA set (1100x720): lobby, concession stand, photo booth, screen + the 80 s film, seats
     den.ts             THE DEV DEN (1000x680): desks, build status screen, kanban, rack, DEPLOY, duck; pomodoro + lightning (wall clock)
-    roof.ts            THE ROOFTOP GARDEN (1100x700): topiaries, hammocks, telescope, fireworks (state + hourly), day/night
+    roof.ts            THE ROOFTOP GARDEN (1500x700): topiaries, hammocks, telescope, fireworks (state + hourly), day/night
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
     stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights
     pier.ts            THE PIER (1300x720): beach, pier + fishing, bonfire + marshmallows, lighthouse, day/night
     season.ts          which season it is ('halloween' / 'winter' / null): server's current_season(), else the date
     halloween.ts       October dressing over every room (pumpkins, webs, lights, bats, fog), the 8 trick-or-treat
                        doors, the haunted Crypt's candle puzzle; installHalloween() appends the spots at runtime
+    garden.ts          the Rooftop's community garden (8 beds at its right end): SEEDS, growth() (same sums as the
+                       server), plant sprites per seed + stage, GARDEN.plots (fetched every 15 s while on the roof)
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
@@ -96,6 +98,7 @@ src/
     claw.ts            the claw machine up close (server picks, client animates) + WEAR IT
     pong.ts            2-player Pong (P1's browser runs the ball)
     prizes.ts          the prize counter: your collection
+    garden.ts          the seed picker and your-plant card (water / harvest / dig up)
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
   audio/sfx.ts         synthesized blips (no audio files)
@@ -113,7 +116,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0001 profiles · 0002 security (members, private channels, chat, reports) ·
                        0003 tokens · 0004 accounts (saves, inventory, guest->account merge) ·
                        0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw) ·
-                       0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes)
+                       0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes) ·
+                       0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -124,6 +128,7 @@ docs/ART_STYLE.md      the style bible
 6. DOM overlays positioned via `R.toScreen()`.
 
 ### Coordinates
+Rooms can be up to 1600x800 (`WMAX`/`HMAX` in renderer.ts); raise those if a set gets bigger.
 World pixels. An avatar's `(x, y)` is its **feet**. Larger y = nearer the camera. The camera
 scale is an integer number of device pixels per world pixel (`Renderer.layout`).
 
@@ -150,6 +155,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | saves | table `saves` (read/write own, ≤16 KB object) | `{ unlocks, friends, feeds, hi, fish, stars }` |
 | prizes | RPC `play_claw()` (3 tokens, server rolls, dupes refund 1); table `inventory` read-own | `{ item, dupe, tokens }`, items are `'slot:index'` |
 | seasons | RPCs `current_season()`; owner `set_season(s)`; `trick_or_treat(door 0..7)` (1/door/day, 20% trick, all 8 = costume) | `{ tokens, trick, visited, prize }` |
+| garden | table `plots` (members read, per server); RPCs `plant(bed, seed)`, `water(bed)`, `harvest(bed)`, `dig_up(bed)`; room state `garden` = "look again" | `{ bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at }` |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |

@@ -24,6 +24,8 @@ import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
 import { setSeason, isHalloween } from './world/season';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
+import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
+import { openMyPlant, openSeeds } from './ui/garden';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { catchFish } from './game/fish';
 import { makeCrypt, platesDown, setDown, blockCenters, resetBlocks, CRYPT_INFO, OPEN_FOR } from './world/crypt';
@@ -104,7 +106,8 @@ let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
 const coinWindow = () => Math.floor(Date.now() / 300000);
-function setTokens(n: number): void { const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; }
+let myTokens = 0;
+function setTokens(n: number): void { myTokens = n; const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; }
 /** Fishing: when the bobber went in, when a fish bites, and whether it's biting right now. */
 let fishing: { bite: number; state: 'wait' | 'bite' } | null = null, roast = 0;
 /** Slop blobs hit this wave: index -> when the coffee lands and where. Thrown mugs in flight. */
@@ -315,6 +318,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   clearBubbles();
   others.clear();
   room = ROOMS[id];
+  if (id === 'roof') GARDEN.dirty = true;
   const p = at ?? room.spawn;
   me.x = p.x; me.y = p.y; me.moving = false; me.born = now(); me.emote = null; me.use = -1; me.pose = 0; booth = null; // your mug comes with you
   R.follow(me.x, me.y, room.w, room.h, 0, true);
@@ -474,6 +478,7 @@ function useSpot(i: number): void {
     return;
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
+  if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'candle') { candle(s.n ?? 0); return; }
   if (s.kind === 'rack' && DEN_INFO.build.ok) { toast('All green. Nothing to fix!'); return; }
   if (s.kind === 'marsh') { me.hold = HOLD_MARSH; me.sips = 0; roast = 0; forceSend = true; SFX.pop(); toast('Hold it near the fire to toast it. Not too long!', 3500); return; }
@@ -524,6 +529,49 @@ function useSpot(i: number): void {
     toast(first ? 'You found the CROWN! It is yours now (Look menu)' : 'The crown suits you', 4000);
   }
 }
+// ---------- the Rooftop garden (world/garden.ts) ----------
+let gardenBusy = false;
+function refreshGarden(bump = false): void {
+  GARDEN.dirty = false; GARDEN.fetchedAt = Date.now();
+  net.plots().then((ps) => { GARDEN.plots = ps; }).catch((e) => console.warn('[garden]', e));
+  if (bump) setState({ k: 'garden', v: { n: Date.now() } }); // tell everyone else on the roof to look again
+}
+function gardenDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
+  if (gardenBusy) return; gardenBusy = true;
+  act().then((r) => { ok(r); refreshGarden(true); }).catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); toast(m[0].toUpperCase() + m.slice(1), 3500); SFX.hurt(); refreshGarden(); }).finally(() => { gardenBusy = false; });
+}
+function waterBed(n: number): void {
+  gardenDo(() => net.water(n), (r) => { setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); });
+}
+function tendBed(n: number): void {
+  const p = GARDEN.plots.find((q) => q.bed === n), mine = GARDEN.plots.find((q) => q.owner === net.selfId && !plantState(q).dead);
+  if (!p || plantState(p).dead) {
+    if (mine) { toast('You already have a ' + SEEDS[mine.seed].name + ' growing (bed ' + (mine.bed + 1) + ')', 3500); return; }
+    SFX.blip();
+    openSeeds(n, myTokens, save.has('seed:4'), (seed) => gardenDo(() => net.plant(n, seed), (bal) => {
+      setTokens(bal); if (seed === 4) { save.inv.delete('seed:4'); }
+      SFX.pop(); toast('Planted a ' + SEEDS[seed].name + '! Ask friends to water it', 3500);
+    }), () => input.clear());
+    return;
+  }
+  if (p.owner === net.selfId) {
+    openMyPlant(p, {
+      water: () => waterBed(n),
+      harvest: () => gardenDo(() => net.harvest(n), (r) => {
+        setTokens(r.tokens); SFX.score(); lastEmoteAt = -9; emote('joy');
+        const s = SEEDS[r.seed]; floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+' + s.pays });
+        const first = !save.data.crops.includes(s.name); if (first) save.update((d) => { d.crops.push(s.name); });
+        toast('Harvested your ' + s.name + '! +' + s.pays + ' tokens' + (first ? ' · NEW CROP ' + save.data.crops.length + '/' + SEEDS.length : ''), 4000);
+        if (r.bonus) { save.addPrize(r.bonus); setTimeout(() => { toast('You found a rare MOONFLOWER seed in the soil! Plant it in any free bed', 5000); SFX.chime(); }, 1800); }
+      }),
+      digUp: () => gardenDo(() => net.digUp(n), () => toast('Dug up. The bed is free again', 2500)),
+    }, () => input.clear());
+    return;
+  }
+  if (plantState(p).wet) { toast(plantLine(p, false), 3500); return; }
+  waterBed(n);
+}
+
 // ---------- Halloween (world/halloween.ts) ----------
 let ghostUntil = 0, knocking = false, lastHowl = -1;
 async function refreshSeason(): Promise<void> {
@@ -1175,6 +1223,7 @@ function frame(nowMs: number): void {
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t);
+    if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);
@@ -1269,6 +1318,7 @@ async function boot(): Promise<void> {
   net.watchWorld(onWorld);
   await save.attach(net.selfId, net);
   await refreshSeason();
+  if (net.mode === 'local' && Number(params.get('grow')) > 0) GARDEN.speed = Number(params.get('grow')); // LOCAL test speed-up
   setInterval(() => void refreshSeason(), 600000);
   if (mergedSave) save.mergeIn(mergedSave);
   start.setAccount(net.account(), mine, {

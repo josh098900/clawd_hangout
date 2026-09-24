@@ -19,6 +19,10 @@ while everyone watches it live on the cabinet, and check your collection at the 
 Start a round of **hide and seek** across every room from the sign on the Square. Click a player
 to FOLLOW them (even through doors); wave next to someone who's waving for a HIGH FIVE.
 Decorate your own desk in the Dev Den (the DESK STUFF shelf).
+Up on the Rooftop is the **community garden**: buy a seed, plant it in a free bed, and it grows
+in real time over hours. Anyone can water anyone's plant (and gets a token for helping), a plant
+left dry for a day wilts, and you harvest it for tokens (sometimes with a rare glowing moonflower
+seed in the soil).
 Every October it's **Halloween**: pumpkins, cobwebs, bats and fog everywhere; knock on the 8
 pumpkin doors around the world for tokens (or a trick that turns you into a ghost), and all 8 in a
 day wins a costume; light the haunted Crypt's candles in the old scroll's order for the pumpkin
@@ -96,6 +100,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
    old build can't join rooms until they reload).
 6. `supabase/migrations/0006_arcade.sql`: the claw machine
 7. `supabase/migrations/0007_halloween.sql`: seasons, trick-or-treat, October-only claw prizes
+8. `supabase/migrations/0008_gardens.sql`: the Rooftop's community garden
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`
@@ -162,6 +167,7 @@ Moderation, from the SQL editor:
 - Add a filtered word: `insert into private.banned_words values ('regex');`
 - Chat log: `select * from private.chat_log order by at desc limit 100;`
 - Claw odds: `update private.claw_prizes set weight = 2 where item = 'hat:10';`
+- Garden: `select * from public.plots;` · seed prices and times: `update private.seeds set cost = 3 where id = 0;` (keep `SEEDS` in `src/world/garden.ts` in step)
 - Seasons switch on by date (October = Halloween). To preview one early for everyone:
   `select public.set_season('halloween');`, and `select public.set_season(null);` to go back to
   the date (don't forget, or it stays Halloween into November). `?season=halloween` in the URL

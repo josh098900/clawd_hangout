@@ -48,7 +48,8 @@ export type StateVal =
   | { k: 'build'; v: BuildState } | { k: 'deploy'; v: { t0: number; ok: boolean; by: string } } | { k: 'notes'; v: KanbanNote[] }
   | { k: 'game'; v: GameState } | { k: 'slop'; v: { w: number; dead: number[] } } | { k: 'fw'; v: { t0: number; seed: number } }
   | { k: 'crypt'; v: { b: number[]; open: number } }
-  | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } };
+  | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
+  | { k: 'garden'; v: { n: number } };
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -92,6 +93,8 @@ export const PROVIDERS: Provider[] = ['discord', 'google'];
 export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string }
 /** A world server and how full it is. `friends` = which of the ids you asked about are on it. */
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
+/** A garden bed on the Rooftop with something growing in it. Times are ms since 1970, `grown` is seconds of growth credited up to `calcAt` (see world/garden.ts growth()). */
+export interface Plot { bed: number; owner: string; ownerName: string; seed: number; plantedAt: number; lastWater: number; grown: number; calcAt: number }
 /** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
 export interface ClawResult { item: string; dupe: boolean; tokens: number }
 
@@ -121,6 +124,15 @@ export interface Transport {
   season(): Promise<string | null>;
   /** Knock on trick-or-treat door 0..7 (once each per day; the server pays). prize = costume for all 8 today. */
   trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }>;
+  /** The Rooftop garden beds on your server (only the ones with something in them). */
+  plots(): Promise<Plot[]>;
+  /** Plant seed `seed` in bed `bed` (tokens, or a found moonflower seed). Resolves with your balance. */
+  plant(bed: number, seed: number): Promise<number>;
+  /** Water a plant (anyone's). thanked = +1 token for watering someone else's. */
+  water(bed: number): Promise<{ tokens: number; thanked: boolean }>;
+  /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
+  harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
+  digUp(bed: number): Promise<void>;
   /** Spend tokens on the claw machine; the server picks the prize. */
   playClaw(): Promise<ClawResult>;
   /** The world servers. `friendIds` = starred players to look for. */
@@ -260,6 +272,7 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     if (!Array.isArray(b) || b.length !== 4 || !b.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 4000) || open === null) return null;
     return { id: o.id, s: { k: 'crypt', v: { b: b as number[], open }, ts } };
   }
+  if (o.k === 'garden' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'garden', v: { n }, ts } }; }
   if (o.k === 'claw' && v && typeof v === 'object') {
     const name = cleanName(v.name), item = typeof v.item === 'string' && /^[a-z]{2,8}:[0-9]{1,3}$/.test(v.item) ? v.item : '';
     return name && item ? { id: o.id, s: { k: 'claw', v: { name, item }, ts } } : null;

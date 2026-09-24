@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -113,6 +113,18 @@ export class SupabaseTransport implements Transport {
     const o = (data ?? {}) as Record<string, unknown>;
     return { tokens: Number(o.tokens) || 0, trick: o.trick === true, visited: Number(o.visited) || 0, prize: typeof o.prize === 'string' ? o.prize : null };
   }
+  // ---- the Rooftop garden (supabase/migrations/0008_gardens.sql) ----
+  async plots(): Promise<Plot[]> {
+    if (!this.server) return [];
+    const { data, error } = await this.sb.from('plots').select('bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at').eq('server', this.server);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((p) => ({ bed: Number(p.bed), owner: String(p.owner), ownerName: cleanName(p.owner_name) || 'SOMEONE', seed: Number(p.seed), plantedAt: Date.parse(p.planted_at), lastWater: Date.parse(p.last_water), grown: Number(p.grown), calcAt: Date.parse(p.calc_at) }));
+  }
+  private async rpcJson(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>> { const { data, error } = await this.sb.rpc(fn, args); if (error) throw new Error(error.message); return (data ?? {}) as Record<string, unknown>; }
+  async plant(bed: number, seed: number): Promise<number> { const { data, error } = await this.sb.rpc('plant', { bed, seed }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: Number(o.tokens) || 0, thanked: o.thanked === true }; }
+  async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: Number(o.tokens) || 0, seed: Number(o.seed) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null }; }
+  async digUp(bed: number): Promise<void> { const { error } = await this.sb.rpc('dig_up', { bed }); if (error) throw new Error(error.message); }
   async playClaw(): Promise<ClawResult> {
     const { data, error } = await this.sb.rpc('play_claw');
     if (error) throw new Error(error.message);

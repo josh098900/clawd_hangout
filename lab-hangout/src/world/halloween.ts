@@ -45,7 +45,7 @@ const LIGHTS: Partial<Record<RoomId, [number, number, number, number][]>> = {
 /** Where bats fly: the band of sky the camera actually shows in each outdoor room. */
 const BATS: Partial<Record<RoomId, [number, number]>> = { plaza: [370, 470], roof: [120, 300], pier: [300, 370] };
 const FOG: RoomId[] = ['plaza', 'pier', 'roof'];
-const WIDTH: Partial<Record<RoomId, number>> = { plaza: 1200, pier: 1300, roof: 1100 };
+const WIDTH: Partial<Record<RoomId, number>> = { plaza: 1200, pier: 1300, roof: 1500 };
 const FLOOR_Y: Partial<Record<RoomId, [number, number]>> = { plaza: [560, 712], pier: [424, 690], roof: [462, 650] };
 
 // ---------- trick-or-treat: which pumpkins you've knocked at today (this browser) ----------

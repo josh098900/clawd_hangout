@@ -23,7 +23,7 @@ export interface Door {
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */

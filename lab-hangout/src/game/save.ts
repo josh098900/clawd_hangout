@@ -12,6 +12,8 @@ export interface SaveData {
   friends: [string, string][];
   feeds: number; hi: number;
   fish: string[]; stars: string[];
+  /** Crops you've harvested on the Rooftop (seed names). */
+  crops: string[];
 }
 export interface SaveStore { loadSave(): Promise<unknown>; storeSave(d: SaveData): Promise<void>; inventory(): Promise<string[]> }
 
@@ -23,14 +25,14 @@ const n = (v: unknown, hi: number): number => (typeof v === 'number' && Number.i
 export function clean(v: unknown): SaveData {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const friends = Array.isArray(o.friends) ? o.friends.filter((f): f is [string, string] => Array.isArray(f) && typeof f[0] === 'string' && f[0].length <= 64 && typeof f[1] === 'string').slice(0, 100).map(([id, nm]) => [id, nm.slice(0, 16)] as [string, string]) : [];
-  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24) };
+  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), crops: strs(o.crops, 16, 16) };
 }
 export function merge(a: SaveData, b: SaveData): SaveData {
   const fr = new Map(a.friends); for (const [id, nm] of b.friends) fr.set(id, nm);
   return {
     unlocks: [...new Set([...a.unlocks, ...b.unlocks])], friends: [...fr].slice(0, 100),
     feeds: Math.max(a.feeds, b.feeds), hi: Math.max(a.hi, b.hi),
-    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])],
+    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], crops: [...new Set([...a.crops, ...b.crops])],
   };
 }
 

@@ -9,8 +9,9 @@ import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { StateMsg } from '../net/transport';
 import type { Room, Prop, Spot } from './room';
+import { GARDEN, GARDEN_BLOCKERS, GARDEN_PROPS, GARDEN_SPOTS, gardenBack } from './garden';
 
-const W = 1100, H = 700, SKYLINE = 400, LEDGE = 440;
+const W = 1500, H = 700, SKYLINE = 400, LEDGE = 440; // the community garden is the far right end (world/garden.ts)
 const HUT = { x: 12, y: 332, w: 84, h: LEDGE + 10 - 332 };
 const HUT_DOOR = { x: 34, y: 366, w: 36, h: 84 };
 const POLES = [150, 470, 790, 1050];
@@ -59,6 +60,7 @@ function build(this: Room): void { paint(this.bg.getContext('2d')!, false); if (
 // ---------- animated set pieces ----------
 function drawBack(a: number): void {
   const day = dayness(), night = 1 - day;
+  gardenBack(a);
   if (day > 0.01 && day < 0.99) alpha(0.25 * Math.sin(Math.PI * day), () => r(0, 0, W, LEDGE, [255, 140, 90]));
   if (day < 0.5) lit(() => { for (let i = 0; i < 24; i++) if ((a * 0.6 + h1(i + 70)) % 1 < 0.25) r(Math.floor(h1(i * 5.3) * W), Math.floor(h1(i * 2.9) * 300), 1, 1, K.WHITE); });
   // string lights sagging between the poles
@@ -139,6 +141,7 @@ export const ROOF_SPOTS: Spot[] = [
   { kind: 'scope', x: 930, y: 494, sx: 930, sy: 494, lift: 0, label: 'STARGAZE', area: { x0: 914, y0: 446, x1: 946, y1: 484 } },
   { kind: 'fireworks', x: 540, y: 490, sx: 540, sy: 490, lift: 0, label: 'FIREWORKS', area: { x0: 524, y0: 446, x1: 556, y1: 480 } },
   ...[-14, 14].map((dx): Spot => ({ kind: 'sit', x: 300 + dx, y: 613, sx: 300 + dx, sy: 622, lift: 6, label: 'SIT', area: { x0: 268, y0: 590, x1: 332, y1: 612 } })),
+  ...GARDEN_SPOTS, // 6..13
 ];
 
 export function makeRoof(): Room {
@@ -152,10 +155,11 @@ export function makeRoof(): Room {
       { x0: 268, y0: 604, x1: 332, y1: 614 }, // bench
       ...[400, 660].flatMap((cx, i) => { const y = i ? 600 : 520; return [{ x0: cx - 42, y0: y - 4, x1: cx - 38, y1: y + 2 }, { x0: cx + 38, y0: y - 4, x1: cx + 42, y1: y + 2 }]; }),
       ...POLES.map((x) => ({ x0: x - 3, y0: 464, x1: x + 3, y1: 472 })),
+      ...GARDEN_BLOCKERS, { x0: 1102, y0: 460, x1: 1136, y1: 470 }, { x0: 1458, y0: 460, x1: 1480, y1: 470 },
     ],
     doors: [{ trigger: { x0: 34, y0: 462, x1: 70, y1: 470 }, to: 'den', arrive: { x: 270, y: 458 }, label: 'DEV DEN', area: { x0: 30, y0: 348, x1: 74, y1: 462 } }],
     spots: ROOF_SPOTS, inUse: new Map(),
-    onState(s: StateMsg) { if (s.k === 'fw') ROOF_INFO.fw = s.v; },
+    onState(s: StateMsg) { if (s.k === 'fw') ROOF_INFO.fw = s.v; else if (s.k === 'garden') GARDEN.dirty = true; },
     spawn: { x: 60, y: 480 },
     dim: 0.1,
     dimNow: () => 0.1 * (1 - dayness()),
@@ -165,7 +169,7 @@ export function makeRoof(): Room {
     bg: mk(W, H), bgAlt: mk(W, H),
     build: () => build.call(room),
     drawBack,
-    props: [...POLES.map(pole), topiary(210, 506, 'BUN', BUNNY), topiary(820, 486, 'SWAN', SWAN), topiary(1010, 576, 'DRAGON', DRAGON), hammock(360, 440, 520), hammock(620, 700, 600), telescope, crate, bench],
+    props: [...POLES.map(pole), topiary(210, 506, 'BUN', BUNNY), topiary(820, 486, 'SWAN', SWAN), topiary(1010, 576, 'DRAGON', DRAGON), hammock(360, 440, 520), hammock(620, 700, 600), telescope, crate, bench, ...GARDEN_PROPS],
   };
   return room;
 }

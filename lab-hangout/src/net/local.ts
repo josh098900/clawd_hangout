@@ -6,8 +6,9 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
+import { growth, plantState, SEEDS } from '../world/garden';
 
 type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
@@ -86,6 +87,44 @@ export class LocalTransport implements Transport {
     if (st.doors.length === 8) { const left = CLAW.filter(([k, , s]) => s === 'halloween' && !this.inv().includes(k)); prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5'; if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize); }
     return { tokens: this.wallet(), trick, visited: st.doors.length, prize };
   }
+  // ---- the Rooftop garden, kept in this browser per server (same rules as 0008_gardens.sql) ----
+  private beds(v?: Plot[]): Plot[] {
+    const k = 'labhangout.localPlots.' + (this.server ?? 'none');
+    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
+    try { return (JSON.parse(localStorage.getItem(k) || '[]') as Plot[]).filter((p) => !plantState(p).dead); } catch { return []; }
+  }
+  async plots(): Promise<Plot[]> { return this.beds(); }
+  async plant(bed: number, seed: number): Promise<number> {
+    const all = this.beds(), s = SEEDS[seed];
+    if (!s) throw new Error('no such seed');
+    if (all.some((p) => p.owner === this.selfId)) throw new Error('you already have a plant growing');
+    if (all.some((p) => p.bed === bed)) throw new Error('that bed is taken');
+    if (s.find) { if (!this.inv().includes('seed:4')) throw new Error('you have no moonflower seed'); try { localStorage.setItem('labhangout.localInv', JSON.stringify(this.inv().filter((i) => i !== 'seed:4'))); } catch { /* ignore */ } }
+    else { if (this.wallet() < s.cost) throw new Error('a ' + s.name + ' seed costs ' + s.cost + ' tokens'); this.wallet(this.wallet() - s.cost); }
+    const now = Date.now(), name = (await this.loadProfile())?.name ?? 'YOU';
+    this.beds([...all, { bed, owner: this.selfId, ownerName: name, seed, plantedAt: now, lastWater: now, grown: 0, calcAt: now }]);
+    return this.wallet();
+  }
+  private thanked = new Set<string>();
+  async water(bed: number): Promise<{ tokens: number; thanked: boolean }> {
+    const all = this.beds(), p = all.find((q) => q.bed === bed);
+    if (!p) throw new Error('nothing growing there');
+    if (plantState(p).wet) throw new Error('it is still wet: water it again in a bit');
+    const now = Date.now(); p.grown = growth(p, now); p.calcAt = now; p.lastWater = now; this.beds(all);
+    const key = bed + ':' + p.plantedAt, thanked = p.owner !== this.selfId && !this.thanked.has(key) && this.thanked.size < 5;
+    if (thanked) { this.thanked.add(key); this.wallet(this.wallet() + 1); }
+    return { tokens: this.wallet(), thanked };
+  }
+  async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> {
+    const all = this.beds(), p = all.find((q) => q.bed === bed);
+    if (!p) throw new Error('nothing growing there');
+    if (p.owner !== this.selfId) throw new Error('that is not your plant');
+    if (plantState(p).stage < 4) throw new Error('not ripe yet');
+    this.beds(all.filter((q) => q !== p)); this.wallet(this.wallet() + SEEDS[p.seed].pays);
+    const bonus = Math.random() < 0.1 && !this.inv().includes('seed:4') ? (this.inv('seed:4'), 'seed:4') : null;
+    return { tokens: this.wallet(), seed: p.seed, bonus };
+  }
+  async digUp(bed: number): Promise<void> { const all = this.beds(); if (!all.some((p) => p.bed === bed && p.owner === this.selfId)) throw new Error('that is not your plant'); this.beds(all.filter((p) => p.bed !== bed)); }
   async playClaw(): Promise<ClawResult> {
     const bal = this.wallet(); if (bal < 3) throw new Error('you need 3 tokens');
     const item = rollClaw(Math.random, await this.season()), dupe = this.inv().includes(item);

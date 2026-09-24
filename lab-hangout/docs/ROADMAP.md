@@ -68,7 +68,7 @@ Guiding rules (from what already works):
 - [x] Cinema schedule: two films (A CRITTER IN SPACE, DRAGON NIGHT) take turns by the hour; the Square's marquee shows what's on
 
 ## Phase 7 — The big plan (one step at a time: see docs/PLAN.md)
-- [ ] 1. Halloween (1 Oct to 1 Nov): decorations, trick-or-treat, haunted Crypt, BOO, costumes
+- [x] 1. Halloween (1 Oct to 1 Nov): decorations, trick-or-treat, haunted Crypt, BOO, costumes
 - [ ] 2. Garden plots on the Rooftop (real-time growth, friends can water)
 - [ ] 3. The Subway (trains on the shared clock)
 - [ ] 4. The Park (boats, kites, ducks, sandbox)
