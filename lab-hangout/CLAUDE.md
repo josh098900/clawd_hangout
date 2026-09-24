@@ -134,7 +134,8 @@ across (once a day per account). Online, the world is invite-only: `is_member()`
 **Servers.** Fixed servers in `private.servers` (LAB 1-3, cap 12 each; owner edits them in SQL).
 You `claim_seat(server)` (refused when full), keep it alive with `seat_ping()` every 30 s (it
 lapses after 90 s), and give it back with `leave_seat()`. Every channel is per server, and RLS
-only lets you in to your seat's server, so the cap is enforced server-side:
+only lets you in to your seat's server, so the cap is enforced server-side. Idle players (10 min, no input;
+`?idle=N` seconds in dev) leave the room, the lobby and their seat, with a REJOIN button (`goIdle` in main.ts):
 `hangout:<server>:<room>` (players send + receive), `hangout-srv:<server>:<room>` (receive only;
 only the database sends there via `realtime.send`, so sender ids on it are real) and
 `hangout:<server>:lobby` (who's online + hide and seek).

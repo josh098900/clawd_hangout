@@ -139,7 +139,7 @@ Then in Supabase:
   `.env.local` (just `discord` if you only set that one up), then redeploy.
 
 ### Servers
-Players pick a server after the start screen (the busiest one with room is suggested). Each is a
+Players pick a server after the start screen (the busiest one with room is suggested). Anyone idle for 10 minutes (no key, click, tap or mouse move) gets a 60-second "still there?" warning and is then taken off the server to free the seat; one click rejoins. Each is a
 separate copy of the world with its own cap, enforced by the database. From the SQL editor:
 - Change a cap: `update private.servers set cap = 20 where id = 'one';`
 - Add a server: `insert into private.servers (id, name, cap, sort) values ('four', 'LAB 4', 12, 4);`

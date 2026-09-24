@@ -56,6 +56,7 @@ Guiding rules (from what already works):
 - [x] Play as a guest (this browser) or log in with Discord / Google (any device); a guest links an account and keeps everything; if that login already has a player, the guest's tokens, prizes and membership merge in
 - [x] Saves: unlocks, friends, fish log, constellations and high score live in a `saves` table (old per-browser progress is picked up automatically)
 - [x] Fixed servers LAB 1-3, 12 players each, cap enforced by the database (seats + per-server channel RLS); server picker suggests the busiest one with room; SWITCH SERVER; `?server=two` links
+- [x] Idle for 10 minutes → a 60 s "still there?" warning, then off the server to free the seat (REJOIN to come back)
 - [x] Movement updates slow down in busy rooms (9 → 4 per second) to fit the Realtime message budget
 - [ ] Live check on the real domain: Turnstile keys, Discord/Google apps, manual linking (README → Security setup)
 - [ ] Player-made servers / private rooms

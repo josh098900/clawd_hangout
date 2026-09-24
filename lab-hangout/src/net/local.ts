@@ -177,6 +177,7 @@ export class LocalTransport implements Transport {
     if (!this.lobbyTimer) this.lobbyTimer = window.setInterval(beat, 2000);
   }
   watchLobby(on: (people: LobbyPerson[]) => void): void { this.lobbyOn = on; }
+  leaveLobby(): void { this.lobbyMe = null; clearInterval(this.lobbyTimer); this.lobbyTimer = 0; this.lobbySeen.clear(); this.lobbyOn([]); }
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'world', p: { id: this.selfId, ...w } } satisfies Wire); }

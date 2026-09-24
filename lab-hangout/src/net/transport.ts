@@ -158,6 +158,8 @@ export interface Transport {
   watchWorld(on: (e: NetEvent) => void): void;
   /** Announce yourself (name + current room) to everyone online, in any room. */
   setLobby(name: string, room: RoomId): void;
+  /** Drop off the who's-online list (going idle). setLobby() puts you back. */
+  leaveLobby(): void;
   /** Called with the full list of people online elsewhere whenever it changes. */
   watchLobby(on: (people: LobbyPerson[]) => void): void;
 }

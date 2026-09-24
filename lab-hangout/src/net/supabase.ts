@@ -228,6 +228,7 @@ export class SupabaseTransport implements Transport {
     } else void this.lobbyCh?.track(this.lobbyMe);
   }
   watchLobby(on: (people: LobbyPerson[]) => void): void { this.lobbyOn = on; }
+  leaveLobby(): void { this.lobbyMe = null; if (this.lobbyCh) { const ch = this.lobbyCh; this.lobbyCh = null; void ch.untrack().finally(() => this.sb.removeChannel(ch)); } this.lobbyOn([]); }
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }

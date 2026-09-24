@@ -54,7 +54,7 @@ import { openBoard } from './ui/boardui';
 import { openArcade } from './ui/arcade';
 import { openTyping } from './ui/typing';
 import { openKanban } from './ui/kanban';
-import { button, flash, modalOpen, openModal, row } from './ui/modal';
+import { button, flash, modalOpen, openModal, row, type Modal } from './ui/modal';
 
 const $ = <T extends HTMLElement>(q: string) => document.querySelector(q) as T;
 const now = () => performance.now() / 1000;
@@ -250,6 +250,49 @@ async function nameServer(): Promise<void> { try { serverName = (await net.serve
 function onSeatLost(): void {
   toast('Your seat lapsed and the server filled up. Pick another one.', 4000);
   void (async () => { await chooseServer(true); for (const k of ROOM_IDS) roomState[k].clear(); await nameServer(); await enterRoom('lab', null); })();
+}
+// ---------- idle: free the seat after 10 minutes of doing nothing ----------
+// Any key, click, tap or mouse move counts as being here. At 9 minutes a "still there?" box
+// counts down; at 10 you leave the server (and the who's-online list) so someone else can have
+// the seat, and a REJOIN button takes you back through the server picker. (?idle=N seconds in dev.)
+const IDLE_S = import.meta.env.DEV && Number(params.get('idle')) > 0 ? Number(params.get('idle')) : 600, IDLE_WARN = Math.min(60, IDLE_S / 4);
+let lastActive = Date.now(), idleOut = false, idleWarn: (Modal & { txt: HTMLElement }) | null = null;
+const markActive = () => { lastActive = Date.now(); if (idleWarn && !idleOut) { const w = idleWarn; idleWarn = null; w.close(); } };
+for (const ev of ['keydown', 'pointerdown', 'pointermove', 'touchstart', 'wheel']) addEventListener(ev, markActive, { capture: true, passive: true });
+setInterval(() => {
+  if (!playing || idleOut || switching) return;
+  const idle = (Date.now() - lastActive) / 1000;
+  if (idle >= IDLE_S) { void goIdle(); return; }
+  if (idle >= IDLE_S - IDLE_WARN) {
+    if (!idleWarn) {
+      const m = openModal('STILL THERE?', () => { if (idleWarn === w) idleWarn = null; });
+      const txt = document.createElement('div'); Object.assign(txt.style, { fontFamily: "'VT323', monospace", fontSize: '21px', color: '#E8D8C0', textAlign: 'center', maxWidth: '360px' });
+      m.body.append(txt, row(button("I'M HERE", markActive)));
+      const w = { ...m, txt }; idleWarn = w; SFX.blip();
+    }
+    idleWarn.txt.textContent = "You've been quiet for a while. To keep seats free for people who want to play, you'll leave the server in " + Math.ceil(IDLE_S - idle) + ' s.';
+  }
+}, 1000);
+async function goIdle(): Promise<void> {
+  idleOut = true;
+  if (idleWarn) { const w = idleWarn; idleWarn = null; w.close(); }
+  following = null; tapTarget = null; me.moving = false; if (me.use >= 0) leaveSpot();
+  clearBubbles(); others.clear(); lobby = [];
+  await net.leaveRoom(); net.leaveLobby(); net.leaveSeat();
+  serverName = ''; updateCount(); SFX.door();
+  const m = openModal('SEE YOU SOON', () => { void rejoin(); });
+  const txt = document.createElement('div'); Object.assign(txt.style, { fontFamily: "'VT323', monospace", fontSize: '21px', color: '#E8D8C0', textAlign: 'center', maxWidth: '360px' });
+  txt.textContent = 'You were away for ' + Math.round(IDLE_S / 60) + ' minutes, so we freed up your spot for someone else. Your stuff is all saved.';
+  m.body.append(txt, row(button('REJOIN', m.close)));
+}
+async function rejoin(): Promise<void> {
+  lastActive = Date.now();
+  await chooseServer(true);
+  for (const k of ROOM_IDS) roomState[k].clear();
+  await nameServer();
+  idleOut = false;
+  await enterRoom(room.id, { x: me.x, y: me.y });
+  toast('Welcome back!', 2000);
 }
 async function switchServer(): Promise<void> {
   const was = net.server;
