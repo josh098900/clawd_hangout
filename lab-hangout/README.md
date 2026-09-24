@@ -24,6 +24,8 @@ Down the green-railed stairs on the Square is **the Subway**: a train pulls in e
 (everyone sees the same train), you board through its open doors and ride together past the
 city skyline to **the Park**: row a boat on the pond, feed the ducks, fly a kite on the shared
 wind, grab a hot dog, picnic, listen to the bandstand, and build castles in the shared sandbox.
+Every day there are **three daily quests** (the same for everyone, new at midnight UTC) worth
+tokens, and **badges** for big milestones that show on your player card: click the QUESTS pill.
 Up on the Rooftop is the **community garden**: buy a seed, plant it in a free bed, and it grows
 in real time over hours. Anyone can water anyone's plant (and gets a token for helping), a plant
 left dry for a day wilts, and you harvest it for tokens (sometimes with a rare glowing moonflower
@@ -108,6 +110,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 6. `supabase/migrations/0006_arcade.sql`: the claw machine
 7. `supabase/migrations/0007_halloween.sql`: seasons, trick-or-treat, October-only claw prizes
 8. `supabase/migrations/0008_gardens.sql`: the Rooftop's community garden
+9. `supabase/migrations/0009_quests.sql`: daily quests and badges
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`
@@ -174,6 +177,8 @@ Moderation, from the SQL editor:
 - Add a filtered word: `insert into private.banned_words values ('regex');`
 - Chat log: `select * from private.chat_log order by at desc limit 100;`
 - Claw odds: `update private.claw_prizes set weight = 2 where item = 'hat:10';`
+- Quests: `select * from private.quest_days order by day desc;` · change the pool's odds with
+  `update private.quest_pool set weight = 0 where id = 'pong';` (0 = never picked)
 - Garden: `select * from public.plots;` · seed prices and times: `update private.seeds set cost = 3 where id = 0;` (keep `SEEDS` in `src/world/garden.ts` in step)
 - Seasons switch on by date (October = Halloween). To preview one early for everyone:
   `select public.set_season('halloween');`, and `select public.set_season(null);` to go back to

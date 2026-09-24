@@ -7,6 +7,7 @@ import { PX, r, txt, tw, withCtx, line } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
 import { save } from '../game/save';
+import { quests } from '../game/quests';
 
 const W = 220, H = 150;
 /** Constellations as points in a 0..1 box, traced in order. */
@@ -39,7 +40,7 @@ export function openStars(onClose: () => void): void {
     hit.push(i); SFX.chime();
     if (hit.length === pts.length) {
       done = performance.now(); SFX.score();
-      const f = found(); if (!f.includes(SKY[which].name)) save.update((d) => { d.stars.push(SKY[which].name); });
+      const f = found(); if (!f.includes(SKY[which].name)) save.update((d) => { d.stars.push(SKY[which].name); }); quests.bump('stars'); quests.checkBadges();
       status.textContent = 'YOU FOUND ' + SKY[which].name + '! · FOUND ' + f.length + '/' + SKY.length;
     }
   });

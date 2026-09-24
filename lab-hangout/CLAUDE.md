@@ -90,6 +90,8 @@ src/
     local.ts           BroadcastChannel transport for offline dev
   game/save.ts         your save (unlocks, friends, fish log, stars, hi score): cached per player id, synced to
                        the `saves` table; merging is a union so nothing earned is ever lost
+  game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
+                       quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
   game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
@@ -106,6 +108,7 @@ src/
     prizes.ts          the prize counter: your collection
     garden.ts          the seed picker and your-plant card (water / harvest / dig up)
     sandbox.ts         the Park sandbox editor (pile / dig / tower)
+    quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
   audio/sfx.ts         synthesized blips (no audio files)
@@ -124,7 +127,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0003 tokens · 0004 accounts (saves, inventory, guest->account merge) ·
                        0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw) ·
                        0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes) ·
-                       0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock)
+                       0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock) ·
+                       0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -163,6 +167,8 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | prizes | RPC `play_claw()` (3 tokens, server rolls, dupes refund 1); table `inventory` read-own | `{ item, dupe, tokens }`, items are `'slot:index'` |
 | seasons | RPCs `current_season()`; owner `set_season(s)`; `trick_or_treat(door 0..7)` (1/door/day, 20% trick, all 8 = costume) | `{ tokens, trick, visited, prize }` |
 | garden | table `plots` (members read, per server); RPCs `plant(bed, seed)`, `water(bed)`, `harvest(bed)`, `dig_up(bed)`; room state `garden` = "look again" | `{ bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at }` |
+| quests | RPCs `todays_quests()` (3 a day, same for all), `complete_quest(q)` (5, +10 for the third; coins/claw/water/harvest checked on the server) | `{ day, quests, done }` |
+| badges | table `badges` (members read); RPC `claim_badge(b)` (green/helper/quester/tycoon checked on the server) | badge ids |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |

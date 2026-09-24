@@ -20,6 +20,8 @@ export interface PongHooks {
   send(p: PongMsg): void;
   /** P1 only: the match is over. */
   over(winnerName: string): void;
+  /** You won a match (either side; once per match). */
+  won(): void;
   onClose(): void;
 }
 export interface PongHandle { recv(id: string, p: PongMsg): void }
@@ -44,7 +46,7 @@ export function openPong(h: PongHooks): PongHandle {
   cv.addEventListener('pointermove', (e) => { if (drag !== null) drag = toY(e); });
   cv.addEventListener('pointerup', () => { drag = null; });
   const m = openModal('PONG', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); h.onClose(); });
-  const setPh = (p: number) => { ph = p; phT = performance.now() / 1000; };
+  const setPh = (p: number) => { ph = p; phT = performance.now() / 1000; if (p === 3 && sc[h.side] >= WIN) h.won(); };
   const serve = (toward: number) => { const an = (Math.random() - 0.5) * 0.9; ball = { x: 0.5, y: 0.3 + Math.random() * 0.4, vx: toward * 0.55 * Math.cos(an), vy: 0.55 * Math.sin(an) }; };
 
   const step = () => {

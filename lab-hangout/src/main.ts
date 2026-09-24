@@ -21,6 +21,8 @@ import { makeArcade, ARCADE_INFO, PONG_SPOTS, pongSeen } from './world/arcade';
 import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
+import { quests } from './game/quests';
+import { openQuests, badgeChips } from './ui/quests';
 import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
@@ -109,8 +111,8 @@ let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
 const coinWindow = () => Math.floor(Date.now() / 300000);
-let myTokens = 0;
-function setTokens(n: number): void { myTokens = n; const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; }
+let myTokens = 0, danceT = 0;
+function setTokens(n: number): void { myTokens = n; const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; quests.setTokens(n); }
 /** Fishing: when the bobber went in, when a fish bites, and whether it's biting right now. */
 let fishing: { bite: number; state: 'wait' | 'bite' } | null = null, roast = 0;
 /** Slop blobs hit this wave: index -> when the coffee lands and where. Thrown mugs in flight. */
@@ -248,6 +250,9 @@ function peopleCard(): void {
   m.body.append(where, list, row(button('SWITCH SERVER', () => { m.close(); void switchServer(); }), button('CLOSE', m.close, true)));
 }
 $('#count').addEventListener('click', peopleCard);
+const questBtn = $<HTMLButtonElement>('#quests');
+function syncQuestPill(): void { const d = quests.today.filter((q) => quests.done.has(q)).length; questBtn.style.display = quests.today.length ? '' : 'none'; questBtn.textContent = (narrow() ? '★ ' : 'QUESTS ') + d + '/' + quests.today.length; questBtn.classList.toggle('allDone', quests.today.length > 0 && d >= quests.today.length); }
+questBtn.addEventListener('click', () => { if (playing && !editing) { SFX.blip(); openQuests(() => input.clear()); } });
 
 // ---------- servers ----------
 async function chooseServer(mustPick: boolean): Promise<string | null> {
@@ -321,6 +326,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   await fade(true);
   clearBubbles();
   others.clear();
+  if (room.id === 'train' && id !== 'train') { quests.stat('rides'); if (id === 'parkstn') quests.bump('ride'); }
   room = ROOMS[id];
   if (id === 'roof') GARDEN.dirty = true;
   const p = at ?? room.spawn;
@@ -461,7 +467,7 @@ function onGamePhase(g: GameState): void {
     if (g.phase === 'grab') { SFX.chime(); if (imIn(g)) toast('GRAB A SEAT!', 1500); }
     if (g.phase === 'out' && g.out.includes(mine)) { SFX.leave(); toast("You're out! Watch the rest from the side", 3000); }
   } else if (g.kind === 'tag' && g.phase === 'play' && g.ids[g.it] === net.selfId) { SFX.huh(); toast("You're IT! Tag someone", 2000); }
-  if (g.phase === 'over') { SFX.score(); if (winner(g) === mine) { lastEmoteAt = -9; emote('joy'); } }
+  if (g.phase === 'over') { SFX.score(); if (winner(g) === mine) { lastEmoteAt = -9; emote('joy'); quests.bump('party'); } }
 }
 function syncGameBar(text: string): void {
   const el = $('#gamebar'); if (el.textContent !== text) { el.textContent = text; el.classList.toggle('on', !!text); }
@@ -486,8 +492,8 @@ function useSpot(i: number): void {
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
-  if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
-  if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
+  if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
+  if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { quests.bump('kite'); me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
   if (s.kind === 'sand') { SFX.blip(); openSandbox(() => PARK_INFO.sand, (v) => setState({ k: 'sand', v }), () => input.clear()); return; }
   if (s.kind === 'candle') { candle(s.n ?? 0); return; }
   if (s.kind === 'rack' && DEN_INFO.build.ok) { toast('All green. Nothing to fix!'); return; }
@@ -506,7 +512,7 @@ function useSpot(i: number): void {
     const ok = Math.random() > 0.15;
     setState({ k: 'deploy', v: { t0: Date.now() / 1000, ok, by: me.name } });
     setState({ k: 'build', v: { ...b, ok, dep: b.dep + (ok ? 1 : 0) } });
-    if (ok) { SFX.score(); say(net.selfId, 'SHIPPED IT!', t, true); lastEmoteAt = -9; emote('joy'); } else { SFX.siren(); SFX.boom(); say(net.selfId, 'uh oh.', t, true); lastEmoteAt = -9; emote('huh'); }
+    if (ok) { quests.bump('deploy'); SFX.score(); say(net.selfId, 'SHIPPED IT!', t, true); lastEmoteAt = -9; emote('joy'); } else { SFX.siren(); SFX.boom(); say(net.selfId, 'uh oh.', t, true); lastEmoteAt = -9; emote('huh'); }
     return;
   }
   me.use = i; me.useT0 = t; me.x = s.x; me.y = s.y; me.moving = false; input.clear();
@@ -551,7 +557,8 @@ function gardenDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
   act().then((r) => { ok(r); refreshGarden(true); }).catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); toast(m[0].toUpperCase() + m.slice(1), 3500); SFX.hurt(); refreshGarden(); }).finally(() => { gardenBusy = false; });
 }
 function waterBed(n: number): void {
-  gardenDo(() => net.water(n), (r) => { setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); });
+  const other = GARDEN.plots.find((q) => q.bed === n)?.owner !== net.selfId;
+  gardenDo(() => net.water(n), (r) => { if (other) quests.bump('water'); if (r.thanked) quests.stat('helped'); setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); });
 }
 function tendBed(n: number): void {
   const p = GARDEN.plots.find((q) => q.bed === n), mine = GARDEN.plots.find((q) => q.owner === net.selfId && !plantState(q).dead);
@@ -568,6 +575,7 @@ function tendBed(n: number): void {
     openMyPlant(p, {
       water: () => waterBed(n),
       harvest: () => gardenDo(() => net.harvest(n), (r) => {
+        quests.bump('harvest'); quests.stat('harvests');
         setTokens(r.tokens); SFX.score(); lastEmoteAt = -9; emote('joy');
         const s = SEEDS[r.seed]; floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+' + s.pays });
         const first = !save.data.crops.includes(s.name); if (first) save.update((d) => { d.crops.push(s.name); });
@@ -609,7 +617,7 @@ function knock(n: number): void {
   SFX.door(); me.dir = me.x < TREAT_DOORS[n].x ? 1 : -1;
   net.trickOrTreat(n).then((r) => {
     markKnocked(n); setTokens(r.tokens);
-    if (r.trick) { me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
+    if (r.trick) { quests.stat('tricks'); me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
     else { SFX.chime(); floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
     if (r.prize === 'tokens:5') toast('ALL 8 DOORS! You have every costume already, so +5 tokens', 5000);
     else if (r.prize) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('ALL 8 DOORS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
@@ -637,7 +645,7 @@ function openClawMachine(i: number): void {
     play: async () => { const r = await net.playClaw(); setTokens(r.tokens); return r; },
     look: () => me.look,
     wear: wearItem,
-    started: () => { ARCADE_INFO.clawT = now(); lastEmoteAt = -9; emote('wow'); },
+    started: () => { ARCADE_INFO.clawT = now(); lastEmoteAt = -9; emote('wow'); quests.bump('claw'); },
     won: (r) => { if (!r.dupe) { save.addPrize(r.item); setState({ k: 'claw', v: { name: me.name, item: r.item } }); } },
     onClose: () => { input.clear(); if (me.use === i) leaveSpot(); },
   });
@@ -654,6 +662,7 @@ function startPong(i: number): void {
       setState({ k: 'champ', v: { name: winner, wins: ch && ch.name === winner ? ch.wins + 1 : 1 } });
       if (winner === me.name) { lastEmoteAt = -9; emote('joy'); }
     },
+    won: () => { quests.bump('pong'); quests.stat('pongWins'); },
     onClose: () => { pong = null; input.clear(); if (me.use === i) leaveSpot(); },
   });
 }
@@ -682,7 +691,7 @@ function openCode(): void {
   openTyping((msg) => {
     const b = DEN_INFO.build, breaks = b.ok && Math.random() < 0.2;
     setState({ k: 'build', v: { ok: b.ok && !breaks, n: b.n + 1, dep: b.dep, by: me.name, id: net.selfId, msg } });
-    say(net.selfId, "git commit -m '" + msg + "'", now(), true); SFX.commit();
+    say(net.selfId, "git commit -m '" + msg + "'", now(), true); SFX.commit(); quests.bump('commit'); quests.stat('commits');
     if (breaks) setTimeout(() => { SFX.siren(); toast('You broke the build! Fix it at the server rack', 3500); }, 700);
   }, () => input.clear());
 }
@@ -713,7 +722,8 @@ function playerCard(o: Avatar): void {
     const h = hsLive(hs, net.selfId); if (h && h.phase !== 'over') { toast('No following during hide and seek!'); return; }
     following = o.id; followT = 0; toast('Following ' + o.name + ' (walk to stop)', 2500); SFX.blip();
   }, true);
-  m.body.append(note, row(wave, follow, mute, report, button('CLOSE', m.close, true)));
+  const chips = document.createElement('div'); net.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
+  m.body.append(chips, note, row(wave, follow, mute, report, button('CLOSE', m.close, true)));
 }
 // ---------- follow a player (even through doors) ----------
 let following: string | null = null, followT = 0;
@@ -743,7 +753,7 @@ function highFive(a: Avatar): void {
     const key = [a.id, b.id].sort().join('|'); if (t - (hi5.get(key) ?? -9) < 3) continue;
     hi5.set(key, t);
     floaters.push({ x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 44, t0: t, text: 'HIGH FIVE!' });
-    SFX.clap(); if (a === me || b === me) SFX.score();
+    SFX.clap(); if (a === me || b === me) { SFX.score(); quests.bump('high5'); }
   }
 }
 /** The live slop blob nearest to (x, y), if the invasion is on and we're in the Square. */
@@ -761,7 +771,7 @@ function throwAt(tg: { i: number; x: number; y: number }): void {
   const sw = slopWave(); if (!sw) return;
   const t = now(); me.dir = tg.x < me.x ? -1 : 1;
   mugs.push({ x0: me.x + me.dir * 8, y0: me.y - 22, x1: tg.x, y1: tg.y - 6, t0: t });
-  slopHits.set(tg.i, { t: t + 0.35, x: tg.x, y: tg.y });
+  slopHits.set(tg.i, { t: t + 0.35, x: tg.x, y: tg.y }); quests.bump('slop');
   const cur = roomState.plaza.get('slop'), dead = cur?.k === 'slop' && cur.v.w === sw.w ? cur.v.dead : [];
   setState({ k: 'slop', v: { w: sw.w, dead: [...new Set([...dead, tg.i])] } });
   SFX.zap(); setTimeout(() => SFX.pop(), 350);
@@ -791,6 +801,7 @@ function syncPad(): void {
 function reel(): void {
   if (!fishing || fishing.state !== 'bite') return;
   const c = catchFish();
+  if (c.fish.rarity === 'RARE' || c.fish.rarity === 'LEGENDARY') quests.bump('fish');
   say(net.selfId, (c.fish.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + c.fish.name + ' (' + c.cm + 'cm)!', now(), true);
   toast((c.isNew ? 'NEW! ' : '') + c.fish.rarity + ' · FISH LOG ' + c.count + '/12', 3000);
   if (c.fish.rarity === 'LEGENDARY' || c.fish.rarity === 'RARE') { SFX.score(); lastEmoteAt = -9; emote('joy'); } else SFX.chime();
@@ -804,13 +815,14 @@ function land(): void {
 /** Throw some seeds on the pond: the ducks come paddling over. */
 function feedDucks(): void {
   if (!emote('feed')) return;
+  quests.bump('feed');
   const ex = me.x + me.dir * 40, ey = me.y;
   const k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((ey - POND.y) / POND.ry) ** 2));
   PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (ey - POND.y) * k, t: now() };
 }
 function feed(): void {
   if (!emote('feed')) return;
-  ambient.feed(me.x + me.dir * 30, me.y, now());
+  ambient.feed(me.x + me.dir * 30, me.y, now()); quests.bump('feed');
   save.update((d) => { d.feeds++; });
   if (save.data.feeds >= 5 && !owns('pet', 1)) setTimeout(() => {
     if (!save.unlock('pet:1')) return;
@@ -860,7 +872,7 @@ function currentAction(): Action | null {
   const i = nearestSpot(20);
   if (i >= 0) { const s = room.spots[i]; return { label: s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
-  if (room.id === 'park' && pondEdge(me.x, me.y) < 26) return { label: 'FEED DUCKS', run: feedDucks, at: null };
+  if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
 }
 let actNow: Action | null = null;
@@ -997,7 +1009,7 @@ function updateMe(dt: number): void {
     const key = coinWindow() + ':' + i;
     if (coinsGot.has(key) || Math.abs(me.x - cx) > 9 || Math.abs(me.y - cy) > 7) return;
     coinsGot.add(key); SFX.pop();
-    net.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); SFX.chime(); floaters.push({ x: cx, y: cy - 20, t0: now(), text: '+1' }); }).catch(() => {});
+    net.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); quests.bump('coins'); SFX.chime(); floaters.push({ x: cx, y: cy - 20, t0: now(), text: '+1' }); }).catch(() => {});
   });
   // fishing: wait for the bite, then a second to reel it in
   if (fishing && usingOf(me) === 'fish') {
@@ -1007,7 +1019,7 @@ function updateMe(dt: number): void {
   // roasting a marshmallow: stand still near the Pier's bonfire
   if (room.id === 'pier' && (me.hold === HOLD_MARSH || me.hold === HOLD_TOAST) && !me.moving && Math.hypot(me.x - PIER_FIRE.x, (me.y - PIER_FIRE.y) * 1.4) < 70) {
     roast += dt;
-    if (me.hold === HOLD_MARSH && roast > 2.5) { me.hold = HOLD_TOAST; forceSend = true; SFX.chime(); toast('Golden! Eat it now (Q), or keep going...'); }
+    if (me.hold === HOLD_MARSH && roast > 2.5) { me.hold = HOLD_TOAST; forceSend = true; SFX.chime(); quests.bump('marsh'); toast('Golden! Eat it now (Q), or keep going...'); }
     else if (me.hold === HOLD_TOAST && roast > 6.5) { me.hold = HOLD_BURNT; forceSend = true; SFX.hurt(); toast('Oops. Burnt.'); }
   }
   // finished what's in your hand?
@@ -1099,7 +1111,7 @@ function runBooth(t: number): void {
   const b = booth!, u = t - b.t0;
   if (b.next < 3 && b.emoted < b.next && u > SHOTS[b.next] - 0.55) { b.emoted = b.next; lastEmoteAt = -9; emote(SHOT_POSE[b.next]); }
   if (b.next < 3 && u > SHOTS[b.next]) { b.next++; SFX.shutter(); flash(); pendingShot = true; }
-  if (b.next >= 3 && !pendingShot && u > 4.2) { const frames = b.frames; booth = null; leaveSpot(); showStrip(frames); }
+  if (b.next >= 3 && !pendingShot && u > 4.2) { const frames = b.frames; booth = null; leaveSpot(); showStrip(frames); quests.bump('photo'); }
 }
 /** Copy the crisp + glow layers around the booth into a frame. Called mid-render, after everyone's drawn. */
 function capture(): void {
@@ -1265,6 +1277,7 @@ function frame(nowMs: number): void {
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t);
+    if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
@@ -1361,6 +1374,12 @@ async function boot(): Promise<void> {
   net.watchWorld(onWorld);
   await save.attach(net.selfId, net);
   await refreshSeason();
+  void quests.init(net, {
+    done: (text, tokens, bonus) => { setTokens(tokens); SFX.score(); toast('QUEST DONE: ' + text + ' · +' + (bonus ? '15 (all three!)' : '5') + ' tokens', 4500); floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: bonus ? '+15' : '+5' }); },
+    badge: (name) => { SFX.score(); lastEmoteAt = -9; emote('joy'); toast('NEW BADGE: ' + name + '! Everyone can see it on your card', 5000); },
+    changed: syncQuestPill,
+  });
+  setInterval(() => { if (quests.resetIn() > 86340) void quests.refresh(); }, 60000);
   if (net.mode === 'local' && Number(params.get('grow')) > 0) GARDEN.speed = Number(params.get('grow')); // LOCAL test speed-up
   setInterval(() => void refreshSeason(), 600000);
   if (mergedSave) save.mergeIn(mergedSave);
@@ -1385,7 +1404,7 @@ async function boot(): Promise<void> {
   logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
 }
 addEventListener('pagehide', () => { void net.leaveRoom(); net.leaveSeat(); });
-addEventListener('resize', () => updateCount());
+addEventListener('resize', () => { updateCount(); syncQuestPill(); });
 // Dev-only test hook (npm run dev + ?debug): lets scripts teleport and use things without walking.
 if (import.meta.env.DEV && params.has('debug')) {
   (window as unknown as Record<string, unknown>).__hangout = {

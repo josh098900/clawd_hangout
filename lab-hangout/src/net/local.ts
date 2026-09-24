@@ -9,6 +9,8 @@ import type { RoomId } from '../world/room';
 import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { growth, plantState, SEEDS } from '../world/garden';
+import { QUESTS } from '../game/quests';
+import { h1 } from '../engine/math';
 
 type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
@@ -125,6 +127,28 @@ export class LocalTransport implements Transport {
     return { tokens: this.wallet(), seed: p.seed, bonus };
   }
   async digUp(bed: number): Promise<void> { const all = this.beds(); if (!all.some((p) => p.bed === bed && p.owner === this.selfId)) throw new Error('that is not your plant'); this.beds(all.filter((p) => p.bed !== bed)); }
+  // ---- daily quests and badges, kept in this browser ----
+  async todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }> {
+    const day = new Date().toISOString().slice(0, 10), seed = Number(day.replace(/-/g, '')), pool = Object.keys(QUESTS);
+    const quests: string[] = []; for (let k = 0; quests.length < 3; k++) { const id = pool[Math.floor(h1(seed * 0.001 + k * 7.3) * pool.length)]; if (!quests.includes(id)) quests.push(id); }
+    const forced = new URLSearchParams(location.search).get('quests'); // tests: ?quests=kite,boat,feed
+    let done: string[] = []; try { const v = JSON.parse(localStorage.getItem('labhangout.localQuests') || 'null'); if (v?.day === day) done = v.done; } catch { /* ignore */ }
+    return { day, quests: forced ? forced.split(',').filter((q) => QUESTS[q]).slice(0, 3) : quests, done };
+  }
+  async completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }> {
+    const t = await this.todaysQuests();
+    if (!t.quests.includes(q)) throw new Error("that is not one of today's quests");
+    if (t.done.includes(q)) throw new Error('already done today');
+    const done = [...t.done, q]; try { localStorage.setItem('labhangout.localQuests', JSON.stringify({ day: t.day, done })); } catch { /* ignore */ }
+    return { tokens: this.wallet(this.wallet() + (done.length >= 3 ? 15 : 5)), bonus: done.length >= 3 };
+  }
+  private localBadges(add?: string): Record<string, string[]> {
+    let v: Record<string, string[]> = {}; try { v = JSON.parse(localStorage.getItem('labhangout.localBadges') || '{}'); } catch { /* ignore */ }
+    if (add) { const mine = v[this.selfId] ?? []; if (!mine.includes(add)) { v[this.selfId] = [...mine, add]; try { localStorage.setItem('labhangout.localBadges', JSON.stringify(v)); } catch { /* ignore */ } } }
+    return v;
+  }
+  async claimBadge(b: string): Promise<boolean> { const had = (this.localBadges()[this.selfId] ?? []).includes(b); this.localBadges(b); return !had; }
+  async badgesOf(id: string): Promise<string[]> { return this.localBadges()[id] ?? []; }
   async playClaw(): Promise<ClawResult> {
     const bal = this.wallet(); if (bal < 3) throw new Error('you need 3 tokens');
     const item = rollClaw(Math.random, await this.season()), dupe = this.inv().includes(item);

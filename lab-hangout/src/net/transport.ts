@@ -134,6 +134,14 @@ export interface Transport {
   /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
   harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
   digUp(bed: number): Promise<void>;
+  /** Today's 3 quests (the same for everyone) and which you've handed in. */
+  todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }>;
+  /** Hand in a quest (5 tokens; +10 with the third). */
+  completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }>;
+  /** Claim a badge you've earned (true = new). */
+  claimBadge(b: string): Promise<boolean>;
+  /** Someone's badges (anyone's, for their player card). */
+  badgesOf(id: string): Promise<string[]>;
   /** Spend tokens on the claw machine; the server picks the prize. */
   playClaw(): Promise<ClawResult>;
   /** The world servers. `friendIds` = starred players to look for. */

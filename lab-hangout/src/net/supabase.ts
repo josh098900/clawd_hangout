@@ -131,6 +131,20 @@ export class SupabaseTransport implements Transport {
   async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: Number(o.tokens) || 0, thanked: o.thanked === true }; }
   async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: Number(o.tokens) || 0, seed: Number(o.seed) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null }; }
   async digUp(bed: number): Promise<void> { const { error } = await this.sb.rpc('dig_up', { bed }); if (error) throw new Error(error.message); }
+  // ---- daily quests and badges (0009_quests.sql) ----
+  async todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }> {
+    const o = await this.rpcJson('todays_quests', {});
+    const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+    return { day: String(o.day ?? ''), quests: arr(o.quests), done: arr(o.done) };
+  }
+  async completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }> { const o = await this.rpcJson('complete_quest', { q }); return { tokens: Number(o.tokens) || 0, bonus: o.bonus === true }; }
+  async claimBadge(b: string): Promise<boolean> { const { data, error } = await this.sb.rpc('claim_badge', { b }); if (error) throw new Error(error.message); return data === true; }
+  async badgesOf(id: string): Promise<string[]> {
+    if (!UUID.test(id)) return [];
+    const { data, error } = await this.sb.from('badges').select('badge').eq('user_id', id);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => String(r.badge));
+  }
   async playClaw(): Promise<ClawResult> {
     const { data, error } = await this.sb.rpc('play_claw');
     if (error) throw new Error(error.message);

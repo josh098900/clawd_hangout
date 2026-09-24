@@ -14,6 +14,10 @@ export interface SaveData {
   fish: string[]; stars: string[];
   /** Crops you've harvested on the Rooftop (seed names). */
   crops: string[];
+  /** Today's quest progress (see game/quests.ts): the day, and a count per quest. */
+  q: { day: string; c: Record<string, number> };
+  /** Lifetime counts for badges: commits, pongWins, rides, helped, harvests, quests, tricks. */
+  stats: Record<string, number>;
 }
 export interface SaveStore { loadSave(): Promise<unknown>; storeSave(d: SaveData): Promise<void>; inventory(): Promise<string[]> }
 
@@ -22,17 +26,30 @@ const strs = (v: unknown, max: number, len: number, re?: RegExp): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((s): s is string => typeof s === 'string' && s.length <= len && (!re || re.test(s))))].slice(0, max) : [];
 const n = (v: unknown, hi: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(hi, Math.floor(v))) : 0);
 
+/** A small { name: count } map, cleaned (at most 32 keys). */
+function tally(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, 32)) if (/^[a-zA-Z0-9]{1,16}$/.test(k)) out[k] = n(x, 1e7);
+  return out;
+}
+function counts(v: unknown): { day: string; c: Record<string, number> } {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  return { day: typeof o.day === 'string' && /^\d{4}-\d\d-\d\d$/.test(o.day) ? o.day : '', c: tally(o.c) };
+}
 export function clean(v: unknown): SaveData {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const friends = Array.isArray(o.friends) ? o.friends.filter((f): f is [string, string] => Array.isArray(f) && typeof f[0] === 'string' && f[0].length <= 64 && typeof f[1] === 'string').slice(0, 100).map(([id, nm]) => [id, nm.slice(0, 16)] as [string, string]) : [];
-  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), crops: strs(o.crops, 16, 16) };
+  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), crops: strs(o.crops, 16, 16), q: counts(o.q), stats: tally(o.stats) };
 }
+const maxOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = Math.max(o[k] ?? 0, v); return o; };
 export function merge(a: SaveData, b: SaveData): SaveData {
   const fr = new Map(a.friends); for (const [id, nm] of b.friends) fr.set(id, nm);
   return {
     unlocks: [...new Set([...a.unlocks, ...b.unlocks])], friends: [...fr].slice(0, 100),
     feeds: Math.max(a.feeds, b.feeds), hi: Math.max(a.hi, b.hi),
     fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], crops: [...new Set([...a.crops, ...b.crops])],
+    q: a.q.day === b.q.day ? { day: a.q.day, c: maxOf(a.q.c, b.q.c) } : a.q.day > b.q.day ? a.q : b.q,
+    stats: maxOf(a.stats, b.stats),
   };
 }
 
