@@ -119,6 +119,8 @@ body:has(#start:not(.hidden)) :is(#bar, #hud, #log) { visibility: hidden; }
 #gateMsg { font-family: 'VT323', ui-monospace, monospace; font-size: 18px; color: #FF9A8A; min-height: 18px; }
 #tokens::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #FFD65A; box-shadow: 0 0 6px #FFD65A; display: inline-block; margin-right: 4px; }
 #mode { font-family: 'VT323', ui-monospace, monospace; font-size: 18px; color: #9FEFFF; max-width: 460px; }
+#legal { font-family: 'VT323', ui-monospace, monospace; font-size: 17px; color: #8A849A; }
+#legal a { color: #B8B0C8; }
 #mode.err { color: #FF9A8A; }
 
 /* emote wheel */
