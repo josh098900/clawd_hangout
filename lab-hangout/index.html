@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06080F">
+<title>Lab Hangout</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="stage" aria-label="Lab Hangout: a multiplayer pixel room where little lab critters walk around and chat">
+  <canvas id="view"></canvas>
+  <canvas id="glowv"></canvas>
+  <div id="vig"></div>
+  <div id="bubbles"></div>
+  <div id="log" aria-live="polite"></div>
+  <div class="plate" id="plate"><span class="sub"></span><span class="big"></span></div>
+
+  <div id="hud">
+    <span id="tokens" class="pill quiet" title="Tokens (pick up coins on the Square)" style="display:none">0</span>
+    <span id="count" class="pill quiet">1 HERE</span>
+    <button id="lookBtn" class="pill" type="button">Look</button>
+    <button id="snd" class="pill" type="button" aria-pressed="false">Sound</button>
+  </div>
+
+  <div id="bar">
+    <div id="emotes"></div>
+    <form id="chatForm" autocomplete="off">
+      <input id="chat" maxlength="80" placeholder="Press Enter to chat" aria-label="Chat message" enterkeyhint="send">
+    </form>
+  </div>
+
+  <div id="gamebar" role="status" aria-live="polite"></div>
+  <div id="modal" class="hidden" role="dialog" aria-modal="true"></div>
+  <div id="flash"></div>
+  <div id="fade"></div>
+  <div id="toast" role="status"></div>
+
+  <div id="start">
+    <div class="s1">LAB HANGOUT</div>
+    <div class="s2">A PIXEL ROOM</div>
+    <div class="card">
+      <canvas id="preview" width="60" height="72" aria-label="Your character"></canvas>
+      <div class="fields">
+        <label class="lbl" for="name">NAME</label>
+        <input id="name" maxlength="16" placeholder="your name" autocomplete="nickname" spellcheck="false">
+        <div class="lbl">COLOUR</div>
+        <div id="swatches"></div>
+        <div class="cyc" data-k="sp"><button type="button" data-d="-1" aria-label="Previous character">&lsaquo;</button><span></span><button type="button" data-d="1" aria-label="Next character">&rsaquo;</button></div>
+        <div class="cyc" data-k="hat"><button type="button" data-d="-1" aria-label="Previous hat">&lsaquo;</button><span></span><button type="button" data-d="1" aria-label="Next hat">&rsaquo;</button></div>
+        <div class="cyc" data-k="face"><button type="button" data-d="-1" aria-label="Previous face item">&lsaquo;</button><span></span><button type="button" data-d="1" aria-label="Next face item">&rsaquo;</button></div>
+        <div class="cyc" data-k="pet"><button type="button" data-d="-1" aria-label="Previous pet">&lsaquo;</button><span></span><button type="button" data-d="1" aria-label="Next pet">&rsaquo;</button></div>
+        <div class="cyc" data-k="fit"><button type="button" data-d="-1" aria-label="Previous outfit">&lsaquo;</button><span></span><button type="button" data-d="1" aria-label="Next outfit">&rsaquo;</button></div>
+      </div>
+    </div>
+    <div id="gate" class="hidden">
+      <label class="lbl" for="invite">INVITE CODE</label>
+      <div class="gaterow"><input id="invite" maxlength="64" autocomplete="off" spellcheck="false" placeholder="ask whoever invited you"><button id="unlock" class="pill" type="button">Unlock</button></div>
+      <div id="gateMsg" role="status"></div>
+    </div>
+    <div id="captcha" class="hidden"></div>
+    <button id="go" class="pill big" type="button" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg><span>Connecting…</span></button>
+    <button id="goMute" type="button">or join muted</button>
+    <div id="mode"></div>
+  </div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
