@@ -62,6 +62,21 @@ export const CHIPTUNES: Track[] = [
     drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
   },
 ];
+/** The Park's bandstand: a sunny waltz and a brass-band stroll. */
+export const PARK_TRACKS: Track[] = [
+  {
+    name: 'SUNDAY WALTZ', bpm: 132, wave: 'triangle',
+    lead: 'G4 - B4 D5 - B4 C5 - A4 B4 - G4 A4 - F#4 G4 - - E5 - D5 C5 - B4 A4 - G4 F#4 - E4 D4 - - . .',
+    bass: 'G2 . D3 G2 . D3 C3 . G3 G2 . D3 D3 . A2 G2 . D3 C3 . G3 G2 . D3 D3 . A2 G2 . . . .',
+    drums: 'k . h k . h k . h k . h k . h k . h k . h k . h k . h k . h s . .',
+  },
+  {
+    name: 'PARK STROLL', bpm: 108, wave: 'square',
+    lead: 'C5 . E5 . G5 . E5 . F5 . D5 . B4 . G4 . A4 . C5 . F5 . E5 . D5 . . . C5 - . .',
+    bass: 'C3 . G2 . C3 . G2 . G2 . D3 . G2 . D3 . F2 . C3 . F2 . C3 . G2 . D3 . C3 . . .',
+    drums: 'k . s . k . s . k . s . k k s . k . s . k . s . k . s . k s s s',
+  },
+];
 /** The Dev Den radio: slow, soft lo-fi loops. */
 export const LOFI: Track[] = [
   {

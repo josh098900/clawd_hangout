@@ -127,6 +127,18 @@ const DEFS: NpcDef[] = [
     chat: ['hop on the next train!', 'the ride past the city is the best bit', 'the Park station is opening soon, they say', 'stand behind the yellow line', 'i busk here every day. the acoustics!', 'the board says when the next train is'],
   },
   {
+    id: 'npc-oak', name: 'OAK', room: 'park', speed: 26,
+    look: { c: 6, hat: 7, face: 0, fit: 2, sp: 0 },
+    stops: [
+      { x: 520, y: 600, wait: 14, say: ['so many leaves...', 'rake, rake, rake', 'lovely day for it'] },
+      { x: 760, y: 640, wait: 16, say: ['hello ducks!', 'no bread for you. seeds only', 'quack, i believe, means thank you'] },
+      { use: 11, wait: 20, say: ['my favourite bench', 'the fountain never stops'] },
+      { x: 1400, y: 720, wait: 10, say: ['who built this castle? magnificent', 'mind the moat'] },
+      { x: 1330, y: 540, wait: 8, say: ['good kite weather', 'the wind is up today'] },
+    ],
+    chat: ['welcome to the park!', 'boats are at the dock, just row back when you are done', 'feed the ducks at the edge of the pond', 'the band plays all day', 'kites fly best when the wind picks up', 'the sandbox is for everyone. build something!', 'the subway stairs are by the gate'],
+  },
+  {
     id: 'npc-spin', name: 'DJ SPIN', room: 'stage', speed: 34,
     look: { c: 3, hat: 3, face: 3, fit: 0, sp: 1 },
     stops: [

@@ -3,11 +3,12 @@
 
 import { basePose, stampCritter, type Look, type Pose } from './critter';
 import type { SpotKind } from '../world/room';
-import { CONFETTI, K, type RGB } from '../engine/palette';
+import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
 
 const OUTLINE = K.OUTLINE;
-import { alpha, oval, lit, r, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX } from '../engine/pixel';
+import { alpha, oval, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX } from '../engine/pixel';
 import { bump, eOB, h1, seg, lerp } from '../engine/math';
+import { wind } from '../world/weather';
 
 export type EmoteKind = 'wave' | 'hop' | 'joy' | 'huh' | 'idea' | 'sip' | 'eat' | 'feed' | 'laugh' | 'cry' | 'love' | 'angry' | 'sleep' | 'cool' | 'clap' | 'wow';
 /** Every emote that can go over the network. Ones with a `key` also get a button in the emote bar. */
@@ -29,11 +30,11 @@ export const EMOTES = ALL_EMOTES.filter((e) => e.key);
 export const emoteDur = (k: EmoteKind): number => ALL_EMOTES.find((e) => e.kind === k)?.dur ?? 2;
 export const isEmote = (k: unknown): k is EmoteKind => typeof k === 'string' && ALL_EMOTES.some((e) => e.kind === k);
 /** Held items (MoveMsg.hold). How many sips/bites each lasts, and the emote that uses it. */
-export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_MARSH = 4, HOLD_TOAST = 5, HOLD_BURNT = 6;
-export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1 };
+export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_MARSH = 4, HOLD_TOAST = 5, HOLD_BURNT = 6, HOLD_KITE = 7, HOLD_HOTDOG = 8;
+export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4 };
 export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
-export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3;
+export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4;
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -315,6 +316,37 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   if (still && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt(PET_SAY[kind] ?? '', x - 5, y - 16 - (ghost ? 6 : 0), [230, 230, 240]));
 }
 
+/** A hot dog: bun, sausage, a squiggle of mustard. */
+function drawHotdog(x: number, y: number, d: number): void {
+  const X = Math.round(x) - (d > 0 ? 1 : 8), Y = Math.round(y) - 3;
+  r(X, Y + 1, 10, 4, [226, 170, 100]); r(X, Y + 1, 10, 1, [246, 200, 130]); r(X - 1, Y, 12, 2, [196, 90, 70]); r(X - 1, Y, 12, 1, [226, 120, 90]);
+  for (let k = 0; k < 5; k++) r(X + k * 2, Y + (k % 2), 1, 1, [255, 214, 60]);
+}
+/**
+ * A kite on a long string from the hand, flying on the shared wind (world/weather.ts) so every
+ * browser draws it in the same place without any messages. Colour = the flyer's body colour.
+ */
+function drawKite(hx: number, hy: number, av: Avatar, a: number): void {
+  const w = wind(), len = 96 + w.gust * 20, lean = w.dx * 0.8 + Math.sin(a * 0.9 + av.seed * 9) * 0.12;
+  const kx = Math.round(hx + lean * len), ky = Math.round(hy - Math.sqrt(Math.max(0, 1 - lean * lean)) * len + Math.sin(a * 1.7 + av.seed * 5) * 4);
+  // the string sags a little
+  for (let k = 0; k <= 16; k++) { const u = k / 16; r(Math.round(hx + (kx - hx) * u), Math.round(hy + (ky - hy) * u + Math.sin(u * Math.PI) * 8), 1, 1, [230, 230, 236]); }
+  const c = BODY[av.look.c]?.c ?? BODY[0].c, hi = M(c, [255, 255, 255], 0.35), lo = M(c, [0, 0, 0], 0.25);
+  for (let j = -7; j <= 9; j++) { const hw = j < 0 ? Math.round((7 + j) * 0.9) : Math.round((9 - j) * 0.7); if (hw > 0) { r(kx - hw, ky + j, hw, 1, j < 0 ? hi : c); r(kx, ky + j, hw, 1, j < 0 ? c : lo); } }
+  r(kx, ky - 7, 1, 17, [240, 236, 220]); r(kx - 6, ky - 1, 13, 1, [240, 236, 220]);
+  // the tail streams away from the wind, with bows
+  for (let k = 1; k <= 10; k++) { const tx = kx - Math.round(w.dx * k * 2.2) + Math.round(Math.sin(a * 5 + k * 0.8) * 2), ty = ky + 9 + k * 2; r(tx, ty, 1, 2, [240, 236, 220]); if (k % 3 === 0) { r(tx - 2, ty, 2, 1, CONFETTI[k % CONFETTI.length]); r(tx + 1, ty, 2, 1, CONFETTI[k % CONFETTI.length]); } }
+}
+/** Rowing on the pond: the boat under the rower (back half first, front half after). */
+function drawBoat(x: number, y: number, a: number, front: boolean, moving: boolean, seed: number): void {
+  const X = Math.round(x), bob = Math.round(Math.sin(a * 2 + seed * 7)), Y = Math.round(y) + bob, hull: RGB = [180, 70, 60], rim: RGB = [230, 200, 150];
+  if (!front) { r(X - 20, Y - 12, 40, 4, M(hull, [0, 0, 0], 0.3)); r(X - 18, Y - 14, 36, 2, rim); return; }
+  const row = moving ? Math.sin(a * 6) : 0;
+  for (const s of [-1, 1]) { const ox = X + s * 16, oy = Y - 10; line(ox, oy, Math.round(ox + s * 8), Math.round(oy + 6 + row * 3), [120, 84, 50]); r(Math.round(ox + s * 8) - 1, Math.round(oy + 6 + row * 3), 3, 2, [120, 84, 50]); }
+  for (let j = 0; j < 8; j++) { const hw = 20 - Math.round(j * j / 6); r(X - hw, Y - 8 + j, hw * 2, 1, j < 2 ? rim : j > 5 ? M(hull, [0, 0, 0], 0.25) : hull); }
+  alpha(0.35, () => { r(X - 24, Y + 1, 48, 1, [220, 240, 255]); if (moving) { r(X - 30 - Math.round((a * 20) % 8), Y + 2, 6, 1, [220, 240, 255]); r(X + 26 + Math.round((a * 20) % 8), Y + 2, 6, 1, [220, 240, 255]); } });
+}
+
 /** Halloween's "trick": a bedsheet ghost over the character, bobbing, hem waving. */
 function drawSheet(x: number, y: number, a: number, seed: number): void {
   const bob = Math.round(Math.sin(a * 3 + seed * 7) * 1.5), X = Math.round(x), Y = Math.round(y) - 2 + bob, c: RGB = [238, 240, 252], sh: RGB = [190, 196, 226], wv = Math.floor(a * 5 + seed * 3) % 2;
@@ -331,7 +363,10 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
   // contact shadow shrinks while airborne (none when seated: the seat is the ground)
   const sk = Math.max(0.4, 1 - hopY / 30);
   if (!lift) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
-  const { TX, c } = stampCritter(av.look, P, av.x, av.y - lift - hopY, dim);
+  const boat = av.pose === POSE_BOAT;
+  if (boat) drawBoat(av.x, av.y, a, false, av.moving, av.seed);
+  const { TX, c } = stampCritter(av.look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0), dim);
+  if (boat) drawBoat(av.x, av.y, a, true, av.moving, av.seed);
   if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
   if (av.hold) {
     let [lx, ly] = c.hand;
@@ -342,6 +377,8 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     if (av.hold === HOLD_MUG) drawMug(mx, my, MUG_COLS[Math.floor(av.seed * MUG_COLS.length)], P.dir > 0 ? 1 : -1, a, av.seed);
     else if (av.hold === HOLD_POPCORN) drawPopcorn(mx, my, a, av.seed);
     else if (av.hold === HOLD_SODA) drawSoda(mx, my);
+    else if (av.hold === HOLD_HOTDOG) drawHotdog(mx, my, P.dir > 0 ? 1 : -1);
+    else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);
     if (em?.kind === 'eat') { const u = now - em.t0; for (let k = 0; k < 3; k++) { const q = u - 0.45 - k * 0.12; if (q > 0 && q < 0.5) r(Math.round(mx + (k - 1) * 3 + q * 8 * (k - 1)), Math.round(my - 2 + q * 30 * q * 4), 1, 1, K.POPCORN_HI); } }
   }

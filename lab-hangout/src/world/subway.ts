@@ -14,9 +14,10 @@ import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { Door, Prop, Room, RoomId, Spot } from './room';
 
-export const STATIONS: { name: string; room: RoomId | null; arrive: { x: number; y: number } }[] = [
-  { name: 'SQUARE', room: 'subway', arrive: { x: 0, y: 500 } },
-  { name: 'PARK', room: null, arrive: { x: 0, y: 500 } }, // opens in step 4
+/** The stops. `room` = its station room (null = OPENING SOON), `exit` = where its stairs go up to, `tile` = wall tiles. */
+export const STATIONS: { name: string; room: RoomId | null; arrive: { x: number; y: number }; exit: { to: RoomId; arrive: { x: number; y: number } }; tile: RGB; tileLn: RGB }[] = [
+  { name: 'SQUARE', room: 'subway', arrive: { x: 0, y: 500 }, exit: { to: 'plaza', arrive: { x: 760, y: 664 } }, tile: [226, 222, 204], tileLn: [196, 190, 170] },
+  { name: 'PARK', room: 'parkstn', arrive: { x: 0, y: 500 }, exit: { to: 'park', arrive: { x: 170, y: 668 } }, tile: [206, 226, 200], tileLn: [172, 196, 166] },
 ];
 const IN_S = 4, OPEN_S = 16, OUT_S = 4, STOP_S = IN_S + OPEN_S + OUT_S, RIDE_S = 36, LEG = STOP_S + RIDE_S;
 export type TrainPhase = 'in' | 'open' | 'out' | 'ride';
@@ -43,16 +44,17 @@ const doorsOpenAt = (s: number) => { const tr = train(); return tr.at === s && t
 const SW = 1300, SH = 700, PLAT = 500;
 const TRAIN_X0 = 30, TRAIN_W = 1240, TRAIN_TOP = PLAT - 108;
 export const DOOR_X = [250, 550, 850, 1150];
-const TILE: RGB = [226, 222, 204], TILE_LN: RGB = [196, 190, 170], BAND: RGB = [40, 120, 90];
+const BAND: RGB = [40, 120, 90];
 
-function buildStation(this: Room): void {
+function buildStation(this: Room, n: number): void {
+  const st = STATIONS[n], TILE = st.tile, TILE_LN = st.tileLn;
   withCtx(this.bg.getContext('2d')!, () => {
     PX.dim = 0; PX.fl = 0; PX.emit = false;
     r(0, 0, SW, 316, [22, 24, 30]); for (let x = 60; x < SW; x += 220) r(x, 314, 120, 5, [50, 54, 62]);
     // tiled wall above the tracks, a green band and the station name set into the tiles
     r(0, 322, SW, TRAIN_TOP - 322, TILE); for (let y = 322; y < TRAIN_TOP; y += 8) r(0, y, SW, 1, TILE_LN); for (let y = 322, j = 0; y < TRAIN_TOP; y += 8, j++) for (let x = (j % 2) * 8; x < SW; x += 16) r(x, y, 1, 8, TILE_LN);
     r(0, TRAIN_TOP - 10, SW, 6, BAND); r(0, TRAIN_TOP - 10, SW, 1, M(BAND, [255, 255, 255], 0.3));
-    for (const cx of [140, 700, 1180]) { r(cx - 46, 340, 92, 22, [30, 34, 40]); r(cx - 44, 342, 88, 18, [240, 236, 220]); txt('SQUARE', cx - tw('SQUARE', 2) / 2, 346, [30, 34, 40], 2); }
+    for (const cx of [140, 700, 1180]) { r(cx - 46, 340, 92, 22, [30, 34, 40]); r(cx - 44, 342, 88, 18, [240, 236, 220]); txt(st.name, cx - tw(st.name, 2) / 2, 346, [30, 34, 40], 2); }
     // the line map poster
     r(360, 330, 200, 50, [30, 34, 40]); r(362, 332, 196, 46, [245, 242, 230]); txt('LAB HANGOUT LINE', 460 - tw('LAB HANGOUT LINE') / 2, 336, [30, 34, 40]);
     line(390, 356, 530, 356, BAND); line(390, 357, 530, 357, BAND);
@@ -100,12 +102,12 @@ function drawTrain(dx: number, open: number, a: number): void {
   txt('1', x0 + 16, top + 20, [60, 64, 72], 3);
   if (Math.abs(dx) > 1) for (let k = 0; k < 6; k++) r(x0 + ((k * 211 + Math.floor(a * 900)) % TRAIN_W), bot - 3, 6, 1, [255, 220, 150]); // sparks at the wheels
 }
-function stationBack(a: number): void {
+function stationBack(a: number, s: number): void {
   // the lights: long fluorescent tubes (one flickers)
   lit(() => { for (let x = 60, i = 0; x < SW; x += 220, i++) { const f = i === 3 && (a * 3.7) % 1 < 0.08 ? 0.3 : 1; r(x, 318, 120, 3, M([80, 90, 90], [230, 250, 245], f)); } });
   for (let x = 60; x < SW; x += 220) G(x, 320, 120, 50, [200, 240, 230], 0.08);
   // the departures board
-  const tr = train(), s = 0, here = tr.at === s && tr.phase !== 'ride';
+  const tr = train(), here = tr.at === s && tr.phase !== 'ride';
   r(790, 336, 190, 26, [20, 22, 26]);
   const msg = here ? (tr.phase === 'open' ? 'NOW BOARDING: ' + STATIONS[tr.next].name + (STATIONS[tr.next].room ? '' : ' - LOOP') : tr.phase === 'in' ? 'TRAIN ARRIVING' : 'DOORS CLOSING') : 'NEXT TRAIN: ' + Math.ceil(nextAt(s)) + 's';
   lit(() => txt(msg.slice(0, 30), 885 - tw(msg.slice(0, 30)) / 2, 346, here && tr.phase === 'open' ? [124, 242, 156] : [255, 180, 60]));
@@ -142,30 +144,32 @@ export const SUBWAY_SPOTS: Spot[] = [
   ...[-14, 14].map((dx): Spot => ({ kind: 'sit', x: 980 + dx, y: 591, sx: 980 + dx, sy: 602, lift: 8, label: 'SIT', area: { x0: 950, y0: 566, x1: 1010, y1: 590 } })),
   { kind: 'soda', x: 1230, y: 564, sx: 1230, sy: 564, lift: 0, label: 'SNACKS', area: { x0: 1208, y0: 482, x1: 1252, y1: 552 } },
 ];
-const boardDoor = (x: number, i: number): Door => ({
+const boardDoor = (x: number, i: number, n: number): Door => ({
   trigger: { x0: x - 18, y0: PLAT + 4, x1: x + 18, y1: PLAT + 12 }, to: 'train', arrive: { x: CAR_DOOR_X[i % CAR_DOOR_X.length], y: 530 }, label: 'BOARD',
   area: { x0: x - 20, y0: TRAIN_TOP + 8, x1: x + 20, y1: PLAT },
-  route: () => (doorsOpenAt(0) ? { to: 'train', arrive: { x: CAR_DOOR_X[i % CAR_DOOR_X.length], y: 530 }, label: 'BOARD' } : null),
+  route: () => (doorsOpenAt(n) ? { to: 'train', arrive: { x: CAR_DOOR_X[i % CAR_DOOR_X.length], y: 530 }, label: 'BOARD' } : null),
 });
 
-export function makeSubway(): Room {
-  STATIONS[0].arrive = { x: DOOR_X[1], y: PLAT + 22 };
+/** The station room for stop `n` (same platform, its own name, tiles and way out). */
+export function makeStation(n: number): Room {
+  const st = STATIONS[n];
+  st.arrive = { x: DOOR_X[1], y: PLAT + 22 };
   const room: Room = {
-    id: 'subway', title: 'SQUARE STATION', sub: 'THE SUBWAY',
+    id: st.room!, title: st.name + ' STATION', sub: 'THE SUBWAY',
     w: SW, h: SH,
     floor: { x0: 14, y0: PLAT + 6, x1: SW - 14, y1: SH - 20 },
     blockers: [{ x0: 390, y0: 582, x1: 450, y1: 592 }, { x0: 950, y0: 582, x1: 1010, y1: 592 }, { x0: 1206, y0: 540, x1: 1254, y1: 554 }, { x0: 112, y0: 632, x1: 128, y1: 642 }, { x0: 162, y0: 632, x1: 178, y1: 642 }],
     doors: [
-      { trigger: { x0: 18, y0: 666, x1: 80, y1: 680 }, edge: true, to: 'plaza', arrive: { x: 760, y: 664 }, label: 'SQUARE', area: { x0: 10, y0: 624, x1: 88, y1: 700 } },
-      ...DOOR_X.map(boardDoor),
+      { trigger: { x0: 18, y0: 666, x1: 80, y1: 680 }, edge: true, to: st.exit.to, arrive: st.exit.arrive, label: st.name, area: { x0: 10, y0: 624, x1: 88, y1: 700 } },
+      ...DOOR_X.map((x, i) => boardDoor(x, i, n)),
     ],
     spots: SUBWAY_SPOTS, inUse: new Map(),
     spawn: { x: 60, y: 646 },
     dim: 0.12,
     fillTop: 'rgb(22,24,30)', fillLow: 'rgb(104,106,112)',
     bg: mk(SW, SH),
-    build: () => buildStation.call(room),
-    drawBack: stationBack,
+    build: () => buildStation.call(room, n),
+    drawBack: (a: number) => stationBack(a, n),
     props: [bench(420, 590), bench(980, 590), snacks, gates],
   };
   return room;
@@ -207,7 +211,7 @@ function carView(): void {
   if (tr.phase !== 'ride') { // a station platform outside
     const st = STATIONS[tr.at];
     if (st.room) {
-      r(0, Y0, CW, Y1 - Y0, TILE); for (let x = -((off % 16) + 16) % 16; x < CW; x += 16) r(x, Y0, 1, Y1 - Y0, TILE_LN);
+      r(0, Y0, CW, Y1 - Y0, st.tile); for (let x = -((off % 16) + 16) % 16; x < CW; x += 16) r(x, Y0, 1, Y1 - Y0, st.tileLn);
       r(0, Y1 - 26, CW, 6, BAND); for (let k = -1; k < 4; k++) { const cx = 180 + k * 400 - off; r(cx - 46, Y0 + 12, 92, 22, [30, 34, 40]); r(cx - 44, Y0 + 14, 88, 18, [240, 236, 220]); txt(st.name, cx - tw(st.name, 2) / 2, Y0 + 18, [30, 34, 40], 2); }
       r(0, Y1 - 14, CW, CFLOOR - Y1 + 14, [104, 106, 112]); r(0, Y1 - 16, CW, 3, [230, 190, 40]); // (the platform carries on down the open doorway)
     } else { // still being built

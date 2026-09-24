@@ -70,7 +70,7 @@ Guiding rules (from what already works):
 ## Phase 7 — The big plan (one step at a time: see docs/PLAN.md)
 - [x] 1. Halloween (1 Oct to 1 Nov): decorations, trick-or-treat, haunted Crypt, BOO, costumes
 - [x] 2. Garden plots on the Rooftop (real-time growth, friends can water)
-- [ ] 3. The Subway (trains on the shared clock)
+- [x] 3. The Subway (trains on the shared clock)
 - [ ] 4. The Park (boats, kites, ducks, sandbox)
 - [ ] 5. Daily quests and badges
 - [ ] 6. Hourly fishing contest

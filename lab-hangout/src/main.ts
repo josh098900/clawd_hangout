@@ -18,7 +18,9 @@ import { makeStage, stageNote, INST_COL } from './world/stage';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, ARCADE_INFO, PONG_SPOTS, pongSeen } from './world/arcade';
-import { makeSubway, makeTrain, train } from './world/subway';
+import { makeStation, makeTrain, STATIONS, train } from './world/subway';
+import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
+import { openSandbox } from './ui/sandbox';
 import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
@@ -39,7 +41,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, HOLD_KITE, HOLD_HOTDOG, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -74,7 +76,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeSubway(), train: makeTrain() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1) };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -118,7 +120,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -191,6 +193,7 @@ function onNet(e: NetEvent): void {
       av.emote = { kind: e.kind, t0: t }; if (!muted.has(e.id)) SFX[e.kind]();
       if (e.kind === 'wave') highFive(av);
       if (e.kind === 'feed' && room.id === 'plaza') ambient.feed(av.x + av.dir * 30, av.y, t);
+      if (e.kind === 'feed' && room.id === 'park') { const ex = av.x + av.dir * 40, k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((av.y - POND.y) / POND.ry) ** 2)); PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (av.y - POND.y) * k, t }; }
       break;
     }
     case 'state': if (allow(e.id, 'state', 6, 12)) applyState(e.s); break;
@@ -322,6 +325,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   if (id === 'roof') GARDEN.dirty = true;
   const p = at ?? room.spawn;
   me.x = p.x; me.y = p.y; me.moving = false; me.born = now(); me.emote = null; me.use = -1; me.pose = 0; booth = null; // your mug comes with you
+  if (me.hold === HOLD_KITE && id !== 'park') me.hold = 0; // (the kite goes back on the stand)
   R.follow(me.x, me.y, room.w, room.h, 0, true);
   try {
     await net.joinRoom(id, peerState(), onNet);
@@ -382,6 +386,7 @@ const FILL: Partial<Record<string, { hold: number; secs: number; msg: string }>>
   coffee: { hold: HOLD_MUG, secs: 1.8, msg: 'Fresh coffee!' },
   popcorn: { hold: HOLD_POPCORN, secs: 1.2, msg: 'Popcorn!' },
   soda: { hold: HOLD_SODA, secs: 1.2, msg: 'Soda!' },
+  hotdog: { hold: HOLD_HOTDOG, secs: 1.5, msg: 'Hot dog!' },
 };
 // ---------- party games ----------
 function gameNow(): GameState | null { const s = roomState[room.id].get('game'); return s?.k === 'game' && live(s.v) ? s.v : null; }
@@ -481,6 +486,9 @@ function useSpot(i: number): void {
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
+  if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
+  if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
+  if (s.kind === 'sand') { SFX.blip(); openSandbox(() => PARK_INFO.sand, (v) => setState({ k: 'sand', v }), () => input.clear()); return; }
   if (s.kind === 'candle') { candle(s.n ?? 0); return; }
   if (s.kind === 'rack' && DEN_INFO.build.ok) { toast('All green. Nothing to fix!'); return; }
   if (s.kind === 'marsh') { me.hold = HOLD_MARSH; me.sips = 0; roast = 0; forceSend = true; SFX.pop(); toast('Hold it near the fire to toast it. Not too long!', 3500); return; }
@@ -577,12 +585,12 @@ function tendBed(n: number): void {
 // ---------- the Subway (world/subway.ts): sounds that follow the clock-run train ----------
 let trainKey = '', lastClack = 0;
 function subwaySounds(): void {
-  const tr = train(), key = tr.at + tr.phase, t = now();
+  const tr = train(), key = tr.at + tr.phase, t = now(), here = STATIONS.findIndex((st) => st.room === room.id), mine = room.id === 'train' || tr.at === here;
   if (key !== trainKey) {
     const first = trainKey === ''; trainKey = key;
-    if (!first && tr.phase === 'open' && (room.id === 'train' || tr.at === 0)) SFX.dingdong();
-    if (!first && tr.phase === 'out' && (room.id === 'train' || tr.at === 0)) { SFX.blip(); if (room.id === 'subway' && tr.at === 0) toast('Doors closing! Next train in about a minute', 2500); }
-    if (!first && room.id === 'train' && tr.phase === 'in') toast('Now arriving: ' + (['SQUARE', 'PARK'][tr.at] ?? ''), 2500);
+    if (!first && tr.phase === 'open' && mine) SFX.dingdong();
+    if (!first && tr.phase === 'out' && mine) { SFX.blip(); if (room.id !== 'train') toast('Doors closing! Next train in about a minute', 2500); }
+    if (!first && room.id === 'train' && tr.phase === 'in') toast('Now arriving: ' + STATIONS[tr.at].name, 2500);
   }
   if (room.id === 'train' && tr.phase === 'ride' && t - lastClack > 0.55) { lastClack = t; SFX.clack(); }
 }
@@ -665,6 +673,7 @@ function endArcade(score: number): void {
 }
 /** Sip / eat whatever's in your hand. */
 function useItem(): void {
+  if (me.hold === HOLD_KITE) { me.hold = 0; forceSend = true; toast('Kite back on the stand'); return; }
   if (!me.hold || me.emote) return;
   if (emote(useEmote(me.hold))) me.sips++;
 }
@@ -787,6 +796,18 @@ function reel(): void {
   if (c.fish.rarity === 'LEGENDARY' || c.fish.rarity === 'RARE') { SFX.score(); lastEmoteAt = -9; emote('joy'); } else SFX.chime();
   fishing = { bite: now() + 2.5 + Math.random() * 6, state: 'wait' };
 }
+/** Rowing: get out at the dock. */
+function land(): void {
+  if (Math.hypot(me.x - DOCK.launch.x, me.y - DOCK.launch.y) > 44) { toast('Row back to the dock to get out', 2500); return; }
+  me.pose = 0; me.x = DOCK.x; me.y = DOCK.y + 12; forceSend = true; SFX.step(); toast('Back on dry land', 1500);
+}
+/** Throw some seeds on the pond: the ducks come paddling over. */
+function feedDucks(): void {
+  if (!emote('feed')) return;
+  const ex = me.x + me.dir * 40, ey = me.y;
+  const k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((ey - POND.y) / POND.ry) ** 2));
+  PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (ey - POND.y) * k, t: now() };
+}
 function feed(): void {
   if (!emote('feed')) return;
   ambient.feed(me.x + me.dir * 30, me.y, now());
@@ -798,6 +819,7 @@ function feed(): void {
   }, 1500);
 }
 function setPose(p: number): void {
+  if (me.pose === POSE_BOAT) return; // no dancing in a rowing boat
   if (!playing || editing || modalOpen()) return;
   if (me.use >= 0) leaveSpot();
   me.pose = me.pose === p ? 0 : p; me.poseT0 = now(); forceSend = true;
@@ -823,6 +845,7 @@ interface Action { label: string; run: () => void; at: [number, number] | null }
 /** The one thing E / the action button does right now, and where to float its hint. */
 function currentAction(): Action | null {
   if (!playing || editing || switching) return null;
+  if (me.pose === POSE_BOAT) return Math.hypot(me.x - DOCK.launch.x, me.y - DOCK.launch.y) < 44 ? { label: 'GET OUT', run: land, at: null } : null;
   if (me.use >= 0) {
     const k = usingOf(me);
     if (k === 'fish') return fishing?.state === 'bite' ? { label: 'REEL!', run: reel, at: null } : { label: 'STOP FISHING', run: () => { fishing = null; leaveSpot(); }, at: null };
@@ -837,6 +860,7 @@ function currentAction(): Action | null {
   const i = nearestSpot(20);
   if (i >= 0) { const s = room.spots[i]; return { label: s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
+  if (room.id === 'park' && pondEdge(me.x, me.y) < 26) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
 }
 let actNow: Action | null = null;
@@ -852,7 +876,7 @@ function syncActionBar(): void {
     actShown = label; actBtn.style.display = label ? '' : 'none';
     const k = document.createElement('kbd'); k.textContent = 'E'; actBtn.replaceChildren(k, ' ' + label);
   }
-  const s = me.hold && playing ? (useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
+  const s = me.hold && playing ? (me.hold === HOLD_KITE ? 'PUT AWAY' : useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
   if (s !== sipShown) {
     sipShown = s; sipBtn.style.display = s ? '' : 'none';
     const k = document.createElement('kbd'); k.textContent = 'Q'; sipBtn.replaceChildren(k, ' ' + s);
@@ -963,7 +987,7 @@ function updateMe(dt: number): void {
       else if (npc) { tx = clamp(npc.av.x + (me.x < npc.av.x ? -22 : 22), f.x0, f.x1); ty = clamp(npc.av.y + (npc.av.use >= 0 ? 10 : 0), f.y0, f.y1); }
       else if (spot >= 0) { tx = room.spots[spot].sx; ty = room.spots[spot].sy; }
       else if (tk) { tx = tk.sx; ty = tk.sy; }
-      const path = routeTo(room, me.x, me.y, tx, ty); // detour around seat rows, desks, sofas
+      const path = me.pose === POSE_BOAT ? [[tx, ty] as [number, number]] : routeTo(room, me.x, me.y, tx, ty); // detour around seat rows, desks, sofas (boats just row straight)
       tapTarget = { x: path[0][0], y: path[0][1], door: d, stuck: 0, spot, npc, tk, path: path.slice(1) };
       tapFx = { x: tx, y: ty, t0: t };
     }
@@ -1019,9 +1043,11 @@ function updateMe(dt: number): void {
   }
   const len = Math.hypot(vx, vy); if (len > 1) { vx /= len; vy /= len; }
   let moved = 0;
-  const nx = me.x + vx * SPEED_X * dt, ny = me.y + vy * SPEED_Y * dt;
-  if (vx && (walkable(room, nx, me.y) || push(nx - me.x, 0))) { moved += Math.abs(nx - me.x); me.x = nx; }
-  if (vy && (walkable(room, me.x, ny) || push(0, ny - me.y))) { moved += Math.abs(ny - me.y); me.y = ny; }
+  const rowing = me.pose === POSE_BOAT, sp = rowing ? 0.7 : 1; // boats go where it's wet, a bit slower
+  const ok = (x: number, y: number) => (rowing ? !!room.water?.(x, y) : walkable(room, x, y));
+  const nx = me.x + vx * SPEED_X * sp * dt, ny = me.y + vy * SPEED_Y * sp * dt;
+  if (vx && (ok(nx, me.y) || (!rowing && push(nx - me.x, 0)))) { moved += Math.abs(nx - me.x); me.x = nx; }
+  if (vy && (ok(me.x, ny) || (!rowing && push(0, ny - me.y)))) { moved += Math.abs(ny - me.y); me.y = ny; }
   if (tapTarget && tapTarget.door && inside(tapTarget.door.trigger, me.x, me.y)) { const door = tapTarget.door; tapTarget = null; goThrough(door); }
   if (tapTarget) {
     tapTarget.stuck = moved < 0.01 ? tapTarget.stuck + dt : 0;
@@ -1035,7 +1061,7 @@ function updateMe(dt: number): void {
   for (const d of room.doors) if (inside(d.trigger, me.x, me.y) && (d.edge || vy < -0.3) && doorDest(d)) goThrough(d);
   const was = me.moving;
   me.moving = moved > 0.01;
-  if (me.moving && me.pose && me.pose !== POSE_GHOST) { me.pose = 0; forceSend = true; }
+  if (me.moving && me.pose && me.pose !== POSE_GHOST && me.pose !== POSE_BOAT) { me.pose = 0; forceSend = true; }
   if (me.pose === POSE_GHOST && now() > ghostUntil) { me.pose = 0; forceSend = true; toast('You are yourself again'); }
   if (Math.abs(vx) > 0.15) me.dir = vx > 0 ? 1 : -1;
   if (was && !me.moving) me.stopT = t;
@@ -1240,7 +1266,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
-    if (room.id === 'subway' || room.id === 'train') subwaySounds();
+    if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);

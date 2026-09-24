@@ -47,6 +47,10 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.arcade .sub { color: #9FEFFF; } .plate.arcade .big { color: #FFF6FF; text-shadow: 0 3px 0 #2A0A4A, 0 0 14px rgba(95, 231, 255, .8); }
 .plate.subway, .plate.train { background: linear-gradient(90deg, rgba(20, 60, 46, .95), rgba(40, 110, 84, .9)); border-left: 5px solid #E6BE28; }
 .plate.subway .sub, .plate.train .sub { color: #B8F0D8; } .plate.subway .big, .plate.train .big { color: #F4FFF8; text-shadow: 0 3px 0 #0A2A20, 0 0 14px rgba(124, 242, 156, .6); }
+.plate.park { background: linear-gradient(90deg, rgba(24, 70, 36, .95), rgba(60, 130, 70, .9)); border-left: 5px solid #FFD65A; }
+.plate.park .sub { color: #D8F5C0; } .plate.park .big { color: #FAFFF0; text-shadow: 0 3px 0 #10301A, 0 0 14px rgba(180, 240, 140, .6); }
+.plate.parkstn { background: linear-gradient(90deg, rgba(20, 60, 46, .95), rgba(40, 110, 84, .9)); border-left: 5px solid #E6BE28; }
+.plate.parkstn .sub { color: #B8F0D8; } .plate.parkstn .big { color: #F4FFF8; text-shadow: 0 3px 0 #0A2A20, 0 0 14px rgba(124, 242, 156, .6); }
 .plate.pier { background: linear-gradient(90deg, rgba(10, 26, 58, .95), rgba(28, 58, 114, .9)); border-left: 5px solid #FFE08A; }
 .plate.pier .sub { color: #CFE6FF; } .plate.pier .big { color: #FFF6E0; text-shadow: 0 3px 0 #0B1A3A, 0 0 14px rgba(255, 224, 138, .6); }
 .plate.plaza .sub { color: #FFE59A; } .plate.plaza .big { color: #FFD65A; text-shadow: 0 3px 0 #9A5B12, 0 0 14px rgba(255, 200, 90, .6); }

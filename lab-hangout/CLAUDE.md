@@ -73,6 +73,9 @@ src/
     subway.ts          THE SUBWAY: the timetable (train(), all from the wall clock), SQUARE STATION (1300x700) with
                        the train pulling in, and THE TRAIN carriage (1000x650) with the view going by; STATIONS
                        lists the stops (room: null = OPENING SOON, doors stay shut)
+    park.ts            CITY PARK (1600x760, day/night): pond (onWater, ducks, fountain, dock), kite stand, bandstand
+                       music, hot dogs, picnic blankets, the shared sandbox (room state 'sand'), OAK
+    weather.ts         the shared wind (kites fly on it), from the wall clock
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
@@ -102,6 +105,7 @@ src/
     pong.ts            2-player Pong (P1's browser runs the ball)
     prizes.ts          the prize counter: your collection
     garden.ts          the seed picker and your-plant card (water / harvest / dig up)
+    sandbox.ts         the Park sandbox editor (pile / dig / tower)
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
   audio/sfx.ts         synthesized blips (no audio files)
@@ -165,7 +169,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
 | moderation | RPC `report_player(who, reason)`; 3 reporters in 10 min = 30 min mute; owner-only `ban_player` | |
 | emote | broadcast `emote` | `{ id, kind }` (`wave` `hop` `joy` `huh` `idea` `sip` `eat` `feed`) |
-| room state | broadcast `state`, newest `ts` wins (`slop` merges as a union); the host re-sends all of it when someone joins | `{ id, k, v, ts }` (`juke`, `hi`, `board`, `build`, `deploy`, `notes`, `game`, `slop`, `fw`, `crypt`, `claw`, `champ`) |
+| room state | broadcast `state`, newest `ts` wins (`slop` merges as a union); the host re-sends all of it when someone joins | `{ id, k, v, ts }` (`juke`, `hi`, `board`, `build`, `deploy`, `notes`, `game`, `slop`, `fw`, `crypt`, `claw`, `champ`, `garden`, `sand`) |
 | stage notes | broadcast `note`, ≤14/s | `{ id, i, n }` (instrument 0-3, pad 0-7) |
 | who's online | presence on the server's `hangout:<server>:lobby` (LOCAL: `lobby` messages every 2 s) | `{ name, room }` |
 | whiteboard | broadcast `draw`, ~12/s while drawing | `{ id, c, p: [x0,y0,…], clear, ts }` |
@@ -175,8 +179,9 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 (`desk` is a bitmask of `DESK_ITEMS`)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
-1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when
-you move). Spot lists are append-only, like look options.
+1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
+8 hot dog); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
+4 rowing a boat (moves only where `room.water()` is true). Spot lists are append-only, like look options.
 
 **Shared time without a server:** NPC routines, the Square's day/night (20 min loop), the
 cinema film (80 s loop) and jukebox playback are all computed from `Date.now()`, so every

@@ -4,8 +4,9 @@ A multiplayer pixel hangout. Pick a colour, a hat and an outfit for your little 
 (or Clawd), then walk around **the Lab**, **the Square**, **the Cinema** and **the Dev Den**, chat in speech
 bubbles and emote with everyone else who's online.
 
-Eleven rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
-**the Crypt**, **the Stage**, **the Pier**, **the Arcade**, **the Subway station** and **the train**. Things to do: sit on sofas, benches, cinema seats
+Thirteen rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
+**the Crypt**, **the Stage**, **the Pier**, **the Arcade**, **the Subway** (two stations and the train)
+and **the Park**. Things to do: sit on sofas, benches, cinema seats
 and hammocks; get coffee, popcorn, soda and marshmallows (roast them on the bonfire); draw on
 the Lab's shared whiteboard; play SLOP INVADERS on the arcade cabinet; change the jukebox
 track for the whole room; dance, plonk down on the floor or pick from the emote wheel; feed
@@ -21,7 +22,8 @@ to FOLLOW them (even through doors); wave next to someone who's waving for a HIG
 Decorate your own desk in the Dev Den (the DESK STUFF shelf).
 Down the green-railed stairs on the Square is **the Subway**: a train pulls in every two minutes
 (everyone sees the same train), you board through its open doors and ride together past the
-city skyline. The Park stop opens soon.
+city skyline to **the Park**: row a boat on the pond, feed the ducks, fly a kite on the shared
+wind, grab a hot dog, picnic, listen to the bandstand, and build castles in the shared sandbox.
 Up on the Rooftop is the **community garden**: buy a seed, plant it in a free bed, and it grows
 in real time over hours. Anyone can water anyone's plant (and gets a token for helping), a plant
 left dry for a day wilts, and you harvest it for tokens (sometimes with a rare glowing moonflower
@@ -67,6 +69,8 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
+| Row a boat (Park) | walk on the water; E at the dock to get out | tap the water |
+| Put a kite away | Q | PUT AWAY button |
 | Change your look | **Look** button | **Look** button |
 
 ## Going online with Supabase

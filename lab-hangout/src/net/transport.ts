@@ -16,7 +16,7 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt). `pose` = 0 normal, 1 dancing, 2 sitting on the floor.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 6, POSE_MAX = 3;
+export const SPOTS_MAX = 40, HOLD_MAX = 8, POSE_MAX = 4;
 
 /**
  * Room state: small shared values that someone arriving later must also get. Each has a
@@ -49,7 +49,7 @@ export type StateVal =
   | { k: 'game'; v: GameState } | { k: 'slop'; v: { w: number; dead: number[] } } | { k: 'fw'; v: { t0: number; seed: number } }
   | { k: 'crypt'; v: { b: number[]; open: number } }
   | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
-  | { k: 'garden'; v: { n: number } };
+  | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string };
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -273,6 +273,7 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     if (!Array.isArray(b) || b.length !== 4 || !b.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 4000) || open === null) return null;
     return { id: o.id, s: { k: 'crypt', v: { b: b as number[], open }, ts } };
   }
+  if (o.k === 'sand' && typeof o.v === 'string' && /^[0-4]{320}$/.test(o.v)) return { id: o.id, s: { k: 'sand', v: o.v, ts } };
   if (o.k === 'garden' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'garden', v: { n }, ts } }; }
   if (o.k === 'claw' && v && typeof v === 'object') {
     const name = cleanName(v.name), item = typeof v.item === 'string' && /^[a-z]{2,8}:[0-9]{1,3}$/.test(v.item) ? v.item : '';
