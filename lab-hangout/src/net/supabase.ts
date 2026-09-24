@@ -54,8 +54,12 @@ export class SupabaseTransport implements Transport {
     if (!data.session) return this.acct = { kind: 'none' };
     this.selfId = data.session.user.id;
     const user = data.session.user;
-    const provider = user.identities?.find((i) => i.provider !== 'anonymous')?.provider ?? (user.app_metadata?.providers as string[] | undefined)?.find((p) => p !== 'anonymous');
-    return this.acct = user.is_anonymous && !provider ? { kind: 'guest' } : { kind: 'account', provider };
+    // every login attached to this player (Supabase links logins with the same email automatically),
+    // and which one was used this time (remembered when the button was pressed; else the first)
+    const linked = [...new Set([...(user.identities ?? []).map((i) => i.provider), ...((user.app_metadata?.providers as string[] | undefined) ?? [])])].filter((p) => p !== 'anonymous' && p !== 'email');
+    let last: string | null = null; try { last = localStorage.getItem('labhangout.lastLogin'); } catch { /* private mode */ }
+    const provider = last && linked.includes(last) ? last : linked[0];
+    return this.acct = user.is_anonymous && !provider ? { kind: 'guest' } : { kind: 'account', provider, linked };
   }
   account(): Account { return this.acct; }
   takeAuthError(): { code: string; message: string } | null { const e = this.authErr; this.authErr = null; return e; }
@@ -74,12 +78,14 @@ export class SupabaseTransport implements Transport {
   private back(): string { return location.origin + location.pathname; }
   async loginWith(p: Provider): Promise<void> {
     if (!PROVIDERS.includes(p)) return;
+    try { localStorage.setItem('labhangout.lastLogin', p); } catch { /* private mode */ }
     const { error } = await this.sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: this.back() } });
     if (error) throw new Error(error.message);
     await new Promise(() => {}); // the page is leaving for the provider
   }
   async linkWith(p: Provider): Promise<void> {
     if (!PROVIDERS.includes(p)) return;
+    try { localStorage.setItem('labhangout.lastLogin', p); } catch { /* private mode */ }
     const { error } = await this.sb.auth.linkIdentity({ provider: p, options: { redirectTo: this.back() } });
     if (error) throw new Error(/manual linking/i.test(error.message) ? error.message + ' (turn on "Allow manual linking" in Supabase Auth settings)' : error.message);
     await new Promise(() => {});

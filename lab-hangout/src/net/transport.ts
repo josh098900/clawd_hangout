@@ -90,7 +90,8 @@ export interface LobbyPerson { id: string; name: string; room: RoomId }
 export type Provider = 'discord' | 'google';
 export const PROVIDERS: Provider[] = ['discord', 'google'];
 /** Who you are: nobody yet (pick guest or log in), a guest (this browser only), or an account. */
-export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string }
+/** `provider` = the login used this time; `linked` = every login attached to this player (Supabase links logins that share an email). */
+export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string; linked?: string[] }
 /** A world server and how full it is. `friends` = which of the ids you asked about are on it. */
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
 /** A garden bed on the Rooftop with something growing in it. Times are ms since 1970, `grown` is seconds of growth credited up to `calcAt` (see world/garden.ts growth()). */

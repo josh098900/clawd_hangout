@@ -72,7 +72,8 @@ export class StartScreen {
     box.classList.remove('hidden'); btns.replaceChildren();
     const mk = (label: string, fn: () => void, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill ' + cls; b.textContent = label; b.onclick = fn; btns.appendChild(b); };
     if (a.kind === 'account') {
-      txt.textContent = 'Logged in' + (a.provider ? ' with ' + (PROV_NAME[a.provider] ?? a.provider) : '') + ' ·';
+      const name = (p: string) => PROV_NAME[p] ?? p, also = (a.linked ?? []).filter((p) => p !== a.provider);
+      txt.textContent = 'Logged in' + (a.provider ? ' with ' + name(a.provider) : '') + (also.length ? ' (' + also.map(name).join(', ') + ' linked too)' : '') + ' ·';
       mk('Log out', on.logout);
     } else {
       txt.textContent = providers.length ? 'Playing as a guest · save your progress:' : 'Playing as a guest';
