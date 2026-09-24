@@ -6,6 +6,7 @@ import { K } from '../engine/palette';
 import { PX, r, txt, tw, withCtx, line } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
+import { save } from '../game/save';
 
 const W = 220, H = 150;
 /** Constellations as points in a 0..1 box, traced in order. */
@@ -16,8 +17,7 @@ const SKY: { name: string; pts: [number, number][] }[] = [
   { name: 'THE DRAGON', pts: [[0, 0.6], [0.2, 0.3], [0.35, 0.55], [0.55, 0.2], [0.7, 0.5], [0.9, 0.35], [1, 0.1]] },
   { name: 'THE MUG', pts: [[0.1, 0.1], [0.15, 0.9], [0.7, 0.9], [0.75, 0.1], [0.95, 0.35], [0.9, 0.65]] },
 ];
-const KEY = 'labhangout.stars';
-const found = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } };
+const found = (): string[] => save.data.stars;
 
 export function openStars(onClose: () => void): void {
   const S = Math.max(2, Math.min(4, Math.floor(Math.min((innerWidth - 60) / W, (innerHeight - 240) / H))));
@@ -39,7 +39,7 @@ export function openStars(onClose: () => void): void {
     hit.push(i); SFX.chime();
     if (hit.length === pts.length) {
       done = performance.now(); SFX.score();
-      const f = found(); if (!f.includes(SKY[which].name)) { f.push(SKY[which].name); try { localStorage.setItem(KEY, JSON.stringify(f)); } catch { /* ignore */ } }
+      const f = found(); if (!f.includes(SKY[which].name)) save.update((d) => { d.stars.push(SKY[which].name); });
       status.textContent = 'YOU FOUND ' + SKY[which].name + '! · FOUND ' + f.length + '/' + SKY.length;
     }
   });

@@ -2,17 +2,18 @@
 
 import { BODY } from '../engine/palette';
 import { css } from '../engine/pixel';
-import { basePose, composeCritter, FACES, FITS, HATS, LOCKED_HATS, PETS, SPECIES, type Look } from '../entities/critter';
-import { cleanName } from '../net/transport';
+import { basePose, COLLECTABLES, composeCritter, FACES, FITS, HATS, isLocked, PETS, SPECIES, unlockHint, type Look, type Slot } from '../entities/critter';
+import { cleanName, type Account, type Provider } from '../net/transport';
+import { save } from '../game/save';
 
 const $ = <T extends HTMLElement>(q: string) => document.querySelector(q) as T;
 const LISTS = { sp: SPECIES, hat: HATS, face: FACES, fit: FITS, pet: PETS } as const;
 const LABEL: Record<Key, string> = { sp: 'BODY: ', hat: 'HAT: ', face: 'FACE: ', fit: 'OUTFIT: ', pet: 'PET: ' };
 const CLAY = BODY.findIndex((b) => b.name === 'CLAY');
-/** Unlocked in this browser (the CROWN: open the chest in the Crypt). */
-export function hatUnlocked(i: number): boolean { try { return localStorage.getItem('labhangout.hat.' + i) === '1'; } catch { return false; } }
-/** Pets are earned (the pigeon: feed the pigeons on the Square a few times). */
-export function petUnlocked(i: number): boolean { if (i === 0) return true; try { return localStorage.getItem('labhangout.pet.' + i) === '1'; } catch { return false; } }
+/** Can you wear it? Earned items (the CROWN, pets, claw prizes) need unlocking first; see game/save.ts. */
+export function owns(slot: Slot, i: number): boolean { return !isLocked(slot, i) || save.has(slot + ':' + i); }
+export function collected(): number { return COLLECTABLES.filter((k) => save.has(k)).length; }
+const PROV_NAME: Record<string, string> = { discord: 'Discord', google: 'Google' };
 type Key = keyof typeof LISTS;
 
 export interface StartResult { name: string; look: Look; sound: boolean }
@@ -40,7 +41,7 @@ export class StartScreen {
       const k = row.dataset.k as Key;
       row.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
         const n = LISTS[k].length; let guard = n;
-        do { this.look[k] = ((this.look[k] ?? 0) + Number(b.dataset.d) + n) % n; } while (((k === 'hat' && LOCKED_HATS.has(this.look.hat) && !hatUnlocked(this.look.hat)) || (k === 'pet' && !petUnlocked(this.look.pet ?? 0))) && --guard > 0);
+        do { this.look[k] = ((this.look[k] ?? 0) + Number(b.dataset.d) + n) % n; } while (k !== 'sp' && !owns(k, this.look[k] ?? 0) && --guard > 0);
         if (k === 'sp' && this.look.sp === 1) this.look.c = CLAY; // Clawd starts in its own orange
         this.sync();
       }));
@@ -48,10 +49,37 @@ export class StartScreen {
     this.go.addEventListener('click', () => this.finish(true));
     $('#goMute').addEventListener('click', () => this.finish(false));
     this.nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.finish(true); });
+    save.onChange(() => this.sync());
     this.sync();
   }
 
   setName(n: string): void { this.nameEl.value = n; }
+
+  /** Nobody signed in yet: guest or log in? Resolves with the choice. */
+  chooseSignIn(providers: Provider[]): Promise<'guest' | Provider> {
+    const box = $('#signin'), provs = $('#provs');
+    box.classList.remove('hidden'); this.go.style.display = 'none'; $('#goMute').style.display = 'none'; $('#collect').style.visibility = 'hidden';
+    $('#provHint').style.display = providers.length ? '' : 'none';
+    return new Promise((res) => {
+      const done = (v: 'guest' | Provider) => { box.classList.add('hidden'); this.go.style.display = ''; $('#goMute').style.display = ''; $('#collect').style.visibility = ''; res(v); };
+      $('#asGuest').onclick = () => done('guest');
+      provs.replaceChildren(...providers.map((p) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill prov ' + p; b.textContent = 'Log in with ' + PROV_NAME[p]; b.onclick = () => done(p); return b; }));
+    });
+  }
+  /** Who you're playing as, with the buttons that go with it (save progress / log out). */
+  setAccount(a: Account, providers: Provider[], on: { link: (p: Provider) => void; logout: () => void }): void {
+    const box = $('#acct'), txt = $('#acctTxt'), btns = $('#acctBtns');
+    box.classList.remove('hidden'); btns.replaceChildren();
+    const mk = (label: string, fn: () => void, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill ' + cls; b.textContent = label; b.onclick = fn; btns.appendChild(b); };
+    if (a.kind === 'account') {
+      txt.textContent = 'Logged in' + (a.provider ? ' with ' + (PROV_NAME[a.provider] ?? a.provider) : '') + ' ·';
+      mk('Log out', on.logout);
+    } else {
+      txt.textContent = providers.length ? 'Playing as a guest · save your progress:' : 'Playing as a guest';
+      for (const p of providers) mk(PROV_NAME[p], () => on.link(p), 'prov ' + p);
+      mk('Log out', () => { if (confirm('Log out? Guest progress in this browser will be lost.')) on.logout(); });
+    }
+  }
   setLook(l: Look): void { this.look = { ...l }; this.sync(); }
 
   /** Invite-only world: show the code box and resolve once `check` accepts a code. */
@@ -104,8 +132,11 @@ export class StartScreen {
   private sync(): void {
     document.querySelectorAll<HTMLButtonElement>('#swatches button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === this.look.c)));
     document.querySelectorAll<HTMLElement>('.cyc').forEach((row) => {
-      const k = row.dataset.k as Key; (row.querySelector('span') as HTMLElement).textContent = LABEL[k] + LISTS[k][this.look[k] ?? 0] + (k === 'pet' && !petUnlocked(1) ? ' (FEED THE PIGEONS)' : '');
+      const k = row.dataset.k as Key, i = this.look[k] ?? 0;
+      (row.querySelector('span') as HTMLElement).textContent = LABEL[k] + LISTS[k][i] + (k !== 'sp' && !owns(k, i) ? ' (' + unlockHint(k, i) + ')' : '');
     });
+    const n = collected();
+    $('#collect').textContent = 'COLLECTION ' + n + '/' + COLLECTABLES.length + (n < COLLECTABLES.length ? ' · more prizes in the Arcade claw machine' : ' · complete!');
   }
 
   private animate = (): void => {

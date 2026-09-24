@@ -1,5 +1,7 @@
-// What's biting off the Pier. Rarity decides the odds; the log of what you've caught lives in
-// this browser (it's a collection, not a competition, so no server needed).
+// What's biting off the Pier. Rarity decides the odds; the log of what you've caught is part of
+// your save (game/save.ts): it's a collection, not a competition.
+
+import { save } from './save';
 
 export interface Fish { name: string; rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY' | 'JUNK'; cm: [number, number] }
 export const FISH: Fish[] = [
@@ -10,15 +12,13 @@ export const FISH: Fish[] = [
   { name: 'MOON FISH', rarity: 'LEGENDARY', cm: [60, 90] }, { name: 'GOLDEN KOI', rarity: 'LEGENDARY', cm: [40, 70] },
 ];
 const ODDS: Record<Fish['rarity'], number> = { JUNK: 0.14, COMMON: 0.44, UNCOMMON: 0.28, RARE: 0.11, LEGENDARY: 0.03 };
-const KEY = 'labhangout.fish';
 
 export function catchFish(): { fish: Fish; cm: number; isNew: boolean; count: number } {
   let u = Math.random(), rarity: Fish['rarity'] = 'COMMON';
   for (const k of Object.keys(ODDS) as Fish['rarity'][]) { if (u < ODDS[k]) { rarity = k; break; } u -= ODDS[k]; }
   const pool = FISH.filter((f) => f.rarity === rarity), fish = pool[Math.floor(Math.random() * pool.length)];
   const cm = Math.round(fish.cm[0] + Math.random() * (fish.cm[1] - fish.cm[0]));
-  let log: string[] = []; try { log = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* ignore */ }
-  const isNew = !log.includes(fish.name);
-  if (isNew) { log.push(fish.name); try { localStorage.setItem(KEY, JSON.stringify(log)); } catch { /* ignore */ } }
-  return { fish, cm, isNew, count: log.length };
+  const isNew = !save.data.fish.includes(fish.name);
+  if (isNew) save.update((d) => { d.fish.push(fish.name); });
+  return { fish, cm, isNew, count: save.data.fish.length };
 }

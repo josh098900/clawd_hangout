@@ -84,6 +84,18 @@ const DEFS: NpcDef[] = [
     chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.'],
   },
   {
+    id: 'npc-pixel', name: 'PIXEL', room: 'arcade', speed: 36,
+    look: { c: 4, hat: 6, face: 3, fit: 4, sp: 0 },
+    stops: [
+      { x: 1010, y: 500, wait: 22, say: ['prize counter is open!', 'step right up', 'the halo? only ever seen ONE'] },
+      { x: 300, y: 530, wait: 8, say: ['restocking the capsules...', 'this claw is TOTALLY fair', 'wiggle wiggle'] },
+      { x: 468, y: 540, wait: 10, say: ['ooh, good rally', 'who is the champ today?'] },
+      { x: 640, y: 590, wait: 8, say: ['nobody ever finishes air hockey', 'the puck has a mind of its own'] },
+      { x: 780, y: 520, wait: 6, say: ['still out of order. classic', 'have you tried turning it off and on'] },
+    ],
+    chat: ['welcome to the arcade!', 'the claw costs 3 tokens', 'coins spawn on the Square every 5 minutes', 'got a dupe? you get a token back', 'pong is first to 5', 'check your collection at the prize counter', 'the MUSIC cabinet changes the tune'],
+  },
+  {
     id: 'npc-spin', name: 'DJ SPIN', room: 'stage', speed: 34,
     look: { c: 3, hat: 3, face: 3, fit: 0, sp: 1 },
     stops: [

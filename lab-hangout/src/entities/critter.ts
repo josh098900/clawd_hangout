@@ -7,21 +7,53 @@
 import { BODY, K, type RGB } from '../engine/palette';
 import { PX, mk, r, M, shade, outline, withCtx, lit } from '../engine/pixel';
 
-export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** 0 none, 1 pet pigeon */ pet?: number }
-export const PETS = ['NONE', 'PIGEON'] as const;
+export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** 0 none, 1 pigeon, 2 cat, 3 crab, 4 duck, 5 ghost */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
+/** Things you can put on your desk in the Dev Den (bit i = item i). */
+export const DESK_ITEMS = ['2ND MONITOR', 'PLANT', 'MUG', 'LAVA LAMP', 'FAIRY LIGHTS', 'DRAGON FIGURE', 'STICKERS'] as const;
+export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST'] as const;
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN'] as const;
-/** Hats you have to find first (the CROWN is in the Crypt). */
-export const LOCKED_HATS = new Set([5]);
-export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES'] as const;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO'] as const;
+export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE'] as const;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE'] as const;
+export type Slot = 'hat' | 'face' | 'fit' | 'pet';
+/**
+ * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
+ * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
+ * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
+ */
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS' };
+/** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
+export const CLAW: [string, number][] = [
+  ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
+  ['hat:7', 6], ['hat:9', 6], ['face:5', 6], ['pet:2', 6],
+  ['hat:8', 3], ['fit:5', 3], ['pet:5', 3],
+  ['hat:10', 1],
+];
+export const RARITY = (item: string): string => { const w = CLAW.find(([k]) => k === item)?.[1] ?? 0; return w >= 10 ? 'COMMON' : w >= 6 ? 'UNCOMMON' : w >= 3 ? 'RARE' : w ? 'LEGENDARY' : 'SPECIAL'; };
+/** Is this item locked until earned? */
+export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + ':' + i; return k in EARNED || CLAW.some(([c]) => c === k); };
+/** How to get a locked item. */
+export const unlockHint = (slot: Slot, i: number): string => EARNED[slot + ':' + i] ?? 'CLAW MACHINE PRIZE';
+/** Every collectable, for the collection counter. */
+export const COLLECTABLES = [...Object.keys(EARNED), ...CLAW.map(([k]) => k)];
+export function itemName(item: string): string {
+  const [slot, i] = item.split(':'), n = Number(i);
+  const list = slot === 'hat' ? HATS : slot === 'face' ? FACES : slot === 'fit' ? FITS : slot === 'pet' ? PETS : null;
+  return list?.[n] ?? item.toUpperCase();
+}
+/** A weighted pick from CLAW (LOCAL mode only; online the server rolls). */
+export function rollClaw(rand: () => number): string {
+  let u = rand() * CLAW.reduce((t, [, w]) => t + w, 0);
+  for (const [k, w] of CLAW) { if (u < w) return k; u -= w; }
+  return CLAW[0][0];
+}
 export const DEFAULT_LOOK: Look = { c: 0, hat: 0, face: 0, fit: 1, sp: 0 };
 
 export function sanitizeLook(v: unknown): Look {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const n = (x: unknown, max: number) => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < max ? x : 0);
-  return { c: n(o.c, BODY.length), hat: n(o.hat, HATS.length), face: n(o.face, FACES.length), fit: n(o.fit, FITS.length), sp: n(o.sp, SPECIES.length), pet: n(o.pet, PETS.length) };
+  return { c: n(o.c, BODY.length), hat: n(o.hat, HATS.length), face: n(o.face, FACES.length), fit: n(o.fit, FITS.length), sp: n(o.sp, SPECIES.length), pet: n(o.pet, PETS.length), desk: n(o.desk, 1 << DESK_ITEMS.length) };
 }
 
 export type Eyes = 'n' | 'b' | 's' | 'w' | 'h';
@@ -84,7 +116,7 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     };
     // antenna / hat top
     const antBase = look.hat === 1 ? -31 : TOP - 1;
-    if (look.hat !== 2) {
+    if (!COVERS.has(look.hat)) {
       const tipX = Math.round(P.ant), L = look.hat === 4 ? 6 : 6;
       for (let j = 0; j < L; j++) { const u = j / (L - 1), x = Math.round(tipX * u * u); R(x, antBase - j, 1, 1, look.hat === 4 ? [60, 150, 80] : shade(body, 0.5)); }
       const bx = tipX, by = antBase - L - 1;
@@ -94,6 +126,10 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
         lit(() => { R(bx - 1, by - 1, 3, 3, M(bulbCol, [255, 255, 255], P.flare * 0.8)); R(bx - 1, by - 1, 1, 1, [255, 255, 255]); });
         bulb = [bx, by];
       }
+    }
+    if (look.fit === 5) { // cape, behind the body: flares out at the back as you walk
+      const cc: RGB = [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
+      for (let y = -14; y <= -2; y++) { const w = hwAt(Math.min(y, -4)) + 2 + Math.floor((y + 14) / 4); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -3 ? shade(cc, 0.7) : cc); }
     }
     // body
     for (let y = TOP; y <= -4; y++) {
@@ -114,6 +150,13 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
       }
       R(-hwAt(-4) - 1, -4, hwAt(-4) * 2 + 2, 1, K.COAT_LN); R(0, -9, 1, 5, K.COAT_LN); R(4, -8, 5, 1, K.COAT_LN); R(4, -8, 1, 3, K.COAT_LN); R(8, -8, 1, 3, K.COAT_LN);
       R(6, -9, 1, 2, [70, 110, 220]);
+    } else if (look.fit === 4) { // hoodie: pouch pocket, drawstrings, the hood bunched behind the neck
+      const hc: RGB = [80, 110, 210], hd = shade(hc, 0.72);
+      for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, y === -4 ? hd : hc); R(-hw, y, 1, 1, M(hc, [255, 255, 255], 0.25)); R(hw - 1, y, 1, 1, hd); }
+      R(-hwAt(-14) - 1, -14, hwAt(-14) * 2 + 2, 1, hd); R(-5, -9, 10, 3, hd); R(-4, -9, 8, 1, shade(hc, 0.85));
+      R(-2, -13, 1, 4, [236, 238, 250]); R(2, -13, 1, 3, [236, 238, 250]);
+    } else if (look.fit === 5) { // cape: collar + gold clasp
+      R(-hwAt(-13), -13, hwAt(-13) * 2, 1, [200, 40, 60]); R(-2, -13, 4, 2, [255, 214, 90]); R(-1, -13, 1, 1, [255, 244, 190]);
     } else if (look.fit === 2) { // scarf
       const sc: RGB = [220, 64, 76], st: RGB = [255, 210, 120];
       for (let y = -13; y <= -11; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, sc); }
@@ -151,9 +194,10 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     } else if (look.face === 3) { // shades
       for (const x of ex) { R(x - 1, ey - 1, 5, 4, K.BLACK); R(x, ey, 1, 1, [120, 130, 160]); }
       R(ex[0] + 4, ey - 1, ex[1] - ex[0] - 5, 1, K.BLACK);
-    }
+    } else if (look.face >= 4) extraFace(R, look.face, ex, ey, mx, -16);
     // hats
-    if (look.hat === 1) { // hard hat
+    if (look.hat >= 6) { const b = extraHat(R, look.hat, -23, d, P, bulbCol); if (b) bulb = b; }
+    else if (look.hat === 1) { // hard hat
       const rows = [16, 18, 20, 22]; rows.forEach((w, j) => R(-w / 2, -31 + j, w, 1, K.YEL)); R(-14, -27, 28, 2, K.YEL_DK); R(-1, -31, 2, 4, K.YEL_HI); R(-8, -30, 3, 1, K.YEL_HI);
     } else if (look.hat === 2) { // beanie with a glowing pompom
       const bc: RGB = [210, 60, 70], bh: RGB = [240, 110, 110];
@@ -172,8 +216,55 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
   });
   PX.dim = pd; PX.emit = pe; PX.fl = pf;
   outline(src, out, sil, '#160C2C');
-  const top = look.hat === 2 ? -37 : look.hat === 1 ? -40 : look.hat === 5 ? -39 : -34;
+  const top = look.hat >= 6 ? -23 - HAT_TALL[look.hat - 6] : look.hat === 2 ? -37 : look.hat === 1 ? -40 : look.hat === 5 ? -39 : -34;
   return { cv: out, ox: OX, oy: OY, bulb, bulbCol, top, hand: P.dir > 0 ? [16, -12] : [-17, -12], mouth: [P.dir, -14] };
+}
+
+/** Hats that hide the critter's antenna. */
+const COVERS = new Set([2, 6, 7, 8, 9]);
+/** How far each prize hat (6..10) rises above its brim row. */
+const HAT_TALL = [14, 10, 17, 13, 16];
+type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
+
+/** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
+function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: RGB): [number, number] | null {
+  if (hat === 6) { // party hat: striped cone with a glowing pompom
+    for (let j = 0; j < 11; j++) { const w = Math.max(1, Math.round(12 * (1 - j / 11))); R(-Math.floor(w / 2), b - j, w, 1, (j >> 1) % 2 ? [255, 214, 90] : [255, 95, 170]); if (w > 2) R(-Math.floor(w / 2), b - j, 1, 1, [255, 240, 250]); }
+    lit(() => { R(-1, b - 13, 3, 3, M(bulbCol, [255, 255, 255], 0.5 + P.flare * 0.5)); R(-1, b - 13, 1, 1, [255, 255, 255]); });
+    return [0, b - 12];
+  }
+  if (hat === 7) { // cowboy: dented crown, band, brim curled up at the ends
+    const br: RGB = [150, 96, 52], bl: RGB = [184, 124, 72], bd: RGB = [96, 60, 32];
+    for (let y = b - 8; y < b; y++) { const w = y === b - 8 ? 14 : 16; R(-w / 2, y, w, 1, br); R(-w / 2, y, 1, 1, bl); }
+    R(-1, b - 8, 2, 1, bd); R(-8, b - 2, 16, 1, bd);
+    R(-15, b, 30, 2, br); R(-15, b, 30, 1, bl); R(-16, b - 1, 2, 2, br); R(14, b - 1, 2, 2, br);
+    return null;
+  }
+  if (hat === 8) { // wizard: tall droopy cone with stars
+    const wc: RGB = [110, 80, 210], wl: RGB = [150, 125, 240];
+    R(-13, b, 26, 2, shade(wc, 0.7));
+    for (let j = 1; j < 16; j++) { const w = Math.max(2, Math.round(16 * (1 - j / 16))), sh = -d * Math.round((j * j) / 45); R(sh - Math.floor(w / 2), b - j, w, 1, wc); R(sh - Math.floor(w / 2), b - j, 1, 1, wl); }
+    lit(() => { R(-4, b - 4, 1, 1, [255, 236, 140]); R(3, b - 7, 1, 1, [255, 236, 140]); R(-1, b - 10, 1, 1, [255, 255, 255]); });
+    return null;
+  }
+  if (hat === 9) { // top hat
+    const tc: RGB = [40, 36, 52], tl: RGB = [84, 78, 104];
+    R(-7, b - 11, 14, 11, tc); R(-7, b - 11, 14, 1, tl); R(-7, b - 10, 1, 10, tl); R(-7, b - 3, 14, 2, [200, 40, 60]);
+    R(-12, b, 24, 2, tc); R(-12, b, 24, 1, tl);
+    return null;
+  }
+  // halo: a glowing gold ring bobbing over the head
+  const y = b - 15 + Math.round(Math.sin(P.ant * 0.7 + P.wave) * 0.6), g: RGB = [255, 236, 140];
+  lit(() => { R(-5, y, 10, 1, g); R(-8, y + 1, 3, 1, g); R(5, y + 1, 3, 1, g); R(-5, y + 2, 10, 1, [255, 214, 90]); });
+  return [0, y + 1];
+}
+
+/** The claw machine face items: 4 mustache, 5 monocle (around the second eye). */
+function extraFace(R: Rect, face: number, ex: number[], ey: number, mx: number, my: number): void {
+  if (face === 4) { const c: RGB = [92, 58, 40]; R(mx - 5, my, 4, 2, c); R(mx + 2, my, 4, 2, c); R(mx - 1, my, 3, 1, c); R(mx - 6, my - 1, 1, 1, c); R(mx + 6, my - 1, 1, 1, c); R(mx - 4, my, 2, 1, [130, 88, 62]); return; }
+  const x = ex[1], g: RGB = [255, 214, 90];
+  R(x - 2, ey - 2, 7, 1, g); R(x - 2, ey + 4, 7, 1, g); R(x - 2, ey - 2, 1, 7, g); R(x + 4, ey - 2, 1, 7, g); R(x - 1, ey - 1, 1, 1, K.WHITE);
+  for (let k = 0; k < 5; k++) R(x + 4 + (k >> 1), ey + 5 + k, 1, 1, k % 2 ? [184, 144, 42] : g);
 }
 
 /** The Crypt's crown: gold band with points and three gems, sitting with its base at y = `base`. */
@@ -192,6 +283,7 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
   const body = BODY[look.c]?.c ?? BODY[0].c;
   const hi = M(body, [255, 255, 255], 0.22), lo = shade(body, 0.8), lo2 = shade(body, 0.6);
   const bulbCol = M(body, [255, 255, 255], 0.6);
+  let clawdBulb: [number, number] | null = null;
   const pd = PX.dim, pe = PX.emit, pf = PX.fl;
   PX.dim = dim; PX.emit = false; PX.fl = 0;
   sctx.clearRect(0, 0, SW, SH);
@@ -203,6 +295,10 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       const up = P.lift === (i % 2 ? 2 : 1) ? 2 : 0;
       R(lx, -6, 3, 6 - up, body); R(lx + 2, -6, 1, 6 - up, lo); R(lx, -1 - up, 3, 1, lo2);
     });
+    if (look.fit === 5) { // cape behind the block
+      const cc: RGB = [200, 40, 60], fl = Math.round(Math.abs(P.ant) * 0.8);
+      for (let y = -18; y <= -3; y++) { const w = 14 + Math.floor((y + 18) / 5); R(-w - (d > 0 ? fl : 0), y, w * 2 + fl, 1, y >= -4 ? shade(cc, 0.7) : cc); }
+    }
     // body
     R(-12, -24, 24, 18, body); R(-12, -24, 24, 1, hi); R(-12, -23, 1, 16, hi);
     R(10, -23, 2, 17, lo); R(-11, -7, 21, 1, lo);
@@ -220,6 +316,12 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
         if (open > 0 && y < -6) { R(-open, y, open * 2, 1, body); R(-open - 1, y, 1, 1, K.COAT_LN); R(open, y, 1, 1, K.COAT_LN); }
       }
       R(-13, -5, 26, 1, K.COAT_LN); R(5, -12, 5, 1, K.COAT_LN); R(5, -12, 1, 3, K.COAT_LN); R(9, -12, 1, 3, K.COAT_LN); R(7, -13, 1, 2, [70, 110, 220]);
+    } else if (look.fit === 4) { // hoodie
+      const hc: RGB = [80, 110, 210], hd = shade(hc, 0.72);
+      for (let y = -15; y <= -5; y++) { R(-13, y, 26, 1, y === -5 ? hd : hc); R(-13, y, 1, 1, M(hc, [255, 255, 255], 0.25)); R(12, y, 1, 1, hd); }
+      R(-6, -11, 12, 3, hd); R(-5, -11, 10, 1, shade(hc, 0.85)); R(-2, -15, 1, 4, [236, 238, 250]); R(2, -15, 1, 3, [236, 238, 250]);
+    } else if (look.fit === 5) { // cape collar + clasp
+      R(-12, -16, 24, 1, [200, 40, 60]); R(-2, -16, 4, 2, [255, 214, 90]); R(-1, -16, 1, 1, [255, 244, 190]);
     } else if (look.fit === 2) { // scarf: a band under the eyes with a fluttering tail
       const sc: RGB = [220, 64, 76], st: RGB = [255, 210, 120];
       R(-13, -16, 26, 3, sc); for (let x = -11; x < 12; x += 5) R(x, -16, 2, 3, st);
@@ -229,11 +331,11 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       const bc: RGB = [123, 97, 255];
       R(-4, -16, 3, 3, bc); R(2, -16, 3, 3, bc); R(-1, -15, 3, 2, shade(bc, 0.75)); R(-4, -16, 1, 1, M(bc, [255, 255, 255], 0.4));
     }
-    const coat = look.fit === 1;
+    const sleeve: [RGB, RGB] | null = look.fit === 1 ? [K.COAT, K.COAT_SH] : look.fit === 4 ? [[80, 110, 210], shade([80, 110, 210], 0.72)] : null;
     const arm2 = (side: -1 | 1, raised: boolean, sway: number) => {
-      if (!coat) return arm(side, raised, sway);
+      if (!sleeve) return arm(side, raised, sway);
       const ax = (side < 0 ? (raised ? -17 : -18) : (raised ? 11 : 12)) + sway, ay = raised ? -27 : -18;
-      R(ax, ay, 6, 6, K.COAT); R(ax, ay + 5, 6, 1, K.COAT_SH); if (side > 0) R(ax + 5, ay, 1, 6, K.COAT_SH); R(side < 0 ? ax : ax + 4, ay + 2, 2, 2, body);
+      R(ax, ay, 6, 6, sleeve[0]); R(ax, ay + 5, 6, 1, sleeve[1]); if (side > 0) R(ax + 5, ay, 1, 6, sleeve[1]); R(side < 0 ? ax : ax + 4, ay + 2, 2, 2, body);
     };
     if (P.arm === 'wave') { arm2(-1, false, 0); arm2(1, true, Math.round(P.wave)); }
     else if (P.arm === 'up') { arm2(-1, true, 0); arm2(1, true, 0); }
@@ -260,9 +362,10 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
     } else if (look.face === 3) { // shades
       for (const x of ex) { R(x - 1, ey - 1, 5, 4, K.BLACK); R(x, ey, 1, 1, [120, 130, 160]); }
       R(ex[0] + 4, ey - 1, ex[1] - ex[0] - 5, 1, K.BLACK);
-    }
+    } else if (look.face >= 4) extraFace(R, look.face, ex, ey, d - 1, -16);
     // hats sit on the flat top (y = -24)
-    if (look.hat === 1) { // hard hat
+    if (look.hat >= 6) clawdBulb = extraHat(R, look.hat, -25, d, P, bulbCol);
+    else if (look.hat === 1) { // hard hat
       [14, 18, 20, 22].forEach((w, j) => R(-w / 2, -30 + j, w, 1, K.YEL)); R(-15, -26, 30, 2, K.YEL_DK); R(-1, -30, 2, 4, K.YEL_HI); R(-7, -29, 3, 1, K.YEL_HI);
     } else if (look.hat === 2) { // beanie with a glowing pompom
       const bc: RGB = [210, 60, 70], bh: RGB = [240, 110, 110];
@@ -281,8 +384,8 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
   PX.dim = pd; PX.emit = pe; PX.fl = pf;
   outline(src, out, sil, '#160C2C');
   // no antenna: the "idea" glow + sparkles hover above the head only while it's lit
-  const bulb: [number, number] | null = look.hat === 2 ? [0, -32] : P.flare > 0.05 ? [0, -30] : null;
-  const top = look.hat === 1 ? -34 : look.hat === 2 ? -37 : look.hat === 4 ? -35 : look.hat === 3 ? -33 : look.hat === 5 ? -37 : -30;
+  const bulb: [number, number] | null = clawdBulb ?? (look.hat === 2 ? [0, -32] : P.flare > 0.05 ? [0, -30] : null);
+  const top = look.hat >= 6 ? -25 - HAT_TALL[look.hat - 6] : look.hat === 1 ? -34 : look.hat === 2 ? -37 : look.hat === 4 ? -35 : look.hat === 3 ? -33 : look.hat === 5 ? -37 : -30;
   return { cv: out, ox: OX, oy: OY, bulb, bulbCol, top, hand: P.dir > 0 ? [19, -15] : [-20, -15], mouth: [P.dir, -16] };
 }
 

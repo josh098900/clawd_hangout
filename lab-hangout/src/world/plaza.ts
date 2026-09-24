@@ -1,7 +1,7 @@
 // THE SQUARE — the film's night city square, widened to 1200px. The giant robot and the
 // stage are gone; the three voxel creations she built now stand as permanent installations.
 
-import { K, DK, CK, type RGB } from '../engine/palette';
+import { K, DK, CK, CONFETTI, type RGB } from '../engine/palette';
 import { PX, mk, r, txt, alpha, lit, G, Gd, Gline, withCtx, M, shade, tw } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import type { Room, Prop, Spot } from './room';
@@ -15,6 +15,8 @@ const COASTER_AT: [number, number] = [760, GROUND];
 const DRAGON_AT: [number, number] = [990, GROUND - 14];
 const LABDOOR = { x: 40, y: 488, w: 44, h: 72 };
 const CINE = { x0: 380, x1: 508, top: 432, door: { x: 426, y: 506, w: 36, h: 54 } };
+/** The Arcade stairwell (top edge centre), down in the front-left of the Square. */
+const ARC = { x: 186, y: 680 };
 
 /**
  * Day/night on a 20-minute loop of the WALL clock, so every player sees the same sky.
@@ -113,6 +115,11 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     // the grate down to the Crypt
     r(1100, 684, 40, 14, [20, 22, 30]); for (let x = 1102; x < 1140; x += 5) r(x, 684, 2, 14, [70, 74, 88]); r(1100, 684, 40, 2, [90, 94, 110]); r(1100, 696, 40, 2, [50, 54, 66]);
     r(1146, 660, 2, 38, K.STEEL_POST); r(1140, 652, 30, 10, [30, 34, 56]); txt('CRYPT', 1155 - tw('CRYPT') / 2, 654, [124, 242, 208]);
+    // the stairs down to the Arcade: a lit stairwell with railings, like a subway entrance
+    r(ARC.x - 26, ARC.y, 52, 26, [14, 10, 24]); for (let k = 0; k < 5; k++) r(ARC.x - 22 + k, ARC.y + 3 + k * 5, 44 - k * 2, 2, [70, 56, 100]);
+    r(ARC.x - 28, ARC.y - 2, 56, 2, [90, 94, 110]); for (const sx of [ARC.x - 28, ARC.x + 26]) { r(sx, ARC.y - 12, 2, 38, K.STEEL_POST); r(sx, ARC.y - 12, 2, 1, [140, 150, 180]); }
+    r(ARC.x - 28, ARC.y - 12, 56, 2, K.STEEL_POST);
+    r(ARC.x + 40, ARC.y - 42, 2, 70, K.STEEL_POST); r(ARC.x + 14, ARC.y - 60, 56, 18, [30, 20, 50]); r(ARC.x + 14, ARC.y - 60, 56, 1, [90, 60, 140]);
   });
 }
 
@@ -122,6 +129,9 @@ function drawBack(a: number): void {
   if (day > 0.01 && day < 0.99) alpha(0.28 * Math.sin(Math.PI * day), () => r(0, 0, W, GROUND, [255, 140, 90]));
   // the stage sign over the tower door
   lit(() => txt('STAGE', 593 - tw('STAGE') / 2, 498, (a % 1.4) < 1.1 ? K.MAG : [120, 40, 100])); G(574, 494, 38, 12, K.MAG, 0.25);
+  // the ARCADE sign blinks through the colours, and the stairwell glows
+  lit(() => { const s = 'ARCADE'; let x = ARC.x + 42 - tw(s) / 2; for (let i = 0; i < s.length; i++) { txt(s[i], x, ARC.y - 56, CONFETTI[(i + Math.floor(a * 3)) % CONFETTI.length]); x += tw(s[i]) + 1; } const ac: RGB = (a % 1) < 0.5 ? K.GOLD : [120, 90, 40]; for (let k = 0; k < 3; k++) r(ARC.x + 40 - 2 + k, ARC.y - 50 + k, 5 - k * 2, 1, ac); });
+  G(ARC.x + 14, ARC.y - 60, 56, 18, [255, 120, 220], 0.22); G(ARC.x - 26, ARC.y, 52, 26, [200, 120, 255], 0.14 + 0.06 * Math.sin(a * 3));
   // something glows green down the Crypt grate
   G(1098, 682, 44, 18, [124, 242, 208], 0.12 + 0.08 * Math.sin(a * 2)); lit(() => { for (let x = 1104; x < 1138; x += 5) if ((a * 2 + x * 0.3) % 3 < 0.6) r(x + 1, 690, 1, 2, [124, 242, 208]); });
   // cinema marquee: chasing bulbs around the board, and tonight's film
@@ -176,7 +186,8 @@ const benchSeats = (x: number, y: number): Spot[] => [-14, 14].map((dx) => ({ ki
 /** Coins you can pick up (server-owned tokens: see supabase/migrations/0003_tokens.sql). Index = coin id 0..5. */
 export const COINS: [number, number][] = [[330, 640], [512, 700], [1110, 610], [690, 668], [250, 600], [880, 700]];
 export const PLAZA_SPOTS: Spot[] = [...benchSeats(422, 642), ...benchSeats(902, 654),
-  { kind: 'party', game: 'tag', x: 660, y: 600, sx: 660, sy: 600, lift: 0, label: 'PLAY TAG', area: { x0: 646, y0: 548, x1: 674, y1: 590 } }]; // 4
+  { kind: 'party', game: 'tag', x: 660, y: 600, sx: 660, sy: 600, lift: 0, label: 'PLAY TAG', area: { x0: 646, y0: 548, x1: 674, y1: 590 } }, // 4
+  { kind: 'party', game: 'hide', x: 112, y: 624, sx: 112, sy: 624, lift: 0, label: 'HIDE & SEEK', area: { x0: 90, y0: 572, x1: 134, y1: 612 } }]; // 5
 
 // ---- standing props ----
 const lampPost = (x: number, y: number): Prop => ({
@@ -208,6 +219,16 @@ const tagSign: Prop = {
     lit(() => txt('TAG!', x - tw('TAG!') / 2, y - 36, (a % 1.2) < 0.7 ? K.RED : [255, 140, 90]));
   },
 };
+/** HIDE & SEEK: a signboard by the Lab door (starts a round across every room). */
+const hideSign: Prop = {
+  y: 612,
+  draw(a: number) {
+    const x = 112, y = 612;
+    r(x - 1, y - 26, 3, 26, K.STEEL_POST); r(x - 20, y - 42, 40, 18, [30, 34, 56]); r(x - 19, y - 41, 38, 16, [240, 236, 220]);
+    lit(() => { txt('HIDE &', x - tw('HIDE &') / 2, y - 39, (a % 2) < 1.4 ? [123, 97, 255] : [180, 160, 255]); txt('SEEK', x - tw('SEEK') / 2, y - 32, [123, 97, 255]); });
+    if ((a * 0.5) % 1 < 0.5) r(x + 14, y - 38, 2, 2, [255, 214, 90]);
+  },
+};
 const bin = (x: number, y: number): Prop => ({
   y,
   draw() { r(x - 6, y - 16, 12, 16, [46, 90, 70]); r(x - 7, y - 18, 14, 3, [60, 110, 86]); for (let k = 0; k < 3; k++) r(x - 4 + k * 4, y - 13, 1, 11, [36, 70, 56]); },
@@ -223,12 +244,15 @@ export function makePlaza(): Room {
       { x0: 392, y0: 636, x1: 452, y1: 646 }, { x0: 872, y0: 648, x1: 932, y1: 658 },
       { x0: 604, y0: 598, x1: 616, y1: 606 },
       { x0: 654, y0: 582, x1: 666, y1: 590 }, // tag sign
+      { x0: 106, y0: 606, x1: 118, y1: 614 }, // hide & seek sign
+      { x0: 156, y0: 668, x1: 162, y1: 712 }, { x0: 210, y0: 668, x1: 216, y1: 712 }, { x0: 224, y0: 668, x1: 230, y1: 676 }, // stairwell railings + sign post
     ],
     doors: [
       { trigger: { x0: 42, y0: 570, x1: 82, y1: 578 }, to: 'lab', arrive: { x: 30, y: 456 }, label: 'THE LAB', area: { x0: 34, y0: 448, x1: 90, y1: 576 } },
       { trigger: { x0: 1184, y0: 600, x1: 1194, y1: 712 }, edge: true, to: 'pier', arrive: { x: 40, y: 620 }, label: 'PIER', area: { x0: 1168, y0: 580, x1: 1200, y1: 712 } },
       { trigger: { x0: 578, y0: 570, x1: 608, y1: 578 }, to: 'stage', arrive: { x: 40, y: 500 }, label: 'STAGE', area: { x0: 572, y0: 494, x1: 614, y1: 576 } },
       { trigger: { x0: 1102, y0: 684, x1: 1138, y1: 694 }, to: 'crypt', arrive: { x: 40, y: 470 }, label: 'CRYPT', area: { x0: 1096, y0: 648, x1: 1172, y1: 698 } },
+      { trigger: { x0: 168, y0: 684, x1: 204, y1: 700 }, edge: true, to: 'arcade', arrive: { x: 90, y: 500 }, label: 'ARCADE', area: { x0: 158, y0: 618, x1: 256, y1: 706 } },
       { trigger: { x0: 426, y0: 570, x1: 462, y1: 578 }, to: 'cinema', arrive: { x: 62, y: 462 }, label: 'CINEMA', area: { x0: 420, y0: 500, x1: 468, y1: 576 } },
     ],
     spots: PLAZA_SPOTS, inUse: new Map(),
@@ -241,7 +265,7 @@ export function makePlaza(): Room {
     altAlpha: dayness,
     glowMul: () => 1 - 0.75 * dayness(),
     drawBack,
-    props: [lampPost(161, 574), lampPost(521, 574), lampPost(701, 574), lampPost(1061, 574), bench(422, 642), bench(902, 654), bin(610, 604), tagSign],
+    props: [lampPost(161, 574), lampPost(521, 574), lampPost(701, 574), lampPost(1061, 574), bench(422, 642), bench(902, 654), bin(610, 604), tagSign, hideSign],
   };
   return room;
 }

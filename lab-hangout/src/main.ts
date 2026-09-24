@@ -17,9 +17,17 @@ import { makeRoof, showStart } from './world/roof';
 import { makeStage, stageNote, INST_COL } from './world/stage';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
+import { makeArcade, ARCADE_INFO, PONG_SPOTS, pongSeen } from './world/arcade';
+import { openClaw, withItem } from './ui/claw';
+import { openPong, type PongHandle } from './ui/pong';
+import { openPrizes } from './ui/prizes';
+import { openDesk } from './ui/desk';
+import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { catchFish } from './game/fish';
 import { makeCrypt, platesDown, setDown, blockCenters, resetBlocks, CRYPT_INFO, OPEN_FOR } from './world/crypt';
-import { hatUnlocked, petUnlocked } from './ui/start';
+import { owns } from './ui/start';
+import { save } from './game/save';
+import { pickServer } from './ui/servers';
 import { openStars } from './ui/stars';
 import { makePlaza, COINS } from './world/plaza';
 import { turnstileToken } from './ui/captcha';
@@ -30,7 +38,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -53,13 +61,15 @@ const now = () => performance.now() / 1000;
 
 // ---------- tuning ----------
 const SPEED_X = 80, SPEED_Y = 54;         // world px / s (depth moves slower, like the film's floor)
-const SEND_HZ = 9;                        // position broadcasts per second while walking
+/** Position broadcasts per second while walking: 9 in a quiet room, easing to 4 in a full one
+ *  (every message is delivered to everyone in the room, so traffic grows with the square of the crowd). */
+const sendHz = (n: number) => (n <= 3 ? 9 : Math.max(4, 9 - (n - 3) * 0.625));
 const HEARTBEAT = 4;                      // re-send position when idle (s)
 const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -84,7 +94,6 @@ const ambient = new Ambient();
 /** Spots in this room used by anyone but you (players, bots, NPCs) -> when they started. */
 const busy = new Map<number, number>();
 let fillEnd = 0, told = new Set<number>();
-let hiScore = 0; try { hiScore = Number(localStorage.getItem('labhangout.hiscore')) || 0; } catch { /* private mode */ }
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
@@ -103,7 +112,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -174,6 +183,7 @@ function onNet(e: NetEvent): void {
     case 'emote': {
       const av = others.get(e.id); if (!av || !allow(e.id, 'emote', 4, 6)) break;
       av.emote = { kind: e.kind, t0: t }; if (!muted.has(e.id)) SFX[e.kind]();
+      if (e.kind === 'wave') highFive(av);
       if (e.kind === 'feed' && room.id === 'plaza') ambient.feed(av.x + av.dir * 30, av.y, t);
       break;
     }
@@ -184,17 +194,24 @@ function onNet(e: NetEvent): void {
       break;
     }
     case 'draw': if (room.id === 'lab' && others.has(e.id) && allow(e.id, 'draw', 20, 40)) BOARD.apply(e.d); break;
+    case 'pong': {
+      // only from whoever is actually standing at that side of the table
+      const av = others.get(e.id); if (!av || room.id !== 'arcade' || av.use !== PONG_SPOTS[e.p.s] || !allow(e.id, 'pong', 20, 30)) break;
+      pongSeen(e.p); pong?.recv(e.id, e.p);
+      break;
+    }
     case 'status': toast(e.text); break;
   }
 }
 const narrow = () => innerWidth < 560;
-function updateCount(): void { $('#count').textContent = narrow() ? (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ON' : (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ONLINE' + (net.mode === 'local' ? ' · LOCAL' : ''); }
+let serverName = '';
+function updateCount(): void { $('#count').textContent = narrow() ? (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ON' : (serverName ? serverName + ' · ' : '') + (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ONLINE' + (net.mode === 'local' ? ' · LOCAL' : ''); }
 
 // ---------- who's online, and friends ----------
 let lobby: LobbyPerson[] = [];
-const friends = new Map<string, string>(); // id -> name, starred people (kept in this browser)
-try { for (const [id, n] of JSON.parse(localStorage.getItem('labhangout.friends') || '[]')) friends.set(id, n); } catch { /* ignore */ }
-const saveFriends = () => { try { localStorage.setItem('labhangout.friends', JSON.stringify([...friends])); } catch { /* ignore */ } };
+const friends = new Map<string, string>(); // id -> name, starred people (in your save)
+save.onChange(() => { friends.clear(); for (const [id, n] of save.data.friends) friends.set(id, n); });
+const saveFriends = () => save.update((d) => { d.friends = [...friends]; });
 function onLobby(people: LobbyPerson[]): void {
   const was = new Set(lobby.map((p) => p.id));
   for (const p of people) if (friends.has(p.id) && !was.has(p.id) && playing) { toast('★ ' + p.name + ' is online (' + ROOMS[p.room].title + ')', 3500); SFX.join(); }
@@ -211,14 +228,39 @@ function peopleCard(): void {
     const star = button(friends.has(p.id) ? '★' : '☆', () => { if (friends.has(p.id)) friends.delete(p.id); else friends.set(p.id, p.name); saveFriends(); star.textContent = friends.has(p.id) ? '★' : '☆'; }, true);
     star.title = 'Friend: get a notice when they come online'; Object.assign(star.style, { fontFamily: 'ui-sans-serif, system-ui', fontSize: '16px', padding: '4px 9px' });
     const name = document.createElement('span'); name.textContent = p.name; name.style.flex = '1';
-    const where = document.createElement('span'); where.textContent = ROOMS[p.room].title; where.style.color = '#9FEFFF';
+    const hiding = !!hsLive(hs, net.selfId) && hsLive(hs, net.selfId)!.phase !== 'over'; // no peeking during hide and seek
+    const where = document.createElement('span'); where.textContent = hiding ? '???' : ROOMS[p.room].title; where.style.color = '#9FEFFF';
     line.append(star, name, where);
-    if (p.room !== room.id) line.appendChild(button('GO', () => { m.close(); SFX.door(); void enterRoom(p.room, null); }));
+    if (p.room !== room.id && !hiding) line.appendChild(button('GO', () => { m.close(); SFX.door(); void enterRoom(p.room, null); }));
     list.appendChild(line);
   }
-  m.body.append(list, row(button('CLOSE', m.close, true)));
+  const where = document.createElement('div'); where.textContent = 'You are on ' + (serverName || 'a server') + '. Friends on other servers can\'t see you.';
+  Object.assign(where.style, { fontFamily: "'VT323', monospace", fontSize: '18px', color: '#E8D8C0', textAlign: 'center' });
+  m.body.append(where, list, row(button('SWITCH SERVER', () => { m.close(); void switchServer(); }), button('CLOSE', m.close, true)));
 }
 $('#count').addEventListener('click', peopleCard);
+
+// ---------- servers ----------
+async function chooseServer(mustPick: boolean): Promise<string | null> {
+  const want = params.get('server');
+  if (want && mustPick && !net.server) { try { await net.claimSeat(want); return want; } catch (e) { toast(e instanceof Error ? e.message : String(e), 3500); } }
+  return pickServer(net, [...friends.keys()], mustPick);
+}
+async function nameServer(): Promise<void> { try { serverName = (await net.servers([])).find((v) => v.id === net.server)?.name ?? ''; } catch { serverName = ''; } updateCount(); }
+function onSeatLost(): void {
+  toast('Your seat lapsed and the server filled up. Pick another one.', 4000);
+  void (async () => { await chooseServer(true); for (const k of ROOM_IDS) roomState[k].clear(); await nameServer(); await enterRoom('lab', null); })();
+}
+async function switchServer(): Promise<void> {
+  const was = net.server;
+  const id = await chooseServer(false);
+  if (!id || id === was) return;
+  for (const k of ROOM_IDS) roomState[k].clear();
+  await nameServer();
+  await enterRoom('lab', null);
+  toast('Welcome to ' + serverName + '!', 2500);
+}
+
 
 // ---------- rooms ----------
 async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
@@ -277,6 +319,7 @@ function emote(kind: EmoteKind): boolean {
   me.emote = { kind, t0: t };
   SFX[kind]();
   net.sendEmote(kind);
+  if (kind === 'wave') highFive(me);
   return true;
 }
 
@@ -296,7 +339,54 @@ function hostView(): HostView {
   return { using: (id) => (id === net.selfId ? me.use : others.get(id)?.use ?? null), seatSpots: room.spots.map((s, i) => (s.kind === 'sit' ? i : -1)).filter((i) => i >= 0), pos: posOf };
 }
 const imIn = (g: GameState): boolean => { const i = g.ids.indexOf(net.selfId); return i >= 0 && (g.kind !== 'chairs' || g.alive.includes(i)); };
-function startGame(kind: 'chairs' | 'tag'): void {
+// ---------- hide and seek (server-wide, see game/hideseek.ts) ----------
+let hs: HideSeek | null = null, hsSent = 0, hsKey = '';
+function setHS(h: HideSeek): void { const prev = hs; hs = h; hsSent = now(); net.sendWorld(h); onHS(prev, h); }
+function onWorld(e: NetEvent): void {
+  if (e.type !== 'world' || !allow(e.id, 'world', 3, 6)) return;
+  const w = e.w, live = hsLive(hs, net.selfId);
+  // during a round only the seeker's browser speaks for it; between rounds anyone can start one
+  // (and a seeker's update also catches up someone who missed the start)
+  const ok = live && live.phase !== 'over' ? e.id === live.seeker && w.seeker === live.seeker && w.ts > live.ts : w.phase === 'hide' || e.id === w.seeker;
+  if (!ok) return;
+  const prev = hs; hs = w; onHS(prev, w);
+}
+/** Local reactions: sounds, toasts, the seeker being walked back to the Lab. */
+function onHS(prev: HideSeek | null, h: HideSeek): void {
+  const key = h.seeker + h.phase + h.t0 + ':' + h.found.length;
+  if (key === hsKey) return; hsKey = key;
+  const seeker = h.seeker === net.selfId, sName = nameIn(h, h.seeker), fresh = !prev || prev.t0 !== h.t0 && prev.phase === 'over' || prev.seeker !== h.seeker;
+  if (h.phase === 'hide' && (fresh || prev?.phase !== 'hide')) {
+    SFX.join();
+    if (seeker) { toast("You're IT! Count to 30 in the Lab, then find everyone", 4500); if (room.id !== 'lab') void enterRoom('lab', null); }
+    else toast('HIDE AND SEEK! ' + sName + ' is seeking. Hide anywhere, in any room!', 4500);
+  } else if (h.phase === 'seek' && prev?.phase === 'hide') { SFX.siren(); toast(seeker ? 'Ready or not, here you come!' : sName + ' is coming...', 3000); }
+  else if (h.phase === 'seek' && prev && h.found.length > prev.found.length) {
+    const who = h.ids[h.found[h.found.length - 1]];
+    if (who === net.selfId) { SFX.hurt(); toast('You were found!', 3000); } else { SFX.pop(); toast('FOUND: ' + nameIn(h, who), 2000); }
+  } else if (h.phase === 'over' && prev?.phase !== 'over') { SFX.score(); if (seeker && h.found.length >= h.ids.length - 1) { lastEmoteAt = -9; emote('joy'); } }
+}
+/** The seeker is frozen in the Lab while everyone hides. */
+const hsFrozen = (): boolean => { const h = hsLive(hs, net.selfId); return !!h && h.phase === 'hide' && h.seeker === net.selfId; };
+function hsFrame(): void {
+  const h = hsLive(hs, net.selfId);
+  const seeking = !!h && h.seeker === net.selfId && h.phase !== 'over';
+  for (const o of others.values()) o.hideName = seeking;
+  if (!h || h.seeker !== net.selfId) return;
+  let next = hsTick(h);
+  if (!next && h.phase === 'seek') for (const o of others.values()) if (Math.hypot(o.x - me.x, o.y - me.y) < TAG_DIST) { next = hsFound(h, o.id); if (next) break; }
+  if (next) setHS(next);
+  else if (h.phase !== 'over' && now() - hsSent > 3) setHS({ ...h, ts: Date.now() }); // keep everyone (and newcomers) in sync
+}
+function startHide(): void {
+  if (hsLive(hs, net.selfId) && hsLive(hs, net.selfId)!.phase !== 'over') { toast('A round is already on!'); return; }
+  const people = [{ id: net.selfId, name: me.name }, ...lobby.map((p) => ({ id: p.id, name: p.name }))];
+  if (people.length < 2) { toast('Need at least 2 people on this server', 3500); return; }
+  setHS(startHS(people));
+}
+
+function startGame(kind: 'chairs' | 'tag' | 'hide'): void {
+  if (kind === 'hide') { startHide(); return; }
   if (gameNow()) { toast('A game is already on!'); return; }
   const seats = hostView().seatSpots.length, cap = kind === 'chairs' ? Math.min(GAME_MAX, seats + 1) : GAME_MAX;
   const ids = [net.selfId, ...others.keys()].slice(0, cap), names = ids.map((id) => (id === net.selfId ? me.name : others.get(id)?.name ?? '?'));
@@ -362,7 +452,14 @@ function useSpot(i: number): void {
   const fill = FILL[s.kind];
   if (s.kind === 'sit') SFX.sit();
   else if (fill) { fillEnd = t + fill.secs; if (s.kind === 'coffee') SFX.brew(); else if (s.kind === 'soda') SFX.pour(); else SFX.pop(); }
-  else if (s.kind === 'arcade') openArcade(Math.max(hiScore, LAB_INFO.hi?.score ?? 0), endArcade);
+  else if (s.kind === 'arcade') openArcade(Math.max(save.data.hi, roomHi()?.score ?? 0), endArcade);
+  else if (s.kind === 'claw') openClawMachine(i);
+  else if (s.kind === 'pong') startPong(i);
+  else if (s.kind === 'decor') {
+    SFX.blip();
+    openDesk(me.look.desk ?? 0, (bits) => { me.look = { ...me.look, desk: bits }; net.updateMe(peerState()); }, () => { applyProfile(me.name, me.look); input.clear(); if (me.use === i) leaveSpot(); });
+  }
+  else if (s.kind === 'prizes') { SFX.blip(); openPrizes(wearItem, () => { input.clear(); if (me.use === i) leaveSpot(); }); }
   else if (s.kind === 'board') openBoard((d) => net.sendDraw(d), () => { input.clear(); if (me.use === i) leaveSpot(); });
   else if (s.kind === 'booth') { booth = { t0: t, next: 0, emoted: -1, frames: [] }; toast('Smile! 3 photos coming up'); }
   else if (s.kind === 'desk') { SFX.sit(); openCode(); }
@@ -374,12 +471,40 @@ function useSpot(i: number): void {
   else if (s.kind === 'instrument') toast(isTouch ? 'Tap the pads to play' : 'Keys 1-8 play notes. Walk away to stop', 3000);
   else if (s.kind === 'chest') {
     leaveSpot();
-    const first = !hatUnlocked(5);
-    try { localStorage.setItem('labhangout.hat.5', '1'); } catch { /* ignore */ }
+    const first = save.unlock('hat:5');
     applyProfile(me.name, { ...me.look, hat: 5 });
     SFX.score(); lastEmoteAt = -9; emote('joy');
     toast(first ? 'You found the CROWN! It is yours now (Look menu)' : 'The crown suits you', 4000);
   }
+}
+/** The SLOP INVADERS high score of the cabinet you're at (the Lab's or the Arcade's). */
+const roomHi = () => (room.id === 'arcade' ? ARCADE_INFO.hi : LAB_INFO.hi);
+/** Put on a hat / face item / outfit / pet you own ('slot:index'). */
+function wearItem(item: string): void { applyProfile(me.name, withItem(me.look, item)); lastEmoteAt = -9; emote('joy'); }
+function openClawMachine(i: number): void {
+  openClaw({
+    play: async () => { const r = await net.playClaw(); setTokens(r.tokens); return r; },
+    look: () => me.look,
+    wear: wearItem,
+    started: () => { ARCADE_INFO.clawT = now(); lastEmoteAt = -9; emote('wow'); },
+    won: (r) => { if (!r.dupe) { save.addPrize(r.item); setState({ k: 'claw', v: { name: me.name, item: r.item } }); } },
+    onClose: () => { input.clear(); if (me.use === i) leaveSpot(); },
+  });
+}
+let pong: PongHandle | null = null;
+function startPong(i: number): void {
+  const side = (PONG_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = PONG_SPOTS[1 - side];
+  pong = openPong({
+    side, myName: me.name,
+    opponent: () => { for (const o of others.values()) if (o.use === other) return { id: o.id, name: o.name }; return null; },
+    send: (p) => { net.sendPong(p); pongSeen(p); },
+    over: (winner) => {
+      const ch = ARCADE_INFO.champ;
+      setState({ k: 'champ', v: { name: winner, wins: ch && ch.name === winner ? ch.wins + 1 : 1 } });
+      if (winner === me.name) { lastEmoteAt = -9; emote('joy'); }
+    },
+    onClose: () => { pong = null; input.clear(); if (me.use === i) leaveSpot(); },
+  });
 }
 function leaveSpot(): void {
   const s = room.spots[me.use];
@@ -390,8 +515,8 @@ function endArcade(score: number): void {
   input.clear();
   if (me.use >= 0 && usingOf(me) === 'arcade') leaveSpot();
   if (score <= 0) return;
-  const roomBest = LAB_INFO.hi?.score ?? 0;
-  if (score > hiScore) { hiScore = score; try { localStorage.setItem('labhangout.hiscore', String(score)); } catch { /* ignore */ } }
+  const roomBest = roomHi()?.score ?? 0;
+  if (score > save.data.hi) save.update((d) => { d.hi = score; });
   if (score > roomBest) { setState({ k: 'hi', v: { name: me.name, score } }); say(net.selfId, 'NEW HI SCORE: ' + score + '!', now(), true); SFX.score(); emote('joy'); }
   else say(net.selfId, 'SCORE: ' + score, now(), true);
 }
@@ -430,7 +555,44 @@ function playerCard(o: Avatar): void {
     const send = (why: string) => { m.close(); net.report(o.id, why).then(() => toast('Thanks. A moderator will look at it.')).catch((e: unknown) => toast(e instanceof Error ? e.message : 'Could not report')); };
     m.body.replaceChildren(note, row(button('BEING RUDE', () => send('rude')), button('SPAM', () => send('spam')), button('CHEATING', () => send('cheating')), button('CANCEL', m.close, true)));
   }, true);
-  m.body.append(note, row(wave, mute, report, button('CLOSE', m.close, true)));
+  const follow = button(following === o.id ? 'STOP FOLLOWING' : 'FOLLOW', () => {
+    m.close();
+    if (following === o.id) { following = null; toast('Stopped following ' + o.name); return; }
+    const h = hsLive(hs, net.selfId); if (h && h.phase !== 'over') { toast('No following during hide and seek!'); return; }
+    following = o.id; followT = 0; toast('Following ' + o.name + ' (walk to stop)', 2500); SFX.blip();
+  }, true);
+  m.body.append(note, row(wave, follow, mute, report, button('CLOSE', m.close, true)));
+}
+// ---------- follow a player (even through doors) ----------
+let following: string | null = null, followT = 0;
+function followStep(t: number): void {
+  if (!following || !playing || switching) return;
+  const h = hsLive(hs, net.selfId); if (h && h.phase !== 'over') { following = null; return; }
+  const o = others.get(following);
+  if (o) {
+    const tx = clamp(o.x - o.dir * 26, room.floor.x0, room.floor.x1), ty = clamp(o.y + 4, room.floor.y0, room.floor.y1);
+    if (Math.hypot(tx - me.x, ty - me.y) > 34 && t - followT > 0.5 && me.use < 0) {
+      followT = t; const path = routeTo(room, me.x, me.y, tx, ty);
+      tapTarget = { x: path[0][0], y: path[0][1], door: null, stuck: 0, spot: -1, npc: null, tk: null, path: path.slice(1) };
+    }
+    return;
+  }
+  // they left the room: go where they went
+  const p = lobby.find((q) => q.id === following);
+  if (p && p.room !== room.id) { if (t - followT > 1) { followT = t; toast('Following ' + p.name + ' to ' + ROOMS[p.room].title, 2000); SFX.door(); void enterRoom(p.room, null); } }
+  else if (!p && t - followT > 4) { following = null; toast('Lost them'); }
+}
+// ---------- high five: two waves side by side ----------
+const hi5 = new Map<string, number>();
+function highFive(a: Avatar): void {
+  const t = now();
+  for (const b of [me, ...others.values()]) {
+    if (b === a || b.emote?.kind !== 'wave' || t - b.emote.t0 > 1.2 || Math.hypot(a.x - b.x, a.y - b.y) > 46) continue;
+    const key = [a.id, b.id].sort().join('|'); if (t - (hi5.get(key) ?? -9) < 3) continue;
+    hi5.set(key, t);
+    floaters.push({ x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 44, t0: t, text: 'HIGH FIVE!' });
+    SFX.clap(); if (a === me || b === me) SFX.score();
+  }
 }
 /** The live slop blob nearest to (x, y), if the invasion is on and we're in the Square. */
 function slopTarget(x: number, y: number, maxD: number): { i: number; x: number; y: number } | null {
@@ -485,9 +647,9 @@ function reel(): void {
 function feed(): void {
   if (!emote('feed')) return;
   ambient.feed(me.x + me.dir * 30, me.y, now());
-  let n = 0; try { n = Number(localStorage.getItem('labhangout.feeds')) + 1; localStorage.setItem('labhangout.feeds', String(n)); } catch { /* ignore */ }
-  if (n === 5 && !petUnlocked(1)) setTimeout(() => {
-    try { localStorage.setItem('labhangout.pet.1', '1'); } catch { /* ignore */ }
+  save.update((d) => { d.feeds++; });
+  if (save.data.feeds >= 5 && !owns('pet', 1)) setTimeout(() => {
+    if (!save.unlock('pet:1')) return;
     applyProfile(me.name, { ...me.look, pet: 1 }); SFX.coo(); SFX.score();
     toast('A pigeon has taken a liking to you! It follows you now (PET in the Look menu)', 4500);
   }, 1500);
@@ -634,9 +796,10 @@ function applyProfile(name: string, look: Look): void {
 // ---------- local player ----------
 function updateMe(dt: number): void {
   if (!playing || editing || switching) return;
-  if (modalOpen()) { input.tap = null; me.moving = false; sendNet(now()); return; }
+  if (modalOpen() || hsFrozen()) { input.tap = null; me.moving = false; sendNet(now()); return; }
   doorCooldown = Math.max(0, doorCooldown - dt);
   const f = room.floor, t = now();
+  if (following && (input.tap || input.axis().x || input.axis().y)) { following = null; toast('Stopped following'); }
   if (input.tap) {
     const [wx, wy] = R.toWorld(input.tap.x, input.tap.y);
     input.tap = null;
@@ -754,7 +917,7 @@ function push(dx: number, dy: number): boolean {
   return true;
 }
 function sendNet(t: number): void {
-  if ((me.moving && t - lastSend > 1 / SEND_HZ) || me.moving !== lastSentMoving || forceSend || t - lastSend > HEARTBEAT) {
+  if ((me.moving && t - lastSend > 1 / sendHz(others.size)) || me.moving !== lastSentMoving || forceSend || t - lastSend > HEARTBEAT) {
     net.sendMove({ x: me.x, y: me.y, dir: me.dir, moving: me.moving, use: me.use, hold: me.hold, pose: me.pose });
     lastSend = t; lastSentMoving = me.moving; forceSend = false;
   }
@@ -900,6 +1063,10 @@ function frame(nowMs: number): void {
     for (const n of npcs.inRoom(room.id)) if (n.av.use >= 0) busy.set(n.av.use, n.av.useT0);
     updateMe(dt);
     room.inUse.clear(); for (const [i, t0] of busy) room.inUse.set(i, t0); if (me.use >= 0) room.inUse.set(me.use, me.useT0);
+    if (room.id === 'den') { // desks show the setup of whoever is sitting at them
+      DEN_INFO.decor.clear();
+      for (const av of [me, ...others.values()]) if (av.use >= 0 && room.spots[av.use]?.kind === 'desk' && av.look.desk) DEN_INFO.decor.set(av.use, av.look.desk);
+    }
     const g = gameNow();
     if (g) {
       if (g.host === net.selfId) { const ng = hostStep(g, hostView()); if (ng) setState({ k: 'game', v: ng }); }
@@ -923,7 +1090,9 @@ function frame(nowMs: number): void {
     actNow = currentAction(); syncActionBar(); syncPad();
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
-    syncGameBar(g ? banner(g) : slopLine);
+    hsFrame(); followStep(t);
+    const hl = hsLive(hs, net.selfId);
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = g && partyMusic(g);
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -968,11 +1137,40 @@ async function boot(): Promise<void> {
   start = new StartScreen(DEFAULT_LOOK, '');
   const chosen = start.open(false);
   let modeMsg = '';
+  let mergedSave: unknown = null;
   let isErr = false;
   const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
+  const captcha = siteKey ? () => { start.status('One quick check that you are human...'); return turnstileToken(siteKey, $('#captcha')); } : undefined;
+  const providers = ((import.meta.env.VITE_AUTH_PROVIDERS as string | undefined) ?? '').split(',').map((p) => p.trim()).filter((p): p is Provider => (PROVIDERS as string[]).includes(p));
+  const mine = net.mode === 'local' ? PROVIDERS : providers;
   try {
-    await net.connect(siteKey ? () => { start.status('One quick check that you are human...'); return turnstileToken(siteKey, $('#captcha')); } : undefined);
-    modeMsg = net.mode === 'supabase' ? 'ONLINE · connected to Supabase' : 'LOCAL MODE · open a second tab to see multiplayer. Add Supabase keys to .env.local to go online.';
+    let acct = await net.connect();
+    // back from a login provider with an error: "that Discord is already someone's account" means
+    // this guest should move their progress into it, so start a merge and log into that account
+    const authErr = net.takeAuthError(), linking = localStorage.getItem('labhangout.linking') as Provider | null;
+    localStorage.removeItem('labhangout.linking');
+    if (authErr) {
+      if (authErr.code === 'identity_already_exists' && linking && acct.kind === 'guest') {
+        start.status('That ' + linking + ' already has a Lab Hangout account: logging you into it and bringing your guest stuff along...');
+        localStorage.setItem('labhangout.merge', await net.startMerge());
+        await net.loginWith(linking);
+        acct = net.account();
+      } else toast('Login problem: ' + authErr.message, 6000);
+    }
+    while (acct.kind === 'none') {
+      const how = await start.chooseSignIn(mine);
+      try {
+        if (how === 'guest') await net.signInGuest(captcha); else await net.loginWith(how);
+        acct = net.account();
+      } catch (e) { start.status(e instanceof Error ? e.message : String(e)); }
+    }
+    modeMsg = net.mode === 'supabase' ? 'ONLINE · connected' : 'LOCAL MODE · open a second tab to see multiplayer. Add Supabase keys to .env.local to go online.';
+    const ticket = localStorage.getItem('labhangout.merge');
+    if (ticket && acct.kind === 'account') {
+      localStorage.removeItem('labhangout.merge');
+      try { const got = await net.finishMerge(ticket); setTokens(got.tokens); mergedSave = got.save; toast('Your guest progress moved into this account!', 4500); }
+      catch (e) { toast('Could not bring your guest progress: ' + (e instanceof Error ? e.message : String(e)), 5000); }
+    }
     if (await net.needsInvite()) { start.status('ONLINE · this world is invite-only'); await start.askInvite((code) => net.joinWorld(code)); }
   } catch (err) {
     console.error(err);
@@ -981,7 +1179,15 @@ async function boot(): Promise<void> {
     modeMsg = 'Could not reach Supabase (' + (err instanceof Error ? err.message : String(err)) + '). Playing in LOCAL mode.';
     isErr = true;
   }
+  net.onSeatLost(onSeatLost);
   net.watchLobby(onLobby);
+  net.watchWorld(onWorld);
+  await save.attach(net.selfId, net);
+  if (mergedSave) save.mergeIn(mergedSave);
+  start.setAccount(net.account(), mine, {
+    link: (p) => { localStorage.setItem('labhangout.linking', p); start.status('Off to ' + p + '...'); void net.linkWith(p).then(() => location.reload(), (e) => start.status(e instanceof Error ? e.message : String(e))); },
+    logout: () => { void net.logout().then(() => { const u = new URL(location.href); u.searchParams.set('signin', ''); location.href = net.mode === 'local' ? u.toString() : location.pathname; }); },
+  });
   const saved = await net.loadProfile();
   if (saved) { start.setName(saved.name); start.setLook(saved.look); }
   start.ready(saved ? 'Back to the lab' : 'Join the lab', modeMsg, isErr);
@@ -990,13 +1196,15 @@ async function boot(): Promise<void> {
   if (res.sound) SFX.chime();
   me = makeAvatar(net.selfId, res.name, res.look, room.spawn.x, room.spawn.y, true, now());
   void net.saveProfile(res.name, res.look);
+  await chooseServer(true);
+  await nameServer();
   playing = true;
   await enterRoom('lab', null);
   net.tokens().then(setTokens).catch(() => {});
   net.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
   logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
 }
-addEventListener('pagehide', () => { void net.leaveRoom(); });
+addEventListener('pagehide', () => { void net.leaveRoom(); net.leaveSeat(); });
 addEventListener('resize', () => updateCount());
 // Dev-only test hook (npm run dev + ?debug): lets scripts teleport and use things without walking.
 if (import.meta.env.DEV && params.has('debug')) {
@@ -1006,6 +1214,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     at: (x: number, y: number) => { me.x = x; me.y = y; forceSend = true; },
     use: (i: number) => useSpot(i), pose: (p: number) => setPose(p), item: () => useItem(), feed: () => feed(),
     state: (v: StateVal) => setState(v), blocks: () => blockCenters(), game: (k: 'chairs' | 'tag') => startGame(k), gameState: () => gameNow(), bots: () => bots?.debug(), hv: () => hostView(), others: () => [...others.values()].map((o) => [o.id, o.use, Math.round(o.x), Math.round(o.y)]),
+    follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
   };
 }
 void boot();

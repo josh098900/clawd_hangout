@@ -4,8 +4,8 @@ A multiplayer pixel hangout. Pick a colour, a hat and an outfit for your little 
 (or Clawd), then walk around **the Lab**, **the Square**, **the Cinema** and **the Dev Den**, chat in speech
 bubbles and emote with everyone else who's online.
 
-Eight rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
-**the Crypt**, **the Stage** and **the Pier**. Things to do: sit on sofas, benches, cinema seats
+Nine rooms: **the Lab**, **the Square**, **the Cinema**, **the Dev Den**, **the Rooftop Garden**,
+**the Crypt**, **the Stage**, **the Pier** and **the Arcade**. Things to do: sit on sofas, benches, cinema seats
 and hammocks; get coffee, popcorn, soda and marshmallows (roast them on the bonfire); draw on
 the Lab's shared whiteboard; play SLOP INVADERS on the arcade cabinet; change the jukebox
 track for the whole room; dance, plonk down on the floor or pick from the emote wheel; feed
@@ -13,6 +13,12 @@ the pigeons; watch the film (two films, everyone sees the same frame); take a ph
 strip and save it; play musical chairs and tag; throw coffee at the slop invasion; find
 constellations and light fireworks on the roof; push stone blocks to open the Crypt (there's
 a crown in it); jam on keys, drums, bass and mic at the Stage; go fishing off the Pier.
+Down the neon stairwell on the Square is **the Arcade**: spend tokens on the claw machine (13
+prizes: hats, face items, outfits and pets like a cat, a crab and a ghost), play 2-player Pong
+while everyone watches it live on the cabinet, and check your collection at the prize counter.
+Start a round of **hide and seek** across every room from the sign on the Square. Click a player
+to FOLLOW them (even through doors); wave next to someone who's waving for a HIGH FIVE.
+Decorate your own desk in the Dev Den (the DESK STUFF shelf).
 Click the HERE/ONLINE pill to see who's online in every room and join them. Upstairs in the Dev Den:
 code at a desk (a typing game that makes commits), break the build and fix it at the server
 rack, hit DEPLOY, move notes on the kanban board, talk to the rubber duck, and work along
@@ -49,6 +55,7 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Play an instrument at the Stage | 1-8 while at it | pads |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
+| Pong | W/S or ↑/↓ | drag on the court |
 | Change your look | **Look** button | **Look** button |
 
 ## Going online with Supabase
@@ -79,28 +86,84 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 2. `supabase/migrations/0002_security.sql`: members, private channels, server-side chat with
    filter + rate limits, reports, auto-mute, bans
 3. `supabase/migrations/0003_tokens.sql`: server-owned tokens (coins + daily bonus)
+4. `supabase/migrations/0004_accounts.sql`: saves, the prize inventory, guest → account merging
+5. `supabase/migrations/0005_servers.sql`: LAB 1-3 with a 12-player cap each. **This renames the
+   Realtime channels, so push the matching game build straight after running it** (players on an
+   old build can't join rooms until they reload).
+6. `supabase/migrations/0006_arcade.sql`: the claw machine
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`
   Share it with testers; they type it once on the start screen.
 - **Realtime → Settings**: switch OFF **Allow public access** (only private channels work now).
-- Optional CAPTCHA: create a Turnstile widget in Cloudflare (add `localhost` and your Vercel
-  domain), put the **site key** in `VITE_TURNSTILE_SITE_KEY` and the **secret key** in Supabase
-  **Auth → Attack Protection → CAPTCHA**. Turn both on together: with CAPTCHA on in Supabase but
-  no site key in the app, new visitors can't sign in.
+
+### CAPTCHA (Cloudflare Turnstile), for guest sign-ins
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Turnstile** → **Add widget**. Name it
+   "Lab Hangout", add hostnames `localhost` and your Vercel domain (e.g. `lab-hangout.vercel.app`),
+   widget mode **Managed**, then **Create**. Copy the **Site Key** and the **Secret Key**.
+2. **Vercel** → your project → **Settings → Environment Variables** → add
+   `VITE_TURNSTILE_SITE_KEY` = the site key (all environments). Put the same line in `.env.local`.
+3. **Supabase** → **Authentication → Attack Protection** → enable **CAPTCHA protection**, provider
+   **Turnstile**, paste the **secret** key, **Save**.
+4. **Vercel** → **Deployments** → ⋯ on the latest → **Redeploy** (env vars only apply to new builds).
+
+Do steps 2-4 together: with CAPTCHA on in Supabase but no site key in the app, new guests can't
+sign in. Logging in with Discord/Google doesn't use the CAPTCHA.
+
+### Logging in with Discord and Google (optional: guests work without it)
+Guests are saved in their browser only. Logging in keeps tokens, prizes, friends and unlocks on
+any device, and a guest who logs in keeps everything they had. You need your Supabase callback
+URL: **Authentication → Sign In / Providers → Discord** shows it (it looks like
+`https://<project-ref>.supabase.co/auth/v1/callback`).
+
+Discord:
+1. [discord.com/developers/applications](https://discord.com/developers/applications) → **New
+   Application** → name it → **OAuth2** → **Redirects** → **Add Redirect** → paste the callback URL
+   → **Save Changes**. Copy the **Client ID**, then **Reset Secret** and copy the **Client Secret**.
+2. Supabase → **Authentication → Sign In / Providers → Discord** → enable, paste both → **Save**.
+
+Google:
+1. [console.cloud.google.com](https://console.cloud.google.com) → create a project → **APIs &
+   Services → OAuth consent screen**: External, app name, your email → save (add your testers'
+   emails under **Test users** while it's in testing).
+2. **Credentials → Create credentials → OAuth client ID** → **Web application** → under
+   **Authorized redirect URIs** add the callback URL → **Create**. Copy the Client ID and secret.
+3. Supabase → **Authentication → Sign In / Providers → Google** → enable, paste both → **Save**.
+
+Then in Supabase:
+- **Authentication → URL Configuration**: **Site URL** = your Vercel URL; **Redirect URLs** →
+  add `http://localhost:5173/**` and `https://<your-vercel-domain>/**`.
+- **Authentication → Sign In / Providers** (user signups section): turn on **Allow manual linking**
+  (that's what lets a guest attach Discord/Google to their existing player).
+- Tell the game which buttons to show: `VITE_AUTH_PROVIDERS=discord,google` in Vercel and
+  `.env.local` (just `discord` if you only set that one up), then redeploy.
+
+### Servers
+Players pick a server after the start screen (the busiest one with room is suggested). Each is a
+separate copy of the world with its own cap, enforced by the database. From the SQL editor:
+- Change a cap: `update private.servers set cap = 20 where id = 'one';`
+- Add a server: `insert into private.servers (id, name, cap, sort) values ('four', 'LAB 4', 12, 4);`
+- Who's where: `select * from private.seats where seen > now() - interval '90 seconds';`
+- Share a direct link to a server: `https://<your-domain>/?server=two`
+
+Realtime message budget: Supabase counts every message once when sent and once per player who
+receives it. The Free plan allows 100 a second (2M a month), which is about 6 people walking
+around one room at once; Pro allows 500 a second, enough for a full server of 12. The game
+already slows its movement updates in busy rooms.
 
 Moderation, from the SQL editor:
 - Reports: `select * from private.reports order by at desc;` (includes the player's last chat lines)
 - Ban / unban: `select public.ban_player('<user id>', 'reason');` / `select public.unban_player('<user id>');`
 - Add a filtered word: `insert into private.banned_words values ('regex');`
 - Chat log: `select * from private.chat_log order by at desc limit 100;`
+- Claw odds: `update private.claw_prizes set weight = 2 where item = 'hat:10';`
 - Public launch: `select public.set_world_open(true);` lets everyone in without a code.
 
 ## Deploying
 
 This is a static site. `npm run build` outputs `dist/`. On **Vercel**: import the repo, set the root
 directory to `lab-hangout` (framework preset: Vite), and add `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON_KEY` (and `VITE_TURNSTILE_SITE_KEY`) as environment variables. The invite
+`VITE_SUPABASE_ANON_KEY` (and `VITE_TURNSTILE_SITE_KEY`, `VITE_AUTH_PROVIDERS`) as environment variables. The invite
 code keeps the world private, whatever Vercel plan you're on. Before going public, read "Known limitations" in `CLAUDE.md`
 (private channels, CAPTCHA on sign-in, moderation).
 
@@ -116,26 +179,21 @@ so you can hand the project to Claude Code in VS Code and keep building.
 
 ## Status
 
-- Tested in a browser in LOCAL mode:
-  - moving between rooms
-  - two-tab multiplayer: join, leave, chat and emotes
-  - bots
-  - the mobile layout
-- The SQL and its RLS policies were checked against Postgres.
-- The Supabase transport is typechecked against `@supabase/supabase-js` v2, and the
-  fallback to LOCAL mode works when Supabase can't be reached.
-- Not yet run against a live Supabase project. Follow the steps above and test it with two
-  browsers first.
+- Live on Vercel + Supabase (invite-only), played online with a friend.
+- Every change is play-tested headlessly in LOCAL mode (two-tab multiplayer, bots, all rooms at
+  60 fps) and every migration is run twice against a local Postgres with PASS/FAIL checks
+  (RLS, rate limits, merge rules, the seat cap, claw odds and payments).
+- Needs a live check after setup: Turnstile, Discord/Google login and guest linking (these only
+  work on the real domain with the keys in place).
 
 ## Credits
 
 - The rendering approach, palette, lab and city-square sets, and the voxel creations are
-  adapted from the pixel-art film "Claw'd Labs, Part 0" by its original creator. Ask them
-  for permission before you publish this publicly, and credit them.
+  adapted, with permission, from the pixel-art film "Claw'd Labs, Part 0" by its original
+  creator. Thank you!
 - The default player character (the lab critter) is an original design for this project.
-- The optional **Clawd** body is Anthropic's mascot, included deliberately for private use.
-  It's Anthropic's IP: before publishing this publicly, get written permission from
-  Anthropic or remove that option. The project uses no Anthropic logos or wordmarks.
+- The optional **Clawd** body is Anthropic's mascot, used with Anthropic's permission. The
+  project uses no Anthropic logos or wordmarks.
 - Fonts: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) and
   [VT323](https://fonts.google.com/specimen/VT323) (SIL Open Font License), loaded from
   Google Fonts.

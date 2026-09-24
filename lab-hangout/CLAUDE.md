@@ -33,6 +33,11 @@ npm run build        # typecheck + production build to dist/
 Handy URLs while developing:
 - `/?bots=5`: adds 5 wandering, chatting demo bots (LOCAL mode only)
 - `/?local`: forces LOCAL mode even when Supabase keys are set
+- `/?server=one`: skip the server picker and take a seat on that server (also works online, e.g. a
+  "join me on LAB 2" link). Test scripts should always pass it.
+- LOCAL-mode test switches: `?signin` starts signed out (the guest / Discord / Google chooser, all
+  faked per tab), `?autherr=identity_already_exists` pretends a provider refused a link (the merge
+  path), `?cap=N` shrinks every server to N players (to see FULL)
 - `/?debug` (dev server only): exposes `window.__hangout` (`go`, `at`, `use`, `pose`, `item`, `feed`,
   `state`, `game`, `gameState`, `bots`, `blocks`, ...) so test scripts can teleport, use things and
   set room state without walking. Headless Chrome + puppeteer-core drives it nicely.
@@ -60,14 +65,21 @@ src/
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
     stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights
     pier.ts            THE PIER (1300x720): beach, pier + fishing, bonfire + marshmallows, lighthouse, day/night
+    arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
+                       (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
   entities/
-    critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter
+    critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;
+                       what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)
     avatar.ts          per-player state, walk/emote posing, remote interpolation, name tags, emote FX
   net/
     transport.ts       Transport interface, message shapes, VALIDATORS (all inbound data is untrusted)
-    supabase.ts        Supabase: anonymous auth, profiles table, one Realtime channel per room
+    supabase.ts        Supabase: guest (anonymous) + Discord/Google (OAuth, PKCE, linkIdentity) auth, saves,
+                       servers/seats, RPCs, private Realtime channels per server + room
     local.ts           BroadcastChannel transport for offline dev
+  game/save.ts         your save (unlocks, friends, fish log, stars, hi score): cached per player id, synced to
+                       the `saves` table; merging is a union so nothing earned is ever lost
+  game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
   game/slop.ts         the slop invasion world event (wall clock waves, blob paths, hits)
@@ -75,7 +87,13 @@ src/
   game/npcs.ts         NPCs (Prof. Fizz, Gus): routines driven by the wall clock, so all players see the same thing
   game/ambient.ts      local-only life: pigeons in the Square, robot vacuum in the Lab, the office cat in the Den
   ui/
-    start.ts           start screen + look editor with live preview
+    start.ts           start screen + look editor with live preview; guest/login chooser, account row
+    servers.ts         the server picker (busiest server with room is suggested)
+    captcha.ts         Turnstile (guest sign-in only)
+    claw.ts            the claw machine up close (server picks, client animates) + WEAR IT
+    pong.ts            2-player Pong (P1's browser runs the ball)
+    prizes.ts          the prize counter: your collection
+    desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
   audio/sfx.ts         synthesized blips (no audio files)
   audio/music.ts       chiptune tracks as note strings; MusicPlayer schedules against the wall clock; the Stage's
@@ -88,7 +106,10 @@ src/
   ui/kanban.ts         the Dev Den kanban board
   ui/stars.ts          the rooftop telescope's constellation game
   net/filter.ts        client-side word filter + per-sender token-bucket rate limits
-supabase/migrations/   SQL (profiles table + RLS)
+supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
+                       0001 profiles · 0002 security (members, private channels, chat, reports) ·
+                       0003 tokens · 0004 accounts (saves, inventory, guest->account merge) ·
+                       0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -104,26 +125,39 @@ scale is an integer number of device pixels per world pixel (`Renderer.layout`).
 
 ## Networking contract
 
-Two **private** Realtime channels per room (members only, RLS on `realtime.messages`, see
-`supabase/migrations/0002_security.sql`): `hangout:<roomId>` (players send + receive) and
-`hangout-srv:<roomId>` (receive only; only the database sends there via `realtime.send`, so
-sender ids on it are real). Online, the world is invite-only: `is_member()` gates everything.
+**Accounts.** Guests are anonymous users (Turnstile-checked when `VITE_TURNSTILE_SITE_KEY` is set);
+accounts log in with Discord/Google. A guest upgrades with `linkIdentity` (same user id, so
+everything carries over). If that login already belongs to someone, the guest gets a merge
+ticket (`start_merge`), logs in, and `finish_merge(ticket)` moves tokens, prizes and membership
+across (once a day per account). Online, the world is invite-only: `is_member()` gates everything.
 
-| What | How | Payload |
-|---|---|---|
+**Servers.** Fixed servers in `private.servers` (LAB 1-3, cap 12 each; owner edits them in SQL).
+You `claim_seat(server)` (refused when full), keep it alive with `seat_ping()` every 30 s (it
+lapses after 90 s), and give it back with `leave_seat()`. Every channel is per server, and RLS
+only lets you in to your seat's server, so the cap is enforced server-side:
+`hangout:<server>:<room>` (players send + receive), `hangout-srv:<server>:<room>` (receive only;
+only the database sends there via `realtime.send`, so sender ids on it are real) and
+`hangout:<server>:lobby` (who's online + hide and seek).
+
 | who's here | presence, key = user id | `{ name, look, x, y, dir }` |
-| movement | broadcast `move`, ≤9 Hz while walking, once on stop, heartbeat every 4s, and again whenever someone joins | `{ id, x, y, dir, moving, use, hold, pose }` |
-| chat | RPC `send_chat(room, body)` → server filters, rate-limits (0.7 s / 12 a minute), logs, then broadcasts `chat` on `hangout-srv:<room>` | `{ id, text }` (≤80 chars) |
+| movement | broadcast `move`, 9 Hz while walking in a quiet room easing to 4 Hz with 11+ others (`sendHz`), once on stop, heartbeat every 4s, and again whenever someone joins | `{ id, x, y, dir, moving, use, hold, pose }` |
+| chat | RPC `send_chat(room, body)` → server filters, rate-limits (0.7 s / 12 a minute), logs, then broadcasts `chat` on `hangout-srv:<server>:<room>` | `{ id, text }` (≤80 chars) |
+| saves | table `saves` (read/write own, ≤16 KB object) | `{ unlocks, friends, feeds, hi, fish, stars }` |
+| prizes | RPC `play_claw()` (3 tokens, server rolls, dupes refund 1); table `inventory` read-own | `{ item, dupe, tokens }`, items are `'slot:index'` |
+| servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
+| pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
+| hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
 | moderation | RPC `report_player(who, reason)`; 3 reporters in 10 min = 30 min mute; owner-only `ban_player` | |
 | emote | broadcast `emote` | `{ id, kind }` (`wave` `hop` `joy` `huh` `idea` `sip` `eat` `feed`) |
-| room state | broadcast `state`, newest `ts` wins (`slop` merges as a union); the host re-sends all of it when someone joins | `{ id, k, v, ts }` (`juke`, `hi`, `board`, `build`, `deploy`, `notes`, `game`, `slop`, `fw`, `crypt`) |
+| room state | broadcast `state`, newest `ts` wins (`slop` merges as a union); the host re-sends all of it when someone joins | `{ id, k, v, ts }` (`juke`, `hi`, `board`, `build`, `deploy`, `notes`, `game`, `slop`, `fw`, `crypt`, `claw`, `champ`) |
 | stage notes | broadcast `note`, ≤14/s | `{ id, i, n }` (instrument 0-3, pad 0-7) |
-| who's online | presence on a separate channel `hangout:lobby` (LOCAL: `lobby` messages every 2 s) | `{ name, room }` |
+| who's online | presence on the server's `hangout:<server>:lobby` (LOCAL: `lobby` messages every 2 s) | `{ name, room }` |
 | whiteboard | broadcast `draw`, ~12/s while drawing | `{ id, c, p: [x0,y0,…], clear, ts }` |
 | profile | table `profiles` (RLS: members read all, write own; names scrubbed by a trigger) | `{ name, look }` |
 
-`look = { c, hat, face, fit, sp }`, small integer indexes into `BODY`/`HATS`/`FACES`/`FITS`/`SPECIES`
+`look = { c, hat, face, fit, sp, pet, desk }`, small integer indexes into `BODY`/`HATS`/`FACES`/`FITS`/`SPECIES`/`PETS`
+(`desk` is a bitmask of `DESK_ITEMS`)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when
@@ -150,7 +184,13 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
   moves. Members-only keeps this to people you invited. Anything that must be trusted goes
   through an RPC + `realtime.send` (like chat and tokens).
 - Coins: the server can't see positions, so a cheater could claim all 6 coins per 5-min window
-  without walking (max ~72 tokens/hour). Spending tokens (claw machine) must also be an RPC.
+  without walking (max ~72 tokens/hour). Spending them is server-side (`play_claw`).
+- Cosmetics are only cosmetic: a modified client could wear an item it hasn't won (the server
+  can't stop what a browser draws). The inventory itself is server-owned.
+- Pong scores and the CHAMP board are client-run (P1's browser); hide and seek is run by the
+  seeker's browser. Fine for friends; don't hang rewards off them without a server check.
+- Realtime billing counts every delivery (1 send + 1 per receiver). Free plan: 100 msg/s and 2M a
+  month, so a server of ~6 walking at once is the practical ceiling; Pro (500/s) fits 12.
 - Presence x/y is only the join position; live positions come from `move` broadcasts.
 - NPC timing, day/night, the film and music use each player's clock (`Date.now()`); badly
   skewed clocks put them out of sync.
@@ -190,16 +230,15 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 ## IP / branding (important)
 - **Clawd is here on purpose.** The owner deliberately added Anthropic's Clawd mascot as a
   second playable body (`sp: 1`, `composeClawd` in critter.ts). Don't remove or "fix" it.
-  It is for private/personal use only: before any public release, either get written
-  permission from Anthropic or remove the Clawd option (the critter stays the default).
+  It is used **with permission from Anthropic** (confirmed by the owner, 2026-09-24).
 - Don't add any other existing characters, and don't use Anthropic/Claude logos or
   wordmarks. The default player character is an original critter.
-- The sets, palette and rendering approach are adapted from someone else's film. Keep the
-  credit in the README, and get the creator's permission before publishing publicly.
+- The sets, palette and rendering approach are adapted from the film "Claw'd Labs, Part 0",
+  used **with its creator's permission** (confirmed 2026-09-24). Always keep the credit in
+  the README.
 - The working title is "Lab Hangout". Check trademarks before choosing a public name.
 
 ## Ideas backlog
 The phased plan is `docs/ROADMAP.md`. Smaller ideas not on it yet:
 - Private rooms / invite links (`hangout:<room>:<code>`)
 - Mobile: on-screen joystick as an alternative to tap-to-walk
-- Hide-and-seek across rooms (needs game state on the lobby channel)

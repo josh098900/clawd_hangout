@@ -28,6 +28,8 @@ const PEDESTAL = { x: 955, y: 505 };
 /** Live copies of this room's state, for drawing and for main.ts to read. */
 export const DEN_INFO = {
   radio: 0, radioT0: 0,
+  /** Desk index -> the desk setup (Look.desk) of whoever is sitting there right now; filled in by main.ts. */
+  decor: new Map<number, number>(),
   build: { ok: true, n: 0, dep: 0, by: '', id: '', msg: '' } as BuildState,
   deploy: null as { t0: number; ok: boolean; by: string } | null,
   notes: [] as KanbanNote[],
@@ -169,6 +171,27 @@ function drawBack(a: number): void {
 }
 
 // ---------- props ----------
+/**
+ * A desk setup (Look.desk bits, see DESK_ITEMS): 0 second monitor, 1 plant, 2 mug, 3 lava lamp,
+ * 4 fairy lights, 5 dragon figure, 6 laptop stickers. (dx, dy) = the desk's front edge.
+ */
+export function drawDecor(dx: number, dy: number, bits: number, a: number): void {
+  const has = (k: number) => (bits & (1 << k)) !== 0, top = dy - 22;
+  if (has(0)) { // second monitor, back to us, the screen's light spilling over the top
+    r(dx - 29, top - 20, 18, 13, [36, 40, 50]); r(dx - 29, top - 20, 18, 1, [70, 76, 90]); r(dx - 21, top - 7, 2, 5, [36, 40, 50]); r(dx - 25, top - 2, 10, 2, [36, 40, 50]);
+    G(dx - 30, top - 24, 20, 5, [120, 220, 255], 0.2);
+  }
+  if (has(1)) { r(dx - 28, top - 6, 7, 6, [184, 102, 74]); r(dx - 29, top - 6, 9, 1, [150, 80, 58]); for (let k = 0; k < 4; k++) r(dx - 28 + k * 2, top - 12 + (k % 2) * 2, 2, 6, [82, 176, 122]); r(dx - 27, top - 13, 1, 2, [255, 150, 190]); }
+  if (has(2)) { r(dx - 19, top - 5, 5, 5, [240, 236, 220]); r(dx - 14, top - 4, 2, 3, [240, 236, 220]); r(dx - 18, top - 5, 3, 1, [90, 55, 35]); if ((a * 0.8) % 1 < 0.6) r(dx - 17 + Math.round(Math.sin(a * 3)), top - 9, 1, 2, [200, 200, 210]); }
+  if (has(3)) { // lava lamp: blobs rise and fall
+    r(dx + 11, top - 2, 6, 2, [60, 64, 72]); r(dx + 12, top - 12, 4, 10, [120, 40, 90]); r(dx + 12, top - 14, 4, 2, [60, 64, 72]);
+    lit(() => { const b1 = Math.round((Math.sin(a * 0.9) + 1) * 3.5), b2 = Math.round((Math.sin(a * 0.7 + 2) + 1) * 3.5); r(dx + 13, top - 4 - b1, 2, 2, [255, 120, 60]); r(dx + 12, top - 5 - b2, 3, 2, [255, 170, 80]); });
+    Gd(dx + 14, top - 8, 8, [255, 120, 80], 0.3);
+  }
+  if (has(4)) lit(() => { for (let k = 0; k < 10; k++) r(dx - 28 + k * 6, dy - 17 + (k % 2), 1, 1, (Math.floor(a * 3) + k) % 3 === 0 ? K.WHITE : CONFETTI[k % CONFETTI.length]); });
+  if (has(5)) { const x = dx - 4, y = top - 14; r(x, y, 6, 3, [124, 242, 156]); r(x + 5, y - 3, 3, 3, [124, 242, 156]); r(x + 7, y - 2, 1, 1, K.EYE); r(x - 2, y + 1, 2, 1, [124, 242, 156]); r(x + 1, y - 1, 1, 1, [255, 214, 90]); r(x + 3, y - 1, 1, 1, [255, 214, 90]); r(x + 1, y + 3, 1, 1, [80, 170, 110]); r(x + 4, y + 3, 1, 1, [80, 170, 110]); }
+  if (has(6)) { r(dx - 8, top - 9, 3, 3, [255, 95, 170]); r(dx + 4, top - 8, 3, 2, [255, 214, 90]); r(dx - 7, top - 5, 2, 2, [90, 209, 255]); r(dx + 5, top - 4, 2, 2, [124, 242, 156]); }
+}
 function desk(i: number): Prop {
   const [dx, dy] = DEN_DESKS[i];
   return {
@@ -184,12 +207,16 @@ function desk(i: number): Prop {
       // lamp on the right corner
       line(dx + 22, dy - 22, dx + 18, dy - 34, [60, 64, 72]); line(dx + 18, dy - 34, dx + 24, dy - 40, [60, 64, 72]); r(dx + 21, dy - 43, 9, 4, [60, 64, 72]);
       lit(() => r(dx + 23, dy - 39, 5, 1, [255, 226, 170])); Gd(dx + 25, dy - 36, 10, [255, 214, 150], 0.35);
-      // the rubber duck lives on desk 1; the others get a mug or a plant
+      // whoever sits here brings their own desk setup; an empty desk keeps its usual bits
+      const mine = DEN_INFO.decor.get(i);
+      if (mine) drawDecor(dx, dy, mine, a);
+      else if (i === 2) { r(dx - 24, dy - 30, 8, 8, [184, 102, 74]); for (let k = 0; k < 4; k++) r(dx - 24 + k * 2, dy - 36 + (k % 2) * 2, 2, 6, [82, 176, 122]); }
+      else if (i !== 1) { r(dx - 24, dy - 28, 6, 6, [90, 209, 255]); r(dx - 18, dy - 27, 2, 3, [90, 209, 255]); r(dx - 23, dy - 28, 4, 1, [90, 55, 35]); }
+      // the rubber duck lives on desk 1 whoever sits there
       if (i === 1) {
         const sq = a - DEN_INFO.duckT < 0.5 ? 1 : 0, x = dx - 24, y = dy - 28 - sq;
         r(x - 1, y - 1, 9, 8, [40, 30, 10]); r(x, y + 2, 8, 4, NK.DUCK); r(x + 4, y - 1, 4, 4, NK.DUCK); r(x + 1, y + 5, 6, 1, NK.DUCK_DK); r(x + 8, y + 1, 2, 1, NK.BEAK); r(x + 6, y, 1, 1, K.EYE); r(x + 1, y + 2, 3, 1, [255, 236, 140]);
-      } else if (i === 2) { r(dx - 24, dy - 30, 8, 8, [184, 102, 74]); for (let k = 0; k < 4; k++) r(dx - 24 + k * 2, dy - 36 + (k % 2) * 2, 2, 6, [82, 176, 122]); }
-      else { r(dx - 24, dy - 28, 6, 6, [90, 209, 255]); r(dx - 18, dy - 27, 2, 3, [90, 209, 255]); r(dx - 23, dy - 28, 4, 1, [90, 55, 35]); }
+      }
     },
   };
 }
@@ -233,6 +260,7 @@ export const DEN_SPOTS: Spot[] = [
   { kind: 'kanban', x: 690, y: 446, sx: 690, sy: 446, lift: 0, label: 'KANBAN', area: { x0: BOARD.x, y0: BOARD.y, x1: BOARD.x + BOARD.w, y1: BOARD.y + BOARD.h } },
   { kind: 'rack', x: 920, y: 446, sx: 920, sy: 446, lift: 0, label: 'FIX', area: { x0: RACK.x, y0: RACK.y, x1: RACK.x + RACK.w, y1: RACK.y + RACK.h } },
   { kind: 'deploy', x: PEDESTAL.x, y: PEDESTAL.y + 13, sx: PEDESTAL.x, sy: PEDESTAL.y + 13, lift: 0, label: 'DEPLOY', area: { x0: PEDESTAL.x - 12, y0: PEDESTAL.y - 46, x1: PEDESTAL.x + 12, y1: PEDESTAL.y } },
+  { kind: 'decor', x: 832, y: 446, sx: 832, sy: 446, lift: 0, label: 'DESK STUFF', area: { x0: 800, y0: 250, x1: 864, y1: 430 } },
 ];
 const DUCK: Talker = {
   id: 'den-duck', name: 'DUCK', x: 450, y: 468, sx: 450, sy: 512,

@@ -34,16 +34,17 @@ Guiding rules (from what already works):
 
 ## Phase 2 — Collect & unlock
 - [x] Tokens: 6 coins on the Square (each once per 5-min window, server clock), daily +5 bonus, HUD counter
-- [ ] Arcade hall room: claw machine (spend tokens → hats/outfits/pets), 2-player Pong and a tank duel over the network
+- [x] The Arcade (down the stairwell on the Square): claw machine (3 tokens, server-rolled prize from 13 hats/faces/outfits/pets, dupes refund 1), 2-player Pong watchable live on the cabinet with a CHAMP board, SLOP INVADERS cabinet, prize counter (your collection), air hockey, PIXEL the attendant, chiptune radio
+- [ ] Tank duel (2-player, networked)
 - [x] Pet pigeon that follows you (feed the pigeons 5 times; a cosmetic unlock kept in the browser, no tokens needed)
-- [ ] Personal desk in the Dev Den you can decorate
+- [x] Personal desk in the Dev Den: DESK STUFF shelf (monitor, plant, mug, lava lamp, fairy lights, dragon, stickers); your setup shows on whichever desk you sit at
 
 ## Phase 3 — Party games (built from existing pieces)
 - [x] Musical chairs in the Cinema (PARTY GAMES podium): music stops, race for the glowing seats, one fewer each round
 - [x] Tag on the Square (TAG! sign): 60 s, least time as IT wins
 - [x] Slop invasion world event on the Square every 10 min: everyone throws coffee (E / click) at slop blobs
 - [x] Bots play too (and now path around furniture), so it's testable with `?bots=4`
-- [ ] Hide-and-seek across rooms
+- [x] Hide-and-seek across rooms (sign on the Square; seeker counts in the Lab, 3 min to find everyone; the seeker sees no name tags, WHO'S ONLINE hides rooms)
 
 ## Phase 4 — More rooms
 - [x] Rooftop garden (up from the Dev Den): the film's topiaries (bunny, swan, dragon), hammocks, string lights, fireflies/butterflies, telescope constellation game (collection saved locally), fireworks crate anyone can light + a show on the hour, gardener NPC FERN, shares the Square's day/night
@@ -51,13 +52,22 @@ Guiding rules (from what already works):
 - [x] The Stage (tower door on the Square): keys, drums, bass and mic; keys 1-8 / pads play notes everyone hears (all pentatonic), DJ booth backing beats, lighting-up dance floor, disco ball, spotlights, bar, DJ SPIN NPC; bots jam too
 - [x] The Pier (walk off the Square's right edge): fishing off the pier end with a bite-and-reel timing game and a 12-species log (junk to legendary), bonfire with log seats, marshmallows you roast raw → golden → burnt, lighthouse, waves + moon path, crabs, OLD SALT NPC, day/night
 
+## Phase 6 — Accounts & servers
+- [x] Play as a guest (this browser) or log in with Discord / Google (any device); a guest links an account and keeps everything; if that login already has a player, the guest's tokens, prizes and membership merge in
+- [x] Saves: unlocks, friends, fish log, constellations and high score live in a `saves` table (old per-browser progress is picked up automatically)
+- [x] Fixed servers LAB 1-3, 12 players each, cap enforced by the database (seats + per-server channel RLS); server picker suggests the busiest one with room; SWITCH SERVER; `?server=two` links
+- [x] Movement updates slow down in busy rooms (9 → 4 per second) to fit the Realtime message budget
+- [ ] Live check on the real domain: Turnstile keys, Discord/Google apps, manual linking (README → Security setup)
+- [ ] Player-made servers / private rooms
+
 ## Phase 5 — Social
 - [x] Emote wheel (R / MORE): laugh, love, clap, wow, cool, sleep, cry, angry, each with a pose, an effect and a sound
 - [x] Who's online (click the HERE/ONLINE pill): everyone in every room via a lobby presence channel, GO to join them, ☆ star friends to get a notice when they come online
+- [x] FOLLOW a player from their card (through doors too); HIGH FIVE by waving next to someone who's waving
 - [x] Cinema schedule: two films (A CRITTER IN SPACE, DRAGON NIGHT) take turns by the hour; the Square's marquee shows what's on
 
 ## Before any public launch
-- [ ] Written permission from Anthropic for Clawd (or remove the option)
-- [ ] Permission + credit from the "Claw'd Labs, Part 0" film's creator for the sets/palette
+- [x] Permission from Anthropic for Clawd
+- [x] Permission + credit from the "Claw'd Labs, Part 0" film's creator for the sets/palette
 - [ ] Phase 0 done
 - [ ] Trademark check on the public name

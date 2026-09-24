@@ -60,6 +60,8 @@ export interface Avatar {
   hold: number;
   /** Sips taken from the current mug (local player only). */
   sips: number;
+  /** Hide this one's name tag (the seeker in hide-and-seek has to recognise people by their look). */
+  hideName?: boolean;
   /** Non-player character (cyan name tag). */
   npc: boolean;
   /** POSE_NONE / POSE_DANCE / POSE_FLOOR, and when it started. */
@@ -169,7 +171,7 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     P.arm = 'wave'; P.wave = Math.sin(a * 9) * 1.5; P.eyes = Math.sin(a * 2) > 0.8 ? 'b' : 'n'; P.lean = Math.sin(a * 3) * 1;
   } else if (using === 'coffee' || using === 'popcorn' || using === 'soda') {
     P.eyes = us < 1.6 ? (Math.sin(a * 5) > 0.6 ? 'b' : 'n') : 'h'; P.sy += 0.02 * Math.sin(a * 12);
-  } else if (using === 'arcade') {
+  } else if (using === 'arcade' || using === 'claw' || using === 'pong') {
     P.eyes = 'w'; P.lean = Math.round(Math.sin(a * 3.1)) * 1.5; P.ant = Math.sin(a * 9) * 1.5;
     if ((a * 1.3 + av.seed) % 1 < 0.08) P.mouth = 'O';
   }
@@ -257,24 +259,59 @@ function drawMug(cx: number, cy: number, col: RGB, handle: 1 | -1, a: number, se
   for (let k = 0; k < 2; k++) { const ph = (a * 0.8 + k * 0.5 + seed) % 1; alpha(0.5 * (1 - ph), () => r(x + 2 + Math.round(Math.sin(a * 3 + k * 2) * 1.2), y - 2 - Math.round(ph * 9), 1, 2, [240, 244, 246])); }
 }
 
-/** A pet pigeon trailing its owner: hops to keep up, flutters when it falls behind, pecks when you stop. */
-function drawPet(av: Avatar, a: number, now: number): void {
+/**
+ * A pet trailing its owner. The pigeon hops to keep up and flutters when it falls behind; the
+ * cat, crab and duck scurry; the ghost just floats. They all catch up through doors and
+ * pipe up now and then when you stand still.
+ */
+const PET_SAY = ['', 'COO', 'MEOW', 'SNIP', 'QUACK', 'BOO'];
+function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   const p = av.pet, dt = Math.min(0.1, Math.max(0, now - p.t)); p.t = now;
   const tx = av.x - av.dir * 20, ty = av.y + 3, d = Math.hypot(tx - p.x, ty - p.y);
-  if (d > 300) { p.x = tx; p.y = ty; } // it teleported (a door): so does the pigeon
+  if (d > 300) { p.x = tx; p.y = ty; } // it teleported (a door): so does the pet
   const k = Math.min(1, dt * (d > 60 ? 5 : 3)); p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
-  p.z += ((d > 60 ? 18 : d > 4 ? Math.abs(Math.sin(a * 14)) * 2 : 0) - p.z) * Math.min(1, dt * 8);
+  const flies = kind === 1, ghost = kind === 5;
+  const zT = ghost ? 9 + Math.sin(a * 2.2 + av.seed * 7) * 2 : d > 60 ? (flies ? 18 : Math.abs(Math.sin(a * 18)) * 4) : d > 4 ? Math.abs(Math.sin(a * 14)) * 2 : 0;
+  p.z += (zT - p.z) * Math.min(1, dt * 8);
   if (Math.abs(tx - p.x) > 1) p.dir = tx > p.x ? 1 : -1;
-  const x = Math.round(p.x), y = Math.round(p.y - p.z), d2 = p.dir, fly = p.z > 6, peck = !fly && d < 4 && Math.sin(a * 7 + av.seed * 9) > 0.5 ? 2 : 0;
+  const x = Math.round(p.x), y = Math.round(p.y - p.z), d2 = p.dir, fly = flies && p.z > 6, still = !fly && d < 4;
+  const peck = still && Math.sin(a * 7 + av.seed * 9) > 0.5 ? 2 : 0, step = d > 4 ? Math.floor(a * 12) % 2 : 0;
   const R = (dx: number, dy: number, w: number, h: number, c: RGB) => r(d2 > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, c);
-  if (p.z > 1) alpha(0.25, () => oval(Math.round(p.x), Math.round(p.y), 3, 1, [10, 10, 24]));
-  R(-5, -5, 2, 2, K.PIGEON_DK); R(-3, -6, 6, 4, K.PIGEON); R(-3, -6, 5, 1, K.PIGEON_LT); R(1, -8 + peck, 3, 3, K.PIGEON_DK); R(1, -6 + peck, 2, 1, K.PIGEON_NECK); R(3, -8 + peck, 1, 1, K.FEET); R(4, -7 + peck, 1, 1, K.BEAK);
-  if (fly) { if (Math.floor(a * 20) % 2) R(-2, -9, 4, 3, K.PIGEON_DK); else R(-2, -3, 4, 2, K.PIGEON_DK); } else { R(-2, -5, 4, 2, K.PIGEON_DK); R(-1, -2, 1, 2, K.FEET); R(1, -2, 1, 2, K.FEET); }
-  if (!fly && d < 4 && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt('COO', x - 5, y - 16, [230, 230, 240]));
+  if (p.z > 1) alpha(ghost ? 0.15 : 0.25, () => oval(Math.round(p.x), Math.round(p.y), 3, 1, [10, 10, 24]));
+  else alpha(0.25, () => oval(Math.round(p.x), Math.round(p.y), 4, 1, [10, 10, 24]));
+  if (kind === 1) {
+    R(-5, -5, 2, 2, K.PIGEON_DK); R(-3, -6, 6, 4, K.PIGEON); R(-3, -6, 5, 1, K.PIGEON_LT); R(1, -8 + peck, 3, 3, K.PIGEON_DK); R(1, -6 + peck, 2, 1, K.PIGEON_NECK); R(3, -8 + peck, 1, 1, K.FEET); R(4, -7 + peck, 1, 1, K.BEAK);
+    if (fly) { if (Math.floor(a * 20) % 2) R(-2, -9, 4, 3, K.PIGEON_DK); else R(-2, -3, 4, 2, K.PIGEON_DK); } else { R(-2, -5, 4, 2, K.PIGEON_DK); R(-1, -2, 1, 2, K.FEET); R(1, -2, 1, 2, K.FEET); }
+  } else if (kind === 2) { // cat: tabby, tail swishing
+    const c: RGB = [240, 150, 70], dk: RGB = [186, 100, 44], sw = Math.round(Math.sin(a * 3 + av.seed * 5) * 1.5);
+    R(-5, -6, 9, 4, c); R(-5, -6, 9, 1, [255, 190, 120]); R(-3, -6, 1, 2, dk); R(0, -6, 1, 2, dk);
+    R(3, -9, 5, 4, c); R(3, -10, 1, 1, dk); R(6, -10, 1, 1, dk); R(6, -8, 1, 1, K.EYE); R(7, -7, 1, 1, [255, 150, 170]);
+    R(-7, -10 + sw, 1, 5 - sw, c); R(-8, -11 + sw, 2, 1, dk);
+    R(-4 + step, -2, 1, 2, dk); R(2 - step, -2, 1, 2, dk);
+  } else if (kind === 3) { // crab: sideways scuttle, claws snapping
+    const c: RGB = [230, 80, 60], dk: RGB = [168, 48, 40], sn = Math.floor(a * 3 + av.seed * 4) % 2;
+    R(-4, -5, 8, 3, c); R(-3, -6, 6, 1, [255, 130, 100]); R(-2, -8, 1, 2, dk); R(1, -8, 1, 2, dk); R(-2, -9, 1, 1, K.WHITE); R(1, -9, 1, 1, K.WHITE);
+    R(-7, -7, 2, 2 + sn, c); R(5, -7, 2, 2 + sn, c);
+    for (const lx of [-5, -3, 2, 4]) R(lx, -2 + (step && lx % 2 ? -1 : 0), 1, 2, dk);
+  } else if (kind === 4) { // duck: waddles
+    const c: RGB = [255, 214, 90], dk: RGB = [220, 170, 50], or: RGB = [255, 140, 40], wd = step ? 1 : 0;
+    R(-4, -5 - wd, 7, 4, c); R(-4, -5 - wd, 6, 1, [255, 240, 170]); R(-2, -4 - wd, 3, 2, dk); R(-5, -4 - wd, 1, 1, c);
+    R(1, -9 - wd + peck, 4, 4, c); R(3, -8 - wd + peck, 1, 1, K.EYE); R(5, -7 - wd + peck, 2, 1, or);
+    R(-2, -1, 2, 1, or); R(1, -1, 2, 1, or);
+  } else { // ghost: floats, see-through, faint glow
+    const c: RGB = [232, 238, 255], sh: RGB = [170, 180, 222], wv = Math.floor(a * 6) % 2;
+    Gd(x, y - 6, 9, [160, 190, 255], 0.3);
+    alpha(0.82, () => {
+      R(-3, -11, 6, 1, c); R(-4, -10, 8, 8, c); R(-4, -10, 1, 7, sh);
+      for (let j = 0; j < 4; j++) R(-4 + j * 2, -2, 1, 1 + ((j + wv) % 2), c);
+      R(-2, -8, 1, 2, K.EYE); R(1, -8, 1, 2, K.EYE); R(-1, -5, 2, 1, sh);
+    });
+  }
+  if (still && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt(PET_SAY[kind] ?? '', x - 5, y - 16 - (ghost ? 6 : 0), [230, 230, 240]));
 }
 
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0): { headX: number; headY: number } {
-  if (av.look.pet === 1) drawPet(av, a, now);
+  if (av.look.pet) drawPet(av, a, now, av.look.pet);
   const { P, hopY } = poseFor(av, a, now, using);
   // contact shadow shrinks while airborne (none when seated: the seat is the ground)
   const sk = Math.max(0.4, 1 - hopY / 30);
@@ -319,7 +356,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     wheelFx(em.kind, u, av, TX, hx, hy, a);
   }
   // name tag (3x5 pixel font, outlined)
-  const label = av.name.toUpperCase().slice(0, 16);
+  const label = av.hideName ? '?' : av.name.toUpperCase().slice(0, 16);
   const nx = Math.round(hx - tw(label) / 2), ny = Math.round(hy - 9);
   txtOutlined(label, nx, ny, av.self ? NAME_SELF : av.npc ? NAME_NPC : NAME_OTHER);
   if (av.self) G(nx - 2, ny - 2, tw(label) + 4, 9, [255, 214, 120], 0.12);

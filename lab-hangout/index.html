@@ -61,7 +61,15 @@
       <div class="gaterow"><input id="invite" maxlength="64" autocomplete="off" spellcheck="false" placeholder="ask whoever invited you"><button id="unlock" class="pill" type="button">Unlock</button></div>
       <div id="gateMsg" role="status"></div>
     </div>
+    <div id="signin" class="hidden">
+      <div class="lbl">HOW DO YOU WANT TO PLAY?</div>
+      <button id="asGuest" class="pill big" type="button">Play as guest</button>
+      <div class="shint" id="provHint">Guests are saved in this browser only. Log in to keep your tokens, prizes and friends on any device:</div>
+      <div class="srow" id="provs"></div>
+    </div>
     <div id="captcha" class="hidden"></div>
+    <div id="acct" class="hidden"><span id="acctTxt"></span><span id="acctBtns"></span></div>
+    <div id="collect"></div>
     <button id="go" class="pill big" type="button" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg><span>Connecting…</span></button>
     <button id="goMute" type="button">or join muted</button>
     <div id="mode"></div>

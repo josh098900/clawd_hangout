@@ -1,6 +1,8 @@
 // Supabase Realtime transport.
-//   - Auth: anonymous sign-in (enable it in Dashboard -> Authentication -> Sign In / Providers).
-//   - One Realtime channel per room: "hangout:<room>".
+//   - Auth: guests are anonymous users (enable Anonymous Sign-Ins); accounts log in with
+//     Discord/Google (OAuth, PKCE). A guest links an account with linkIdentity, same user id.
+//   - Servers: you take a seat on one (claim_seat, capped), and all your channels are that
+//     server's: "hangout:<server>:<room>", "hangout-srv:<server>:<room>", "hangout:<server>:lobby".
 //   - Presence = who is in the room (name + look + where they were when they joined).
 //   - Broadcast = the fast stuff: "move", "chat", "emote". Nothing is stored except your profile.
 //   - Profiles table (supabase/migrations/0001_profiles.sql) remembers your name + look.
@@ -10,7 +12,9 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport } from './transport';
+import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Provider, type ServerInfo } from './transport';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class SupabaseTransport implements Transport {
   readonly mode = 'supabase' as const;
@@ -26,25 +30,123 @@ export class SupabaseTransport implements Transport {
   private lobbyMe: { name: string; room: RoomId } | null = null;
   private lobbyOn: (people: LobbyPerson[]) => void = () => {};
 
-  constructor(url: string, key: string) {
-    this.sb = createClient(url, key, { realtime: { params: { eventsPerSecond: 20 } } });
+  private acct: Account = { kind: 'none' };
+  private authErr: { code: string; message: string } | null = null;
+  server: string | null = null;
+  private pingTimer = 0;
+  private seatLost: (() => void)[] = [];
+
+  constructor(private url: string, private key: string) {
+    // a login provider that refused (e.g. that Discord is already someone else's account) says so in the URL
+    const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+    const code = q.get('error_code') || h.get('error_code'), msg = q.get('error_description') || h.get('error_description');
+    if (code || msg) this.authErr = { code: code || 'error', message: (msg || code || '').replace(/\+/g, ' ') };
+    this.sb = createClient(url, key, { auth: { flowType: 'pkce' }, realtime: { params: { eventsPerSecond: 20 } } });
   }
 
-  async connect(captcha?: () => Promise<string | undefined>): Promise<void> {
+  async connect(): Promise<Account> {
     const { data } = await this.sb.auth.getSession();
-    let session = data.session;
-    if (!session) {
-      const captchaToken = await captcha?.();
-      const res = await this.sb.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
-      if (res.error) {
-        const hint = /fetch|network/i.test(res.error.message) ? ' (check VITE_SUPABASE_URL and your connection)' : ' (is Anonymous Sign-Ins enabled in your Supabase project?)';
-        throw new Error('Anonymous sign-in failed: ' + res.error.message + hint);
-      }
-      session = res.data.session;
+    if (this.authErr) {
+      const u = new URL(location.href);
+      for (const k of ['error', 'error_code', 'error_description']) u.searchParams.delete(k);
+      history.replaceState(history.state, '', u.pathname + u.search);
     }
-    if (!session) throw new Error('No Supabase session');
-    this.selfId = session.user.id;
+    if (!data.session) return this.acct = { kind: 'none' };
+    this.selfId = data.session.user.id;
+    const user = data.session.user;
+    const provider = user.identities?.find((i) => i.provider !== 'anonymous')?.provider ?? (user.app_metadata?.providers as string[] | undefined)?.find((p) => p !== 'anonymous');
+    return this.acct = user.is_anonymous && !provider ? { kind: 'guest' } : { kind: 'account', provider };
   }
+  account(): Account { return this.acct; }
+  takeAuthError(): { code: string; message: string } | null { const e = this.authErr; this.authErr = null; return e; }
+
+  async signInGuest(captcha?: () => Promise<string | undefined>): Promise<void> {
+    const captchaToken = await captcha?.();
+    const res = await this.sb.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
+    if (res.error || !res.data.session) {
+      const m = res.error?.message ?? 'no session';
+      const hint = /fetch|network/i.test(m) ? ' (check VITE_SUPABASE_URL and your connection)' : /captcha/i.test(m) ? ' (the human check did not pass, try again)' : ' (is Anonymous Sign-Ins enabled in your Supabase project?)';
+      throw new Error('Guest sign-in failed: ' + m + hint);
+    }
+    this.selfId = res.data.session.user.id;
+    this.acct = { kind: 'guest' };
+  }
+  private back(): string { return location.origin + location.pathname; }
+  async loginWith(p: Provider): Promise<void> {
+    if (!PROVIDERS.includes(p)) return;
+    const { error } = await this.sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: this.back() } });
+    if (error) throw new Error(error.message);
+    await new Promise(() => {}); // the page is leaving for the provider
+  }
+  async linkWith(p: Provider): Promise<void> {
+    if (!PROVIDERS.includes(p)) return;
+    const { error } = await this.sb.auth.linkIdentity({ provider: p, options: { redirectTo: this.back() } });
+    if (error) throw new Error(/manual linking/i.test(error.message) ? error.message + ' (turn on "Allow manual linking" in Supabase Auth settings)' : error.message);
+    await new Promise(() => {});
+  }
+  async logout(): Promise<void> { this.leaveSeat(); await this.sb.auth.signOut(); }
+  async startMerge(): Promise<string> { const { data, error } = await this.sb.rpc('start_merge'); if (error) throw new Error(error.message); return String(data); }
+  async finishMerge(ticket: string): Promise<{ tokens: number; save: unknown }> {
+    const { data, error } = await this.sb.rpc('finish_merge', { ticket });
+    if (error) throw new Error(error.message);
+    const o = (data ?? {}) as { tokens?: unknown; save?: unknown };
+    return { tokens: typeof o.tokens === 'number' ? o.tokens : 0, save: o.save ?? null };
+  }
+  async loadSave(): Promise<unknown> {
+    const { data, error } = await this.sb.from('saves').select('data').eq('user_id', this.selfId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.data ?? null;
+  }
+  async storeSave(d: object): Promise<void> {
+    const { error } = await this.sb.from('saves').upsert({ user_id: this.selfId, data: d, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+  }
+  async inventory(): Promise<string[]> {
+    const { data, error } = await this.sb.from('inventory').select('item').eq('user_id', this.selfId);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => String(r.item));
+  }
+  async playClaw(): Promise<ClawResult> {
+    const { data, error } = await this.sb.rpc('play_claw');
+    if (error) throw new Error(error.message);
+    const o = (data ?? {}) as { item?: unknown; dupe?: unknown; tokens?: unknown };
+    return { item: String(o.item ?? ''), dupe: o.dupe === true, tokens: typeof o.tokens === 'number' ? o.tokens : 0 };
+  }
+
+  // ---- servers ----
+  async servers(friendIds: string[]): Promise<ServerInfo[]> {
+    const { data, error } = await this.sb.rpc('list_servers', { friends: friendIds.filter((id) => UUID.test(id)).slice(0, 50) });
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as { id: string; name: string; players: number; cap: number; here: string[] | null }[])
+      .map((v) => ({ id: String(v.id), name: String(v.name).slice(0, 16), players: Number(v.players) || 0, cap: Number(v.cap) || 0, friends: v.here ?? [] }));
+  }
+  async claimSeat(id: string): Promise<void> {
+    const { error } = await this.sb.rpc('claim_seat', { server: id });
+    if (error) throw new Error(error.message);
+    if (this.server !== id && this.lobbyCh) { const ch = this.lobbyCh; this.lobbyCh = null; void this.sb.removeChannel(ch); }
+    this.server = id;
+    clearInterval(this.pingTimer);
+    this.pingTimer = window.setInterval(() => void this.ping(), 30000);
+  }
+  /** Keep the seat alive; if it lapsed (sleep, lost wifi), take it again or tell the game. */
+  private async ping(): Promise<void> {
+    if (!this.server) return;
+    const { data, error } = await this.sb.rpc('seat_ping');
+    if (error || data === true) return;
+    try { await this.claimSeat(this.server); } catch { clearInterval(this.pingTimer); this.server = null; for (const f of this.seatLost) f(); }
+  }
+  onSeatLost(fn: () => void): void { this.seatLost.push(fn); }
+  /** Give the seat back straight away (keepalive, so it still goes out while the page closes). */
+  leaveSeat(): void {
+    clearInterval(this.pingTimer);
+    if (!this.server) return;
+    this.server = null;
+    void this.sb.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token; if (!token) return;
+      void fetch(this.url + '/rest/v1/rpc/leave_seat', { method: 'POST', keepalive: true, headers: { apikey: this.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+    });
+  }
+  private topic(prefix: string, room: string): string { if (!this.server) throw new Error('pick a server first'); return prefix + ':' + this.server + ':' + room; }
 
   async loadProfile(): Promise<{ name: string; look: Look } | null> {
     const { data, error } = await this.sb.from('profiles').select('name, look').eq('id', this.selfId).maybeSingle();
@@ -65,7 +167,7 @@ export class SupabaseTransport implements Transport {
     this.known.clear();
     // private channels: only members get in (RLS on realtime.messages, see supabase/migrations/0002_security.sql)
     this.room = room;
-    const ch = this.sb.channel('hangout:' + room, { config: { private: true, presence: { key: this.selfId }, broadcast: { self: false } } });
+    const ch = this.sb.channel(this.topic('hangout', room), { config: { private: true, presence: { key: this.selfId }, broadcast: { self: false } } });
 
     ch.on('presence', { event: 'sync' }, () => {
       const state = ch.presenceState() as Record<string, unknown[]>;
@@ -86,11 +188,12 @@ export class SupabaseTransport implements Transport {
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => { const v = parseEmote(payload); if (v && v.id !== this.selfId) this.on({ type: 'emote', id: v.id, kind: v.kind }); });
     ch.on('broadcast', { event: 'state' }, ({ payload }) => { const v = parseState(payload); if (v && v.id !== this.selfId) this.on({ type: 'state', id: v.id, s: v.s }); });
     ch.on('broadcast', { event: 'note' }, ({ payload }) => { const v = parseNote(payload); if (v && v.id !== this.selfId) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); });
+    ch.on('broadcast', { event: 'pong' }, ({ payload }) => { const v = parsePong(payload); if (v && v.id !== this.selfId) this.on({ type: 'pong', id: v.id, p: v.p }); });
     ch.on('broadcast', { event: 'draw' }, ({ payload }) => { const v = parseDraw(payload); if (v && v.id !== this.selfId) this.on({ type: 'draw', id: v.id, d: v.d }); });
 
     this.ch = ch;
     // the server channel: only the database sends here, so the sender id on chat is real
-    const srv = this.sb.channel('hangout-srv:' + room, { config: { private: true } });
+    const srv = this.sb.channel(this.topic('hangout-srv', room), { config: { private: true } });
     srv.on('broadcast', { event: 'chat' }, ({ payload }) => { const v = parseChat(payload); if (v && v.id !== this.selfId) this.on({ type: 'chat', id: v.id, text: v.text }); });
     srv.subscribe();
     this.srv = srv;
@@ -112,18 +215,23 @@ export class SupabaseTransport implements Transport {
   // ---- the lobby: one presence channel for everyone online, whatever room they're in ----
   setLobby(name: string, room: RoomId): void {
     this.lobbyMe = { name, room };
-    if (!this.lobbyCh) {
-      const ch = this.sb.channel('hangout:lobby', { config: { private: true, presence: { key: this.selfId } } });
+    if (!this.lobbyCh && this.server) {
+      const ch = this.sb.channel(this.topic('hangout', 'lobby'), { config: { private: true, presence: { key: this.selfId } } });
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState() as Record<string, unknown[]>, out: LobbyPerson[] = [];
         for (const [key, metas] of Object.entries(state)) { if (key === this.selfId || !metas.length) continue; const p = parseLobby({ ...(metas[0] as object), id: key }); if (p) out.push(p); }
         this.lobbyOn(out);
       });
+      ch.on('broadcast', { event: 'world' }, ({ payload }) => { const v = parseWorld(payload); if (v && v.id !== this.selfId) this.worldOn({ type: 'world', id: v.id, w: v.w }); });
       ch.subscribe(async (status) => { if (status === 'SUBSCRIBED' && this.lobbyMe) await ch.track(this.lobbyMe); });
       this.lobbyCh = ch;
-    } else void this.lobbyCh.track(this.lobbyMe);
+    } else void this.lobbyCh?.track(this.lobbyMe);
   }
   watchLobby(on: (people: LobbyPerson[]) => void): void { this.lobbyOn = on; }
+  private worldOn: (e: NetEvent) => void = () => {};
+  watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
+  sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
+  sendPong(p: PongMsg): void { void this.ch?.send({ type: 'broadcast', event: 'pong', payload: { id: this.selfId, ...p } }); }
 
   async leaveRoom(): Promise<void> {
     if (this.srv) { const srv = this.srv; this.srv = null; void this.sb.removeChannel(srv); }

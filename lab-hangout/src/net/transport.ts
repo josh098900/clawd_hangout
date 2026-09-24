@@ -47,7 +47,8 @@ export type StateVal =
   | { k: 'juke'; v: { n: number; t0: number } } | { k: 'hi'; v: { name: string; score: number } } | { k: 'board'; v: string }
   | { k: 'build'; v: BuildState } | { k: 'deploy'; v: { t0: number; ok: boolean; by: string } } | { k: 'notes'; v: KanbanNote[] }
   | { k: 'game'; v: GameState } | { k: 'slop'; v: { w: number; dead: number[] } } | { k: 'fw'; v: { t0: number; seed: number } }
-  | { k: 'crypt'; v: { b: number[]; open: number } };
+  | { k: 'crypt'; v: { b: number[]; open: number } }
+  | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } };
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -64,16 +65,68 @@ export type NetEvent =
   | { type: 'state'; id: string; s: StateMsg }
   | { type: 'draw'; id: string; d: DrawMsg }
   | { type: 'note'; id: string; i: number; n: number }
+  | { type: 'pong'; id: string; p: PongMsg }
+  | { type: 'world'; id: string; w: HideSeek }
   | { type: 'status'; text: string };
+
+/**
+ * Pong at the Arcade, sent only during a match. Each side sends its paddle (0..1); the left
+ * player runs the ball and also sends it (x, y, vx, vy in court units 0..1 per second), the
+ * score and the phase (0 waiting, 1 countdown, 2 play, 3 over).
+ */
+export interface PongMsg { s: 0 | 1; p: number; b?: [number, number, number, number]; sc?: [number, number]; ph?: number }
+/**
+ * Hide-and-seek across every room of a server, on the server's lobby channel. The seeker's
+ * browser runs the round: hide (30 s, seeker counts in the Lab) -> seek (3 min) -> over.
+ * `found` = indexes into ids/names. Newest `ts` wins; the seeker re-sends every few seconds.
+ */
+export interface HideSeek { seeker: string; phase: 'hide' | 'seek' | 'over'; t0: number; ids: string[]; names: string[]; found: number[]; ts: number }
+export const HS_MAX = 24;
 
 /** Someone online anywhere, and which room they're in (the lobby channel, separate from rooms). */
 export interface LobbyPerson { id: string; name: string; room: RoomId }
 
+export type Provider = 'discord' | 'google';
+export const PROVIDERS: Provider[] = ['discord', 'google'];
+/** Who you are: nobody yet (pick guest or log in), a guest (this browser only), or an account. */
+export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string }
+/** A world server and how full it is. `friends` = which of the ids you asked about are on it. */
+export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
+/** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
+export interface ClawResult { item: string; dupe: boolean; tokens: number }
+
 export interface Transport {
   readonly mode: 'supabase' | 'local';
   readonly selfId: string;
-  /** Sign in. `captcha` is asked for a token only when a fresh anonymous sign-in is needed. */
-  connect(captcha?: () => Promise<string | undefined>): Promise<void>;
+  /** Resume an existing session (after a login redirect too). 'none' = nobody signed in yet. */
+  connect(): Promise<Account>;
+  account(): Account;
+  /** An error the login provider sent back in the URL (e.g. identity_already_exists), once. */
+  takeAuthError(): { code: string; message: string } | null;
+  /** Play as a guest. `captcha` is asked for a token (Turnstile) first when it's set up. */
+  signInGuest(captcha?: () => Promise<string | undefined>): Promise<void>;
+  /** Log in with Discord/Google. Online this leaves the page and comes back signed in. */
+  loginWith(p: Provider): Promise<void>;
+  /** Guest -> account, keeping everything (same player id). Also leaves the page. */
+  linkWith(p: Provider): Promise<void>;
+  logout(): Promise<void>;
+  /** Guest progress into an existing account: a ticket as the guest, redeemed as the account. */
+  startMerge(): Promise<string>;
+  finishMerge(ticket: string): Promise<{ tokens: number; save: unknown }>;
+  loadSave(): Promise<unknown>;
+  storeSave(d: object): Promise<void>;
+  /** Prizes you own (server-owned; see game/save.ts). */
+  inventory(): Promise<string[]>;
+  /** Spend tokens on the claw machine; the server picks the prize. */
+  playClaw(): Promise<ClawResult>;
+  /** The world servers. `friendIds` = starred players to look for. */
+  servers(friendIds: string[]): Promise<ServerInfo[]>;
+  /** Take a seat on a server (rejects with 'that server is full'). Rooms and the lobby are per server. */
+  claimSeat(id: string): Promise<void>;
+  readonly server: string | null;
+  /** Called if our seat lapsed (e.g. the laptop slept) and the server filled up meanwhile. */
+  onSeatLost(fn: () => void): void;
+  leaveSeat(): void;
   /** Invite-only world: true if this player still has to enter the invite code. */
   needsInvite(): Promise<boolean>;
   /** Try an invite code. Resolves true if you're in; rejects with a readable message on errors. */
@@ -98,6 +151,11 @@ export interface Transport {
   sendDraw(d: DrawMsg): void;
   /** One note on a Stage instrument (i = instrument 0..3, n = pad 0..7). */
   sendNote(i: number, n: number): void;
+  sendPong(p: PongMsg): void;
+  /** Hide-and-seek state to everyone on this server (whatever room they're in). */
+  sendWorld(w: HideSeek): void;
+  /** Where server-wide messages (hide-and-seek) arrive. */
+  watchWorld(on: (e: NetEvent) => void): void;
   /** Announce yourself (name + current room) to everyone online, in any room. */
   setLobby(name: string, room: RoomId): void;
   /** Called with the full list of people online elsewhere whenever it changes. */
@@ -196,6 +254,14 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     if (!Array.isArray(b) || b.length !== 4 || !b.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 4000) || open === null) return null;
     return { id: o.id, s: { k: 'crypt', v: { b: b as number[], open }, ts } };
   }
+  if (o.k === 'claw' && v && typeof v === 'object') {
+    const name = cleanName(v.name), item = typeof v.item === 'string' && /^[a-z]{2,8}:[0-9]{1,3}$/.test(v.item) ? v.item : '';
+    return name && item ? { id: o.id, s: { k: 'claw', v: { name, item }, ts } } : null;
+  }
+  if (o.k === 'champ' && v && typeof v === 'object') {
+    const name = cleanName(v.name), wins = v.wins;
+    return name && typeof wins === 'number' && Number.isInteger(wins) && wins >= 1 && wins <= 9999 ? { id: o.id, s: { k: 'champ', v: { name, wins }, ts } } : null;
+  }
   if (o.k === 'board' && typeof o.v === 'string' && o.v.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(o.v)) return { id: o.id, s: { k: 'board', v: o.v, ts } };
   return null;
 }
@@ -227,6 +293,26 @@ export function parseNote(p: unknown): { id: string; i: number; n: number } | nu
   const i = o.i, n = o.n;
   if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i > 3 || typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 7) return null;
   return { id: o.id, i, n };
+}
+const unit = (v: unknown, lo = -0.2, hi = 1.2): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+export function parsePong(p: unknown): { id: string; p: PongMsg } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id) || (o.s !== 0 && o.s !== 1) || !unit(o.p, 0, 1)) return null;
+  const m: PongMsg = { s: o.s, p: o.p };
+  if (o.b !== undefined) { const b = o.b; if (!Array.isArray(b) || b.length !== 4 || !unit(b[0]) || !unit(b[1]) || !unit(b[2], -5, 5) || !unit(b[3], -5, 5)) return null; m.b = [b[0], b[1], b[2], b[3]]; }
+  if (o.sc !== undefined) { const c = o.sc; if (!Array.isArray(c) || c.length !== 2 || !c.every((x) => Number.isInteger(x) && x >= 0 && x <= 9)) return null; m.sc = [c[0], c[1]]; }
+  if (o.ph !== undefined) { if (!Number.isInteger(o.ph) || (o.ph as number) < 0 || (o.ph as number) > 3) return null; m.ph = o.ph as number; }
+  return { id: o.id, p: m };
+}
+export function parseWorld(p: unknown): { id: string; w: HideSeek } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id) || !isId(o.seeker) || !['hide', 'seek', 'over'].includes(o.phase as string)) return null;
+  const t0 = num(o.t0, 0, 1e11), ts = num(o.ts, 0, 1e13);
+  if (t0 === null || ts === null || !Array.isArray(o.ids) || !Array.isArray(o.names) || !Array.isArray(o.found)) return null;
+  if (o.ids.length > HS_MAX || o.ids.length !== o.names.length || !o.ids.every(isId)) return null;
+  const n = o.ids.length;
+  if (!o.found.every((i) => Number.isInteger(i) && i >= 0 && i < n)) return null;
+  return { id: o.id, w: { seeker: o.seeker, phase: o.phase as HideSeek['phase'], t0, ts, ids: o.ids as string[], names: (o.names as unknown[]).map((x) => cleanName(x) || 'GUEST'), found: [...new Set(o.found as number[])] } };
 }
 export function parseLobby(p: unknown): LobbyPerson | null {
   const o = p as Record<string, unknown> | null;

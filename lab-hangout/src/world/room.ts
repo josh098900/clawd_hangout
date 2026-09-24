@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -23,7 +23,7 @@ export interface Door {
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -37,7 +37,7 @@ export interface Spot {
   /** Clicking/tapping inside this rect (the thing's picture) walks you there and uses it. */
   area: Rect;
   /** For 'party' spots: which game it starts. */
-  game?: 'chairs' | 'tag';
+  game?: 'chairs' | 'tag' | 'hide';
   /** For 'instrument' spots: 0 keys, 1 drums, 2 bass, 3 mic. */
   inst?: number;
 }
