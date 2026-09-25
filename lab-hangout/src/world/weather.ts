@@ -36,6 +36,7 @@ export function roll(slot: number): number {
 }
 function kindOf(slot: number): Sky {
   const n = roll(slot), k: Sky = n < 450 ? 'clear' : n < 700 ? 'rain' : n < 830 ? 'storm' : 'fog';
+  if (season() === 'winter' && n < 200) return 'snow'; // (winter: some of the clear spells snow too; only in the game, the gardens don't mind)
   return (k === 'rain' || k === 'storm') && season() === 'winter' ? 'snow' : k;
 }
 /** `?weather=storm` (and the debug hook) pin the weather in this browser, for testing. */

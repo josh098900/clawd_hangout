@@ -33,10 +33,12 @@ export const isEmote = (k: unknown): k is EmoteKind => typeof k === 'string' && 
 /** Held items (MoveMsg.hold). How many sips/bites each lasts, and the emote that uses it. */
 export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_MARSH = 4, HOLD_TOAST = 5, HOLD_BURNT = 6, HOLD_KITE = 7, HOLD_HOTDOG = 8;
 /** The Diner's kitchen (game/diner.ts): what a cook carries between stations. */
+/** Winter: a snowball ready to throw, a mug of hot cocoa (the Lab's coffee machine in the season). */
+export const HOLD_SNOWBALL = 16, HOLD_COCOA = 17;
 export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12, HOLD_FROZEN = 13, HOLD_FRIES = 14, HOLD_SHAKE = 15;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
-export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4 };
-export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG ? 'sip' : 'eat');
+export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4, 17: 5 };
+export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG || hold === HOLD_COCOA ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
 export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4,
   /** weightless and pushed off the floor (SPACE in zero g): up high for FLOAT_S, walking doesn't clear it */ POSE_FLOAT = 5;
@@ -47,7 +49,7 @@ export const floatH = (ps: number): number => (ps < 0 ? 0 : ps < 1.2 ? 46 * eOut
  * The room everyone's being drawn in, set by main.ts each frame: weightless (everyone bobs and
  * swims), out in open space (no shadows, helmets on, no pets), and the G-force squashing everyone.
  */
-export const ENV = { zeroG: false, free: false, g: 0 };
+export const ENV = { zeroG: false, free: false, g: 0, /** winter: is (x, y) on ice (the Park's frozen pond)? then walking is skating */ ice: null as ((x: number, y: number) => boolean) | null };
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -92,6 +94,8 @@ export interface Avatar {
   pet: { x: number; y: number; z: number; t: number; dir: 1 | -1 };
   /** In a group dance (game/dance.ts): place in the line and crew size, set every frame. */
   crew?: { rank: number; n: number } | null;
+  /** Hit by a snowball (s): a splat of snow on the face for a moment. */
+  splat?: number;
   /** The pet's own errand (roaming its owner's flat) instead of trailing behind. */
   petGoal?: { x: number; y: number } | null;
 }
@@ -207,6 +211,9 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     hopY += bob; P.ant = Math.sin(a * 1.3 + av.seed * 5) * 2.2;
     if (ENV.free) { P.lean += Math.sin(a * 0.7 + av.seed * 9) * 2; if (!av.moving) P.lift = Math.sin(a * 1.2 + av.seed * 3) > 0 ? 1 : 2; }
     if (av.pose === POSE_FLOAT) { hopY += floatH(ps); if (ps < 1.2) { P.arm = 'up'; P.eyes = 's'; P.mouth = 'O'; } else { P.eyes = 'h'; P.lean += Math.sin(ps * 1.4) * 2.5; } }
+  }
+  if (ENV.ice && av.moving && av.use < 0 && ENV.ice(av.x, av.y)) { // skating: gliding, arms out, leaning into it
+    hopY = 0; P.lift = Math.floor(av.walkDist / 26) % 2 ? 1 : 0; P.lean = av.dir * 3; P.arm = 'up'; P.sy = 0.97; P.eyes = 'h'; P.ant = -av.dir * 3;
   }
   if (ENV.g > 0.05) { // pressed into your seat by the rocket
     P.sy *= 1 - 0.12 * ENV.g; hopY *= 1 - ENV.g; if (ENV.g > 0.4) { P.eyes = 'w'; P.mouth = 'o'; P.ant = -3 * ENV.g; P.arm = 'rest'; }
@@ -334,6 +341,10 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
     R(-4, -5 - wd, 7, 4, c); R(-4, -5 - wd, 6, 1, [255, 240, 170]); R(-2, -4 - wd, 3, 2, dk); R(-5, -4 - wd, 1, 1, c);
     R(1, -9 - wd + peck, 4, 4, c); R(3, -8 - wd + peck, 1, 1, K.EYE); R(5, -7 - wd + peck, 2, 1, or);
     R(-2, -1, 2, 1, or); R(1, -1, 2, 1, or);
+  } else if (kind === 7) { // penguin: waddles side to side, flaps its flippers
+    const bk: RGB = [30, 32, 44], wh: RGB = [240, 242, 248], or: RGB = [255, 150, 40], wd = step ? (Math.floor(a * 10) % 2 ? 1 : -1) : 0;
+    R(-3 + wd, -11, 7, 10, bk); R(-2 + wd, -12, 5, 1, bk); R(-1 + wd, -9, 4, 7, wh); R(1 + wd, -10, 1, 1, K.EYE); R(3 + wd, -9, 2, 1, or);
+    R(-4 + wd, -8 - (step ? 1 : 0), 1, 4, bk); R(4 + wd, -8 - (step ? 1 : 0), 1, 4, bk); R(-2, -1, 2, 1, or); R(1, -1, 2, 1, or);
   } else if (kind === 6) { // bat: always flapping, red eyes
     const c: RGB = [62, 44, 84], up = Math.floor(a * 14 + av.seed * 5) % 2;
     R(-2, -8, 5, 4, c); R(-1, -9, 1, 1, c); R(2, -9, 1, 1, c);
@@ -436,6 +447,8 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_POPCORN) drawPopcorn(mx, my, a, av.seed);
     else if (av.hold === HOLD_SODA) drawSoda(mx, my);
     else if (av.hold === HOLD_HOTDOG) drawHotdog(mx, my, P.dir > 0 ? 1 : -1);
+    else if (av.hold === HOLD_COCOA) { drawMug(mx, my, [236, 236, 244], P.dir > 0 ? 1 : -1, a, av.seed); r(Math.round(mx) - 1, Math.round(my) - 2, 3, 1, [120, 76, 50]); r(Math.round(mx) - 1, Math.round(my) - 3, 1, 1, K.WHITE); r(Math.round(mx) + 1, Math.round(my) - 3, 1, 1, K.WHITE); }
+    else if (av.hold === HOLD_SNOWBALL) { const x = Math.round(mx), y = Math.round(my); r(x - 2, y - 3, 5, 5, OUTLINE); r(x - 1, y - 2, 3, 3, [240, 244, 250]); r(x - 1, y - 2, 1, 1, K.WHITE); r(x + 1, y, 1, 1, [200, 212, 230]); }
     else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
     else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);
@@ -467,6 +480,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     if (em.kind === 'wave' && u < 0.3) { const [wx, wy] = TX(16, -30); lit(() => star4(Math.round(wx), Math.round(wy), 1, [255, 255, 255])); }
     wheelFx(em.kind, u, av, TX, hx, hy, a);
   }
+  if (av.splat && now - av.splat < 1.6) { const u = now - av.splat, [sx, sy] = TX(0, -18); alpha(1 - Math.max(0, u - 1) / 0.6, () => { for (let k = 0; k < 9; k++) { const an = k * 0.7, d = 2 + (k % 3) * 3; r(Math.round(sx + Math.cos(an) * d) - 1, Math.round(sy + Math.sin(an) * d * 0.7 + u * 3) - 1, 3, 3, k % 2 ? [240, 244, 250] : [210, 222, 238]); } }); }
   if (brolly) { PX.dim = dim; drawUmbrella(hx, hy, av.seed, a); }
   // name tag (3x5 pixel font, outlined)
   const label = av.hideName ? '?' : av.name.toUpperCase().slice(0, 16);

@@ -80,7 +80,7 @@ Guiding rules (from what already works):
 - [x] 10. Your own apartment (THE LOFTS)
 - [x] 11. The Space Station
 - [x] 12. Karaoke on the Stage
-- [ ] 13. The photo wall (moderated)
+- [x] 13. The photo wall (moderated)
 - [ ] 14. Winter (December)
 
 ## Before any public launch

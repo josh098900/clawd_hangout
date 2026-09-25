@@ -6,7 +6,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseSnowball, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type SnowballMsg, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { TRAY_SPEED } from '../world/station';
@@ -17,7 +17,7 @@ import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk' | 'kscore'; p: Record<string, unknown> };
+type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk' | 'kscore' | 'snowball'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
@@ -84,7 +84,7 @@ export class LocalTransport implements Transport {
   }
   async inventory(): Promise<string[]> { return this.inv(); }
   /** LOCAL: October (or ?season=halloween) is Halloween. */
-  async season(): Promise<string | null> { const q = new URLSearchParams(location.search).get('season'); return q || (new Date().getUTCMonth() === 9 ? 'halloween' : new Date().getUTCMonth() === 11 ? 'winter' : null); }
+  async season(): Promise<string | null> { const q = new URLSearchParams(location.search).get('season'); const d = new Date(); return q || (d.getUTCMonth() === 9 ? 'halloween' : d.getUTCMonth() === 11 || (d.getUTCMonth() === 0 && d.getUTCDate() <= 6) ? 'winter' : null); }
   async trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }> {
     if ((await this.season()) !== 'halloween') throw new Error('trick-or-treating starts on 1 October');
     const day = new Date().toISOString().slice(0, 10), key = 'labhangout.localTreats';
@@ -191,6 +191,58 @@ export class LocalTransport implements Transport {
     const paid = Math.max(0, Math.min(4, Math.floor(pts / 8), 12 - today));
     this.lastWalk = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
     this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+  }
+  // ---- winter, kept in this browser (same rules as 0018_winter.sql, minus the ones only a server can keep) ----
+  private wj<T>(k: string, v?: T): T { const key = 'labhangout.local.' + k; if (v !== undefined) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* full */ } return v; } try { return JSON.parse(localStorage.getItem(key) || 'null') as T; } catch { return null as T; } }
+  private day(): string { return new Date().toISOString().slice(0, 10); }
+  async findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }> {
+    if ((await this.season()) !== 'winter') throw new Error('the presents come out on 1 December');
+    if (n < 0 || n > 11) throw new Error('no such present');
+    const st = this.wj<{ day: string; n: number[]; prized: boolean }>('presents' + this.selfId) ?? { day: '', n: [], prized: false }, cur = st.day === this.day() ? st : { day: this.day(), n: [], prized: false };
+    if (cur.n.includes(n)) throw new Error('you already opened this one today');
+    cur.n.push(n); this.wallet(this.wallet() + 1); let prize: string | null = null;
+    if (cur.n.length >= 12 && !cur.prized) { cur.prized = true; const left = CLAW.filter(([k, , s]) => s === 'winter' && !this.inv().includes(k)); prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5'; if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize); }
+    this.wj('presents' + this.selfId, cur); return { tokens: this.wallet(), found: cur.n.length, prize };
+  }
+  async presentsToday(): Promise<number[]> { const st = this.wj<{ day: string; n: number[] }>('presents' + this.selfId); return st && st.day === this.day() ? st.n : []; }
+  private adventUpto(): number { const d = new Date(); return d.getUTCMonth() === 11 ? Math.min(24, d.getUTCDate()) : d.getUTCMonth() === 0 ? 24 : 1; }
+  async openAdvent(door: number): Promise<{ tokens: number; prize: string }> {
+    if ((await this.season()) !== 'winter') throw new Error('the advent calendar opens on 1 December');
+    if (door < 1 || door > 24) throw new Error('no such door'); if (door > this.adventUpto()) throw new Error('no peeking! door ' + door + ' opens on ' + door + ' December');
+    const opened = this.wj<number[]>('advent' + this.selfId) ?? []; if (opened.includes(door)) throw new Error('you already opened door ' + door);
+    this.wj('advent' + this.selfId, [...opened, door]);
+    const item = ({ 6: 'hat:17', 12: 'face:8', 18: 'fit:9', 24: 'hat:15' } as Record<number, string>)[door];
+    if (item) { if (this.inv().includes(item)) { this.wallet(this.wallet() + 5); return { tokens: this.wallet(), prize: 'tokens:5' }; } this.inv(item); return { tokens: this.wallet(), prize: item }; }
+    const pays = 2 + (door % 3); this.wallet(this.wallet() + pays); return { tokens: this.wallet(), prize: 'tokens:' + pays };
+  }
+  async adventDoors(): Promise<{ opened: number[]; upto: number }> { return { opened: this.wj<number[]>('advent' + this.selfId) ?? [], upto: this.adventUpto() }; }
+  async ornaments(): Promise<Ornament[]> { return this.wj<Ornament[]>('ornaments.' + (this.server ?? 'none')) ?? []; }
+  async hangOrnament(kind: number, x: number, y: number): Promise<number> {
+    if ((await this.season()) !== 'winter') throw new Error('the tree goes up on 1 December');
+    if (kind < 0 || kind > 7 || y < 12 || y > 160 || Math.abs(x) > 8 + (y * 60) / 160) throw new Error('that is not on the tree');
+    const k = 'ornaments.' + (this.server ?? 'none'), all = this.wj<Ornament[]>(k) ?? [], id = Math.max(0, ...all.map((o) => o.id)) + 1;
+    this.wj(k, [...all, { id, kind, x: Math.round(x), y: Math.round(y), ownerName: (await this.loadProfile())?.name ?? 'YOU' }].slice(-240)); return id;
+  }
+  private caught = new Map<number, number[]>();
+  async catchSleigh(pass: number, n: number): Promise<number> {
+    const t = Date.now() / 1000, cur = Math.floor((t - 900) / 1800);
+    if (pass !== cur || t - (cur * 1800 + 900) > 330) throw new Error('too late, it melted');
+    const c = this.caught.get(pass) ?? []; if (c.length >= 3) throw new Error('save some for everyone else!'); if (c.includes(n)) throw new Error('you already caught that one');
+    this.caught.set(pass, [...c, n]); this.wallet(this.wallet() + 1); return this.wallet();
+  }
+  async sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number> {
+    if (to === this.selfId) throw new Error('you can\'t give yourself a present');
+    if (![3, 5, 10].includes(tokens)) throw new Error('that is not a present'); if (this.wallet() < tokens) throw new Error('you need ' + tokens + ' tokens to wrap that');
+    const all = this.wj<(TreeGift & { from: string; tokens: number; note: number; opened: boolean })[]>('gifts') ?? [], id = Math.max(0, ...all.map((g) => g.id)) + 1;
+    const toName = this.lobbySeen.get(to)?.p.name ?? 'SOMEONE';
+    this.wallet(this.wallet() - tokens); this.wj('gifts', [...all, { id, to, toName, wrap, mine: false, from: (await this.loadProfile())?.name ?? 'SOMEONE', tokens, note, opened: false }]);
+    return this.wallet();
+  }
+  async treeGifts(): Promise<TreeGift[]> { return (this.wj<(TreeGift & { opened: boolean })[]>('gifts') ?? []).filter((g) => !g.opened).map((g) => ({ id: g.id, to: g.to, toName: g.toName, wrap: g.wrap, mine: g.to === this.selfId })); }
+  async openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }> {
+    const all = this.wj<(TreeGift & { from: string; tokens: number; note: number; opened: boolean })[]>('gifts') ?? [], g = all.find((x) => x.id === id && x.to === this.selfId && !x.opened);
+    if (!g) throw new Error('that present is not for you (or it is already open)');
+    g.opened = true; this.wj('gifts', all); this.wallet(this.wallet() + g.tokens); return { tokens: this.wallet(), got: g.tokens, from: g.from, note: g.note };
   }
   // ---- the photo wall, kept in this browser (every tab shares it); ?admin makes you the owner. Same rules as 0017_photos.sql ----
   private photoRows(v?: (Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]) {
@@ -434,6 +486,7 @@ export class LocalTransport implements Transport {
   async flatParty(on: boolean): Promise<number | null> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].party = on ? Date.now() / 1000 + 1800 : null; this.flats(all); return all[this.selfId].party ?? null; }
   async letIn(who: string): Promise<void> { const all = this.flats(), f = all[this.selfId]; if (!f) throw new Error('move in first'); f.inv = { ...(f.inv ?? {}), [who]: Date.now() + 1800e3 }; this.flats(all); }
   sendTank(t: TankMsg): void { this.post('tank', { id: this.selfId, ...t }); }
+  sendSnowball(b: SnowballMsg): void { this.post('snowball', { id: this.selfId, ...b }); }
   sendKScore(k: KScore): void { this.post('kscore', { id: this.selfId, ...k }); }
   sendJunk(n: number): void { this.post('junk', { id: this.selfId, n }); }
   sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
@@ -476,6 +529,7 @@ export class LocalTransport implements Transport {
       case 'state': { const v = parseState(w.p); if (v) this.on({ type: 'state', id: v.id, s: v.s }); break; }
       case 'note': { const v = parseNote(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); break; }
       case 'tank': { const v = parseTank(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'tank', id: v.id, t: v.t }); break; }
+      case 'snowball': { const v = parseSnowball(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'snowball', id: v.id, b: v.b }); break; }
       case 'kscore': { const v = parseKScore(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kscore', id: v.id, k: v.k }); break; }
       case 'junk': { const v = parseJunk(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'junk', id: v.id, n: v.n }); break; }
       case 'kart': { const v = parseKart(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kart', id: v.id, k: v.k }); break; }

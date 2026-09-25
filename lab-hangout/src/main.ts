@@ -50,7 +50,9 @@ import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
-import { setSeason, isHalloween } from './world/season';
+import { setSeason, isHalloween, isWinter, season } from './world/season';
+import { WINTER, OUTDOOR, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, winterBack, winterFront, winterProps } from './world/winter';
+import { openAdvent, openSendGift, openTree, showGift } from './ui/winter';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
 import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
 import { openFreeTray, openMyPlant, openMyTray, openSeeds } from './ui/garden';
@@ -67,11 +69,11 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Photo, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Photo, type SnowballMsg, type TreeGift, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -79,7 +81,7 @@ import { Bots } from './game/bots';
 import { Npcs, type Npc } from './game/npcs';
 import { Ambient } from './game/ambient';
 import { BOARD } from './game/board';
-import { MusicPlayer, Rain, Rumble, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK, type Track } from './audio/music';
+import { MusicPlayer, Rain, Rumble, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK, TRACKS as LAB_TRACKS, WINTER_TRACKS, type Track } from './audio/music';
 import { banner, hostStep, live, partyMusic, startChairs, startTag, tagTouch, winner, type HostView } from './game/party';
 import { SLOP_DUR, SLOP_N, blob, drawBlob, drawSplat, drawThrow, slopWave } from './game/slop';
 import type { BotGame } from './game/bots';
@@ -167,6 +169,7 @@ function applyState(s: StateMsg): boolean {
   if (s.k === 'flat' && isFlat(room.id)) { FLAT.party = s.v.party; if (s.v.n > flatRev) { flatRev = s.v.n; if (!FLAT.mine) void recheckFlat(); } }
   const prevBuild = DEN_INFO.build;
   room.onState?.(s);
+  if (s.k === 'snowman') WINTER.snowman = s.v; else if (s.k === 'snowfight') { if (!WINTER.snowfight || WINTER.snowfight.t0 !== s.v.t0) fightHits.clear(); WINTER.snowfight = s.v; }
   // someone else's fresh commit / deploy in the Den: show it and make some noise
   const fresh = Date.now() - s.ts < 5000;
   if (room.id === 'den' && fresh && s.k === 'build' && s.v.id !== net.selfId) {
@@ -271,6 +274,7 @@ function onNet(e: NetEvent): void {
       KARTS.live.set(e.id, { k: e.k, t: now() }); raceUI?.recv(e.id, e.k);
       break;
     }
+    case 'snowball': { if (!others.has(e.id) || !allow(e.id, 'snowball', 3, 5)) break; flyBall(e.id, e.b); break; }
     case 'kscore': { const k = STAGE_INFO.karaoke, av = others.get(e.id); if (room.id === 'stage' && av && k && e.k.r === k.t0 && allow(e.id, 'kscore', 3, 6)) STAGE_INFO.scores.set(e.id, { name: av.name, i: e.k.i, s: e.k.s, c: e.k.c, f: !!e.k.f }); break; }
     case 'junk': if (room.id === 'spacewalk' && others.has(e.id) && allow(e.id, 'junk', 6, 10)) WALK.got.set(e.n, Date.now() / 1000); break;
     case 'status': toast(e.text); break;
@@ -586,6 +590,12 @@ function useSpot(i: number): void {
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'tray') { tendTray(s.n ?? 0); return; }
   if (s.kind === 'karaoke') { openKaraoke(); return; }
+  if (s.kind === 'present') { openPresent(s.n ?? 0); return; }
+  if (s.kind === 'tree') { treeMenu(); return; }
+  if (s.kind === 'advent') { adventMenu(); return; }
+  if (s.kind === 'snowman') { rollSnowman(); return; }
+  if (s.kind === 'snowfight') { startSnowfight(); return; }
+  if (s.kind === 'boat' && isWinter()) { toast('The pond is frozen solid! Walk out onto the ice to skate', 3500); return; }
   if (s.kind === 'photos') { SFX.blip(); openAlbum(albumHooks(), () => input.clear()); return; }
   if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
   if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { quests.bump('kite'); me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
@@ -756,6 +766,7 @@ function openKaraoke(): void {
   openSongs({
     pick: (n) => { setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }); SFX.chime(); toast(usingOf(me) === 'instrument' ? 'Here it comes!' : 'Get up to the MIC to sing, or grab an instrument! Everyone else: cheer to fill the HYPE bar', 4500); },
     stop: on ? () => { setState({ k: 'karaoke', v: { song: -1, t0: Date.now(), by: me.name } }); toast('Song stopped'); } : null,
+    season: season(),
   }, () => input.clear());
 }
 function karaokeStep(dt: number): void {
@@ -796,6 +807,144 @@ function songOver(k: KaraokeState): void {
   net.karaokeTip(score).then((r) => { setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: '+' + r.paid }); }).catch(() => toast(line, 5000));
 }
 
+// ---------- WINTER (world/winter.ts, ui/winter.ts, 0018_winter.sql) ----------
+let giftsMine = -1, fightDone = -1, lightHeard = -1, bellsHeard = -1, nyeHeard = -1, lastThrow = -9;
+const fightHits = new Map<string, { name: string; n: number }>();
+const balls: { from: string; b: SnowballMsg; t0: number; landed: boolean }[] = [];
+/** The tree (ornaments, presents), your present hunt, the advent calendar: fetched on the Square / in the Lab, and now and then. */
+async function refreshWinter(): Promise<void> {
+  if (!isWinter() || !playing) return;
+  WINTER.treeAt = Date.now(); WINTER.treeDirty = false;
+  try { WINTER.presents = new Set(await net.presentsToday()); } catch { /* later */ }
+  try { WINTER.advent = await net.adventDoors(); } catch { /* later */ }
+  await refreshTree();
+}
+async function refreshTree(): Promise<void> {
+  try { WINTER.ornaments = await net.ornaments(); } catch { /* later */ }
+  try {
+    WINTER.gifts = await net.treeGifts(); const mine = WINTER.gifts.filter((g) => g.mine).length;
+    if (giftsMine >= 0 && mine > giftsMine) { toast('A present for you is waiting under the tree in the Square!', 5000); SFX.bells(); }
+    giftsMine = mine;
+  } catch { /* later */ }
+}
+const prizeName = (p: string): string => (p.startsWith('tokens:') ? '+' + p.slice(7) + ' TOKENS' : itemName(p));
+/** The present hunt: open present n. */
+function openPresent(n: number): void {
+  if (WINTER.presents.has(n)) { toast('You already opened this one today. More tomorrow!', 2500); return; }
+  net.findPresent(n).then((r) => {
+    WINTER.presents.add(n); setTokens(r.tokens); SFX.chime(); floaters.push({ x: PRESENTS[n].x, y: PRESENTS[n].y - 30, t0: now(), text: '+1' });
+    toast('A PRESENT! +1 token (' + r.found + '/12 found today)', 3000);
+    if (r.prize === 'tokens:5') toast('ALL 12 PRESENTS! You have every winter prize already, so +5 tokens', 5000);
+    else if (r.prize) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('ALL 12 PRESENTS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(m[0].toUpperCase() + m.slice(1), 3000); });
+}
+function adventMenu(): void {
+  SFX.blip(); void net.adventDoors().then((d) => { WINTER.advent = d; }).catch(() => {});
+  openAdvent({ open: (d) => net.openAdvent(d).then((r) => { setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => input.clear());
+}
+/** Everyone on the server you could send a present to. */
+const giftPeople = (): { id: string; name: string }[] => lobby.filter((p) => p.id !== net.selfId).map((p) => ({ id: p.id, name: p.name }));
+function sendGiftTo(preset: string | null): void {
+  openSendGift(giftPeople(), preset, myTokens, (to, tk, wrap, nt) => net.sendGift(to, tk, wrap, nt).then((bal) => { setTokens(bal); SFX.bells(); toast('Wrapped and under the tree! They\'ll find out who from when they open it', 4500); void refreshTree(); }), () => input.clear());
+}
+function openTreeGift(g: TreeGift): void {
+  net.openGift(g.id).then((r) => { setTokens(r.tokens); SFX.joy(); lastEmoteAt = -9; emote('joy'); showGift(r, g.wrap, () => input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
+}
+function treeMenu(): void {
+  SFX.blip(); void refreshTree();
+  openTree({ hang: (k, x, y) => net.hangOrnament(k, x, y).then(() => { SFX.chime(); void refreshTree(); }), gifts: () => WINTER.gifts, openGift: openTreeGift, send: () => sendGiftTo(null) }, () => input.clear());
+}
+/** The Park's snowman: roll it up (everyone's rolls add up), then dress it. Starts again every day. */
+function rollSnowman(): void {
+  const day = Math.floor(Date.now() / 86400000), cur = WINTER.snowman.day === day ? WINTER.snowman : { day, rolls: 0, deco: 0 };
+  if (cur.rolls < SNOWMAN_ROLLS) {
+    const rolls = cur.rolls + 1; setState({ k: 'snowman', v: { day, rolls, deco: cur.deco } }); SFX.scoop();
+    if (rolls === SNOWMAN_ROLLS) { SFX.score(); toast('The snowman is built! Now dress him up (E)', 4000); }
+    else toast(rolls < 12 ? 'Rolling the big ball...' : rolls < 22 ? 'Rolling the middle...' : 'Rolling his head...', 1200);
+    return;
+  }
+  if (cur.deco < 31) { let i = 0; while (cur.deco & (1 << i)) i++; const deco = cur.deco | (1 << i); setState({ k: 'snowman', v: { day, rolls: cur.rolls, deco } }); SFX.pop(); toast('You gave him ' + SNOW_DECO[i] + (deco === 31 ? '. He\'s perfect!' : ''), 2500); if (deco === 31) { lastEmoteAt = -9; emote('joy'); } return; }
+  toast('Isn\'t he lovely? He melts at midnight (a new one tomorrow)', 3000);
+}
+function startSnowfight(): void {
+  const f = WINTER.snowfight; if (f && Date.now() - f.t0 < 90000) { toast('A snowball fight is on! Scoop snow (E) and throw it at people', 3000); return; }
+  setState({ k: 'snowfight', v: { t0: Date.now(), by: me.name } }); SFX.bells(); toast('SNOWBALL FIGHT! 90 seconds: most hits wins. Scoop snow (E), then throw (E)', 5000);
+}
+function scoopSnow(): void { if (me.hold) return; me.hold = HOLD_SNOWBALL; me.sips = 0; forceSend = true; SFX.scoop(); }
+/** Who you'd throw at: the nearest person (player, NPC or bot) in front of you, within range. */
+function snowTarget(): Avatar | null {
+  let best: Avatar | null = null, bd = 1e9;
+  for (const av of [...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)]) {
+    if (hiddenAv(av, now())) continue; const dx = av.x - me.x, dy = av.y - me.y, d = Math.hypot(dx, dy * 1.5);
+    if (d > 240 || d < 6) continue; const facing = Math.sign(dx) === me.dir ? 0 : 60; if (d + facing < bd) { bd = d + facing; best = av; }
+  }
+  return best;
+}
+function throwSnowball(): void {
+  const t = now(); if (me.hold !== HOLD_SNOWBALL || t - lastThrow < 0.5) return; lastThrow = t;
+  const tg = snowTarget(), miss = !!tg && Math.random() < 0.15;
+  const x1 = tg ? tg.x + (miss ? (Math.random() < 0.5 ? -22 : 22) : 0) : me.x + me.dir * 140, y1 = tg ? tg.y : me.y + 4;
+  const b: SnowballMsg = { x0: me.x, y0: me.y, x1: Math.max(0, x1), y1, hit: tg && !miss && !tg.npc ? tg.id : '' };
+  if (tg) me.dir = tg.x < me.x ? -1 : 1;
+  me.hold = 0; forceSend = true; SFX.toss(); net.sendSnowball(b); flyBall(net.selfId, b);
+  if (tg && !miss && tg.npc) setTimeout(() => { tg.splat = now(); }, 450);
+}
+/** A snowball in the air (yours or someone else's): lands 0.45 s later; a hit splats whoever it was for. */
+function flyBall(from: string, b: SnowballMsg): void {
+  balls.push({ from, b, t0: now(), landed: false });
+  const f = WINTER.snowfight;
+  if (b.hit && f && Date.now() - f.t0 < 90000) { const nm = from === net.selfId ? me.name : others.get(from)?.name ?? '?', c = fightHits.get(from); fightHits.set(from, { name: nm, n: (c?.n ?? 0) + 1 }); }
+  if (from === net.selfId && b.hit) quests.stat('snowhits');
+}
+function ballStep(): void {
+  const t = now();
+  for (let k = balls.length - 1; k >= 0; k--) {
+    const bl = balls[k], u = (t - bl.t0) / 0.45;
+    if (u >= 1 && !bl.landed) {
+      bl.landed = true;
+      if (bl.b.hit === net.selfId) { me.splat = t; SFX.splat(); const nm = others.get(bl.from)?.name ?? 'Someone'; toast('SPLAT! ' + nm + ' got you!', 1800); }
+      else if (bl.b.hit) { const av = others.get(bl.b.hit); if (av) av.splat = t; if (bl.from === net.selfId) { SFX.splat(); floaters.push({ x: bl.b.x1, y: bl.b.y1 - 40, t0: t, text: 'HIT!' }); } }
+    }
+    if (u > 1.6) balls.splice(k, 1);
+  }
+}
+function drawBalls(): void {
+  const t = now();
+  for (const bl of balls) {
+    const u = (t - bl.t0) / 0.45, { x0, y0, x1, y1 } = bl.b;
+    if (u < 1) { const x = x0 + (x1 - x0) * u, y = y0 - 26 + (y1 - 22 - (y0 - 26)) * u - Math.sin(u * Math.PI) * 28; r(Math.round(x) - 2, Math.round(y) - 2, 5, 5, [22, 12, 44]); r(Math.round(x) - 1, Math.round(y) - 1, 3, 3, [240, 244, 250]); }
+    else { const v = u - 1; for (let k = 0; k < 7; k++) { const an = (k / 7) * Math.PI * 2; r(Math.round(x1 + Math.cos(an) * (3 + v * 16)), Math.round(y1 - 20 + Math.sin(an) * (2 + v * 8) + v * v * 20), 2, 2, [236, 242, 250]); } }
+  }
+}
+/** Once a frame in winter: the sleigh (bells, presents to catch), the tree lighting, a snowball fight's end, New Year. */
+function winterStep(): void {
+  ENV.ice = isWinter() && room.id === 'park' ? (x, y) => onIce('park', x, y) : null;
+  if (!isWinter() || !playing) return;
+  ballStep();
+  if (Date.now() - WINTER.treeAt > (room.id === 'plaza' ? 30000 : 120000)) void refreshWinter();
+  const sl = sleigh();
+  if (sl.t >= 0 && sl.t < 20 && bellsHeard !== sl.pass && OUTDOOR.includes(room.id)) { bellsHeard = sl.pass; SFX.bells(); toast(room.id === 'plaza' ? 'HO HO HO! Santa\'s sleigh! Catch the presents as they land' : 'Sleigh bells! Santa is dropping presents on the Square', 4500); }
+  if (room.id === 'plaza' && sl.t < 330) for (const d of drops(sl.pass)) {
+    const key = sl.pass + ':' + d.n; if (WINTER.caught.has(key) || sl.t < d.land || Math.abs(me.x - d.x) > 11 || Math.abs(me.y - d.y) > 9) continue;
+    WINTER.caught.add(key); SFX.pop();
+    net.catchSleigh(sl.pass, d.n).then((bal) => { setTokens(bal); SFX.chime(); floaters.push({ x: d.x, y: d.y - 30, t0: now(), text: '+1' }); }).catch((e: unknown) => toast(errText(e), 2500));
+  }
+  const ls = lightShow(), hour = Math.floor(Date.now() / 3600000);
+  if (ls >= 0 && lightHeard !== hour && room.id === 'plaza') { lightHeard = hour; SFX.jingle(); toast('THE TREE LIGHTING! Hang an ornament at THE TREE', 4000); }
+  const f = WINTER.snowfight;
+  if (f && Date.now() - f.t0 >= 90000 && fightDone !== f.t0 && room.id === 'plaza') { fightDone = f.t0; const top = [...fightHits.values()].sort((p, q) => q.n - p.n)[0]; toast(top ? 'SNOWBALL FIGHT OVER! ' + top.name + ' wins with ' + top.n + ' hits!' : 'SNOWBALL FIGHT OVER! Nobody hit anybody...', 5000); SFX.score(); }
+  const ny = nye();
+  if (ny.left > 0 && ny.left <= 10.5) { const k = Math.ceil(ny.left); if (nyeHeard !== k) { nyeHeard = k; toast(String(k) + '...', 900); SFX.tminus(); } }
+  if (ny.since >= 0 && ny.since < 3 && nyeHeard !== -100) { nyeHeard = -100; toast('HAPPY NEW YEAR ' + ny.year + '!', 6000); SFX.joy(); for (let k = 0; k < 6; k++) setTimeout(() => { SFX.boom(); SFX.pop(); }, k * 450); lastEmoteAt = -9; emote('joy'); }
+}
+function winterLine(): string {
+  if (!isWinter()) return '';
+  const ny = nye(); if (ny.left > 0 && ny.left < 600) return 'NEW YEAR IN ' + clockText(ny.left) + ' · GET TO THE ROOF OR THE SQUARE FOR THE FIREWORKS!';
+  const f = WINTER.snowfight;
+  if (room.id === 'plaza' && f && Date.now() - f.t0 < 90000) { const top = [...fightHits.values()].sort((p, q) => q.n - p.n).slice(0, 3).map((x) => x.name + ' ' + x.n).join(' · '); return 'SNOWBALL FIGHT · ' + clockText(90 - (Date.now() - f.t0) / 1000) + (top ? ' · ' + top : ' · SCOOP SNOW (E) AND THROW!'); }
+  return '';
+}
+
 // ---------- SPACE: the rocket (world/space.ts, rocket.ts), the station (station.ts), the spacewalk (spacewalk.ts) ----------
 /** Your drift velocity while weightless (world px / s). */
 const zv = { x: 0, y: 0 };
@@ -806,11 +955,11 @@ const fire = (k: string, fn: () => void): void => { if (!fired.has(k)) { fired.a
 /** Dev/tests: put this browser's rocket clock `k` seconds into its loop. */
 function setFlight(k: number): void { FLIGHT.skew = 0; FLIGHT.skew = k - (Date.now() / 1000) % CYCLE; }
 /** Weightless moving: you speed up and slow down gently, keep drifting when you let go, and bounce off walls. */
-function drift(dt: number, vx: number, vy: number): number {
+function drift(dt: number, vx: number, vy: number, skate = false): number {
   const free = !!room.freeFloat, ax = input.axis(), steer = !!tapTarget && !ax.x && !ax.y, push = !!(vx || vy);
   const want = steer && tapTarget ? clamp(Math.hypot(tapTarget.x - me.x, tapTarget.y - me.y) / 40, 0.15, 1) : 1; // ease in to where you tapped
-  const rate = steer ? 6 : push ? 2.4 : free ? 0.06 : 0.4, k = 1 - Math.exp(-dt * rate);
-  const mx = SPEED_X * (free ? 0.85 : 0.95), my = SPEED_Y * (free ? 1.1 : 0.95);
+  const rate = steer ? 6 : push ? (skate ? 2 : 2.4) : free ? 0.06 : skate ? 0.3 : 0.4, k = 1 - Math.exp(-dt * rate);
+  const mx = SPEED_X * (free ? 0.85 : skate ? 1.3 : 0.95), my = SPEED_Y * (free ? 1.1 : skate ? 1.2 : 0.95);
   zv.x += (vx * mx * want - zv.x) * k; zv.y += (vy * my * want - zv.y) * k;
   let moved = 0; const t = now(), nx = me.x + zv.x * dt, ny = me.y + zv.y * dt;
   if (walkable(room, nx, me.y)) { moved += Math.abs(nx - me.x); me.x = nx; } else { if (Math.abs(zv.x) > 24 && t - bonkAt > 0.3) { bonkAt = t; SFX.bonk(); } zv.x *= -0.5; }
@@ -993,6 +1142,8 @@ async function refreshSeason(): Promise<void> {
   if (!s) { try { s = await net.season(); } catch { s = null; } }
   setSeason(s);
   if (isHalloween()) installHalloween(ROOMS);
+  npcs.dressFor(season());
+  if (isWinter()) { installWinter(ROOMS, [...LAB_TRACKS, ...WINTER_TRACKS]); FILL.coffee = { hold: HOLD_COCOA, secs: 1.8, msg: 'Hot cocoa with marshmallows!' }; void refreshWinter(); }
 }
 /** Trick or treat at door n: the server pays (or tricks you into a ghost for a minute). */
 function knock(n: number): void {
@@ -1076,6 +1227,7 @@ function endArcade(score: number): void {
 }
 /** Sip / eat whatever's in your hand. */
 function useItem(): void {
+  if (me.hold === HOLD_SNOWBALL) { throwSnowball(); return; }
   if (isKitchen(me.hold)) { cook(ST.BIN); return; }
   if (me.hold === HOLD_KITE) { me.hold = 0; forceSend = true; toast('Kite back on the stand'); return; }
   if (!me.hold || me.emote) return;
@@ -1121,7 +1273,8 @@ function playerCard(o: Avatar): void {
   }, true);
   const chips = document.createElement('div'); net.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
   const flat = button('VISIT FLAT', () => { m.close(); net.flatDoors([o.id]).then(([d]) => { if (!d) toast(o.name + " hasn't moved into THE LOFTS yet"); else if (d.can) void visitFlat(o.id); else knockOn(o.id, o.name); }).catch((e) => toast(errText(e))); }, true);
-  m.body.append(chips, note, row(wave, follow, flat), row(mute, report, button('CLOSE', m.close, true)));
+  const gift = isWinter() ? [button('SEND A PRESENT', () => { m.close(); sendGiftTo(o.id); }, true)] : [];
+  m.body.append(chips, note, row(wave, follow, flat, ...gift), row(mute, report, button('CLOSE', m.close, true)));
 }
 // ---------- follow a player (even through doors) ----------
 let following: string | null = null, followT = 0;
@@ -1299,12 +1452,14 @@ function currentAction(): Action | null {
   }
   const sl = slopTarget(me.x, me.y - 16, 170);
   if (sl) return { label: 'THROW', run: () => throwAt(sl), at: [sl.x, sl.y - 18] };
+  if (isWinter() && OUTDOOR.includes(room.id) && me.hold === HOLD_SNOWBALL) { const tg = snowTarget(); return { label: 'THROW', run: throwSnowball, at: tg ? [tg.x, tg.y - liftOf(tg) - 50] : null }; }
   const n = nearestNpc(30);
   if (n) return { label: 'TALK', run: () => talkTo(n), at: [n.av.x, n.av.y - liftOf(n.av) - 48] };
   const tk = nearestTalker(26);
   if (tk) return { label: 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
   if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
+  if (isWinter() && OUTDOOR.includes(room.id) && !me.hold && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
@@ -1496,8 +1651,10 @@ function updateMe(dt: number): void {
   }
   const len = Math.hypot(vx, vy); if (len > 1) { vx /= len; vy /= len; }
   let moved = 0;
-  if (room.zeroG?.() && me.pose !== POSE_BOAT) moved = drift(dt, vx, vy); // weightless: momentum, bouncing off the walls
+  const skating = isWinter() && onIce(room.id, me.x, me.y) && me.pose !== POSE_BOAT;
+  if ((room.zeroG?.() || skating) && me.pose !== POSE_BOAT) moved = drift(dt, vx, vy, skating); // weightless (or skating on the ice): momentum
   else {
+    zv.x = zv.y = 0;
     const rowing = me.pose === POSE_BOAT, sp = rowing ? 0.7 : 1; // boats go where it's wet, a bit slower
     const ok = (x: number, y: number) => (rowing ? !!room.water?.(x, y) : walkable(room, x, y));
     const nx = me.x + vx * SPEED_X * sp * dt, ny = me.y + vy * SPEED_Y * sp * dt;
@@ -1618,12 +1775,14 @@ function render(a: number, t: number): void {
   PX.dim = dim;
   room.drawBack(a);
   if (isHalloween()) halloweenBack(room.id, a);
+  if (isWinter()) winterBack(room, a);
   for (const c of crews) drawCrewFloor(c);
   // tap marker
   if (tapFx) { const u = t - tapFx.t0; if (u > 0.5) tapFx = null; else lit(() => ring(Math.round(tapFx!.x), Math.round(tapFx!.y), Math.round(3 + u * 16), Math.round(1 + u * 5), [255, 236, 170])); }
   const items: { y: number; av?: Avatar; draw?: (a: number) => void }[] = room.props.map((p) => ({ y: p.y, draw: p.draw }));
   for (const d of ambient.items(room.id, t)) items.push(d);
   if (isHalloween()) for (const p of halloweenProps(room.id)) items.push({ y: p.y, draw: p.draw });
+  if (isWinter()) for (const p of winterProps(room.id)) items.push({ y: p.y, draw: p.draw });
   if (playing) items.push({ y: me.y, av: me });
   for (const av of others.values()) if (!hiddenAv(av, t)) items.push({ y: av.y, av });
   for (const n of npcs.inRoom(room.id)) items.push({ y: n.av.y, av: n.av });
@@ -1652,6 +1811,7 @@ function render(a: number, t: number): void {
   }
   for (const tk of room.talkers ?? []) heads.set(tk.id, R.toScreen(tk.x, tk.y - 4));
   if (isHalloween()) halloweenFront(room.id, a);
+  if (isWinter()) { drawBalls(); winterFront(room, a, R.cam, OUTDOORS.includes(room.id) && weather().kind === 'snow'); }
   // lanterns: stacked faint discs give a soft falloff (one big disc reads as a flat circle)
   if (room.lantern) for (const it of items) if (it.av) { const ly = it.av.y - liftOf(it.av) - 16; for (let k = 0; k < 6; k++) Gd(it.av.x, ly, 10 + k * 9, room.lantern, 0.06); }
   for (const it of items) {
@@ -1753,7 +1913,7 @@ function cook(st: number, quiet = false): void {
   if (g.host === net.selfId) setState({ k: 'diner', v: res.g }); else net.sendCook(st);
 }
 function dinerStep(dt: number, t: number): void {
-  const g = DINER.g, inDiner = room.id === 'diner' && playing, on = inDiner && shiftLive(g);
+  const g = DINER.g, inDiner = room.id === 'diner' && playing && !switching, on = inDiner && shiftLive(g); // (not while walking out: the tour mustn't start mid-fade and follow you)
   npcs.away.clear(); if (on) npcs.away.add('npc-cookie');
   syncTickets(tour ? tour.g : on ? g : null);
   if (inDiner && settled()) tourStep();
@@ -1925,6 +2085,7 @@ function startDecorating(): void {
   if (!FLAT.mine || !isFlat(room.id)) return;
   const view = $<HTMLCanvasElement>('#view');
   openDecorate({
+    season: () => season(),
     room: () => (isFlat(room.id) ? room.id : null),
     buy: async (id) => { try { const r = await net.buyFurniture(id); FLAT.owned[id] = r.n; setTokens(r.tokens); SFX.chime(); quests.stat('furniture'); return true; } catch (e) { toast(errText(e)); SFX.blip(); return false; } },
     save: async () => {
@@ -2082,7 +2243,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); karaokeStep(dt);
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -2090,7 +2251,7 @@ function frame(nowMs: number): void {
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine());
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || winterLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = (g && partyMusic(g)) || (isFlat(room.id) && partyOn());
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -2204,6 +2365,7 @@ async function boot(): Promise<void> {
   });
   setInterval(() => { if (quests.resetIn() > 86340) void quests.refresh(); }, 60000);
   if (net.mode === 'local' && Number(params.get('grow')) > 0) GARDEN.speed = TRAY_SPEED.k = Number(params.get('grow')); // LOCAL test speed-up
+  if ((import.meta.env.DEV || net.mode === 'local') && params.has('nye')) WINTER.nyeAt = Date.now() / 1000 + (Number(params.get('nye')) || 0); // tests: New Year in N s
   if ((import.meta.env.DEV || net.mode === 'local') && params.has('flight')) FLIGHT.skew = Number(params.get('flight')) || 0; // tests: shift the rocket's clock (s)
   setInterval(() => void refreshSeason(), 600000);
   if (mergedSave) save.mergeIn(mergedSave);
@@ -2247,6 +2409,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     tour: () => (tour ? { step: tour.step, back: tour.back, bar: tourStepNow().bar } : null), tourDone: () => !!save.data.stats.dinerTour,
     race: () => KARTS.race, kartLive: () => [...KARTS.live.entries()].map(([id, v]) => [id, v.k.lap, v.k.g, v.k.fin]),
     flat: () => FLAT,
+    winter: () => ({ season: season(), presents: [...WINTER.presents], advent: WINTER.advent, ornaments: WINTER.ornaments.length, gifts: WINTER.gifts, snowman: WINTER.snowman, fight: [...fightHits.values()], hold: me.hold, zv: { ...zv } }), throwAt: () => throwSnowball(), scoop: () => scoopSnow(), refreshWinter: () => refreshWinter(), nyeIn: (sec: number) => { WINTER.nyeAt = Date.now() / 1000 + sec; },
     karaoke: () => ({ k: STAGE_INFO.karaoke, hype: STAGE_INFO.hype, scores: [...STAGE_INFO.scores.entries()], result: STAGE_INFO.result, perf: perf ? { inst: perf.inst, score: perf.score(true), combo: perf.combo, judged: perf.judged.size, final: perf.score() } : null, t: STAGE_INFO.karaoke ? kTime(STAGE_INFO.karaoke) : null }),
     sing: (n: number) => setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }), note: (n: number) => playNote(n),
     lane: () => (perf ? lane(perf.song, perf.inst).map((x) => [x.s, x.p]) : []), stepSec: () => (STAGE_INFO.karaoke ? stepS(SONGS[STAGE_INFO.karaoke.song]) : 0),

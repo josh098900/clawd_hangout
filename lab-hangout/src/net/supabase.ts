@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseSnowball, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type SnowballMsg, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -164,6 +164,22 @@ export class SupabaseTransport implements Transport {
   async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> { const o = await this.rpcJson('space_harvest', { tray }); return { tokens: Number(o.tokens) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null, rotten: o.rotten === true }; }
   async spaceDigUp(tray: number): Promise<void> { const { error } = await this.sb.rpc('space_dig_up', { tray }); if (error) throw new Error(error.message); }
   async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('spacewalk_pay', { pts: Math.max(0, Math.round(pts)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
+  // ---- winter ----
+  async findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }> { const o = await this.rpcJson('find_present', { n }); return { tokens: Number(o.tokens) || 0, found: Number(o.found) || 0, prize: typeof o.prize === 'string' ? o.prize : null }; }
+  async presentsToday(): Promise<number[]> { const { data, error } = await this.sb.rpc('presents_today'); if (error) throw new Error(error.message); return Array.isArray(data) ? (data as unknown[]).map(Number).filter((n) => n >= 0 && n < 12) : []; }
+  async openAdvent(door: number): Promise<{ tokens: number; prize: string }> { const o = await this.rpcJson('open_advent', { door }); return { tokens: Number(o.tokens) || 0, prize: String(o.prize ?? '') }; }
+  async adventDoors(): Promise<{ opened: number[]; upto: number }> { const o = await this.rpcJson('advent_doors', {}); return { opened: Array.isArray(o.opened) ? (o.opened as unknown[]).map(Number) : [], upto: Number(o.upto) || 0 }; }
+  async ornaments(): Promise<Ornament[]> {
+    if (!this.server) return [];
+    const { data, error } = await this.sb.from('ornaments').select('id, kind, x, y, owner_name').eq('server', this.server).gte('placed_at', new Date(Date.now() - 45 * 86400000).toISOString()).order('id', { ascending: true }).limit(240);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((o) => ({ id: Number(o.id), kind: Number(o.kind), x: Number(o.x), y: Number(o.y), ownerName: cleanName(o.owner_name) || 'SOMEONE' }));
+  }
+  async hangOrnament(kind: number, x: number, y: number): Promise<number> { const { data, error } = await this.sb.rpc('hang_ornament', { kind, x: Math.round(x), y: Math.round(y) }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async catchSleigh(pass: number, n: number): Promise<number> { const { data, error } = await this.sb.rpc('catch_sleigh', { pass, n }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number> { const { data, error } = await this.sb.rpc('send_gift', { recipient: to, tokens, wrap, note }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async treeGifts(): Promise<TreeGift[]> { const { data, error } = await this.sb.rpc('tree_gifts'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((g) => ({ id: Number(g.id), to: String(g.to ?? ''), toName: cleanName(g.to_name) || 'SOMEONE', wrap: Number(g.wrap) || 0, mine: g.mine === true })); }
+  async openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }> { const o = await this.rpcJson('open_gift', { gift: id }); return { tokens: Number(o.tokens) || 0, got: Number(o.got) || 0, from: cleanName(o.from) || 'SOMEONE', note: Number(o.note) || 0 }; }
   // ---- the photo wall ----
   private photoOf(o: Record<string, unknown>): Photo { return { id: Number(o.id), owner: String(o.owner ?? ''), ownerName: cleanName(o.owner_name) || 'SOMEONE', png: typeof o.png === 'string' && o.png.startsWith('data:image/png;base64,') ? o.png : '', at: Number(o.at) || 0, hearts: Number(o.hearts) || 0, mine: o.mine === true }; }
   async isAdmin(): Promise<boolean> { const { data, error } = await this.sb.rpc('is_admin'); if (error) return false; return data === true; }
@@ -286,6 +302,7 @@ export class SupabaseTransport implements Transport {
     ch.on('broadcast', { event: 'state' }, ({ payload }) => { const v = parseState(payload); if (v && v.id !== this.selfId) this.on({ type: 'state', id: v.id, s: v.s }); });
     ch.on('broadcast', { event: 'note' }, ({ payload }) => { const v = parseNote(payload); if (v && v.id !== this.selfId) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); });
     ch.on('broadcast', { event: 'tank' }, ({ payload }) => { const v = parseTank(payload); if (v && v.id !== this.selfId) this.on({ type: 'tank', id: v.id, t: v.t }); });
+    ch.on('broadcast', { event: 'snowball' }, ({ payload }) => { const v = parseSnowball(payload); if (v && v.id !== this.selfId) this.on({ type: 'snowball', id: v.id, b: v.b }); });
     ch.on('broadcast', { event: 'kscore' }, ({ payload }) => { const v = parseKScore(payload); if (v && v.id !== this.selfId) this.on({ type: 'kscore', id: v.id, k: v.k }); });
     ch.on('broadcast', { event: 'junk' }, ({ payload }) => { const v = parseJunk(payload); if (v && v.id !== this.selfId) this.on({ type: 'junk', id: v.id, n: v.n }); });
     ch.on('broadcast', { event: 'kart' }, ({ payload }) => { const v = parseKart(payload); if (v && v.id !== this.selfId) this.on({ type: 'kart', id: v.id, k: v.k }); });
@@ -337,6 +354,7 @@ export class SupabaseTransport implements Transport {
   sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
   sendFlat(f: FlatMsg): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'flat', payload: { id: this.selfId, ...f } }); }
   sendTank(t: TankMsg): void { void this.ch?.send({ type: 'broadcast', event: 'tank', payload: { id: this.selfId, ...t } }); }
+  sendSnowball(b: SnowballMsg): void { void this.ch?.send({ type: 'broadcast', event: 'snowball', payload: { id: this.selfId, ...b } }); }
   sendKScore(k: KScore): void { void this.ch?.send({ type: 'broadcast', event: 'kscore', payload: { id: this.selfId, ...k } }); }
   sendJunk(n: number): void { void this.ch?.send({ type: 'broadcast', event: 'junk', payload: { id: this.selfId, n } }); }
   sendKart(k: KartMsg): void { void this.ch?.send({ type: 'broadcast', event: 'kart', payload: { id: this.selfId, ...k } }); }

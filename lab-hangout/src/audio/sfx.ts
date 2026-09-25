@@ -67,6 +67,12 @@ export const SFX = {
   flap: () => { for (let i = 0; i < 4; i++) noise(700, 1.2, 0.04, 0.05, i * 0.05); },
   beep: () => { tone('square', 1200, 1200, 0.05, 0.02); tone('square', 900, 900, 0.06, 0.02, 0.07); },
   zap: () => tone('square', 1400, 500, 0.08, 0.03),
+  // winter (world/winter.ts)
+  bells: () => { for (let i = 0; i < 10; i++) noise(rnd(6500, 8500), 9, 0.08, 0.035, i * 0.13 + (i % 2) * 0.04); tone('sine', 2637, 2637, 0.3, 0.02, 0.1); tone('sine', 3136, 3136, 0.3, 0.015, 0.5); },
+  jingle: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => { tone('triangle', f, f, 0.22, 0.05, i * 0.13); tone('sine', f * 2, f * 2, 0.15, 0.015, i * 0.13); }),
+  scoop: () => { noise(900, 1.2, 0.15, 0.08); noise(1500, 2, 0.1, 0.05, 0.12); },
+  toss: () => noise(1200, 0.8, 0.2, 0.05, 0, 400),
+  splat: () => { noise(800, 0.8, 0.25, 0.14, 0, 300); noise(3000, 2, 0.08, 0.05, 0.02); },
   // space (world/space.ts, station.ts, spacewalk.ts)
   tminus: () => tone('square', 880, 880, 0.09, 0.03),
   ignite: () => { noise(120, 0.6, 2.5, 0.3, 0, 60); noise(600, 0.8, 1.2, 0.12, 0, 200); tone('sawtooth', 70, 40, 2.2, 0.05); },

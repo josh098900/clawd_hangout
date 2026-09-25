@@ -8,7 +8,7 @@
 // per room ('wall0'..'wall5', 'floor0'..'floor4'; the first two of each are free).
 
 import { CONFETTI, K, type RGB } from '../engine/palette';
-import { PX, r, line, disc, oval, txt, tw, lit, alpha, Gd, G, M, shade } from '../engine/pixel';
+import { PX, r, line, disc, oval, txt, tw, lit, alpha, Gd, Gsoft, G, M, shade } from '../engine/pixel';
 import { h1 } from '../engine/math';
 
 /** The flats' geometry: back wall bottom, the three floor rows' feet lines, where wall pieces hang. */
@@ -20,6 +20,8 @@ export type FurnUse = 'sit' | 'nap' | 'juke' | 'arcade' | 'keys' | 'look' | 'par
 export interface FurnCtx { a: number; night: number; party: boolean; fish: string[]; badges: string[]; owner: string; /** the owner's photo from the Lab's photo wall (32x30), for the PHOTO FRAME */ photo: HTMLCanvasElement | null }
 export interface Furn {
   id: string; name: string; price: number; w: number; h: number; layer: Layer;
+  /** Only in the shop in this season (you keep it after). */
+  season?: string;
   /** Seats as [dx from centre, lift]. */
   seats?: [number, number][];
   use?: FurnUse; label?: string;
@@ -125,6 +127,27 @@ export const FURNITURE: Furn[] = [
   { id: 'clock', name: 'WALL CLOCK', price: 6, w: 18, h: 18, layer: 'wall', draw(x, y) {
     const cy = y - 20; disc(x, cy, 8, [60, 60, 70]); disc(x, cy, 7, [240, 240, 236]); const d = new Date(), hh = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * Math.PI * 2, mm = d.getMinutes() / 60 * Math.PI * 2;
     line(x, cy, Math.round(x + Math.sin(hh) * 4), Math.round(cy - Math.cos(hh) * 4), [30, 30, 40]); line(x, cy, Math.round(x + Math.sin(mm) * 6), Math.round(cy - Math.cos(mm) * 6), [30, 30, 40]); r(x, cy, 1, 1, K.RED); } },
+  // ---------- winter (in the shop 1 Dec - 6 Jan) ----------
+  { id: 'xtree', name: 'XMAS TREE', price: 20, w: 40, h: 70, layer: 'floor', season: 'winter', draw(x, y, _f, c) {
+    r(x - 3, y - 8, 6, 8, [110, 70, 40]); r(x - 8, y - 4, 16, 4, [214, 44, 56]);
+    for (const [t0, t1, w] of [[6, 30, 12], [20, 48, 16], [36, 64, 20]] as [number, number, number][]) for (let j = t0; j <= t1; j++) { const hw = Math.round(w * (j - t0) / (t1 - t0)) + 2; r(x - hw, y - 72 + j, hw * 2, 1, j > t1 - 2 ? [26, 96, 60] : [38, 124, 76]); r(x - hw, y - 72 + j, Math.max(1, Math.round(hw * 0.4)), 1, [70, 160, 96]); }
+    lit(() => { for (let k = 0; k < 14; k++) { const j = 10 + Math.floor(h1(k * 3.3) * 54), hw = Math.round(j * 0.33); if ((c.a * 1.3 + h1(k)) % 1 < 0.7) r(x - hw + Math.floor(h1(k * 7.7) * hw * 2), y - 72 + j, 2, 2, CONFETTI[k % CONFETTI.length]); } r(x - 1, y - 72, 3, 5, K.GOLD); r(x - 3, y - 70, 7, 1, K.GOLD); });
+    Gd(x, y - 71, 8, [255, 220, 120], 0.4); } },
+  { id: 'fireplace', name: 'FIREPLACE', price: 25, w: 60, h: 52, layer: 'floor', season: 'winter', draw(x, y, _f, c) {
+    r(x - 30, y - 52, 60, 52, [150, 70, 56]); for (let j = 0; j < 52; j += 6) for (let i = (j / 6) % 2 ? 0 : 6; i < 60; i += 12) r(x - 30 + i, y - 52 + j, 11, 5, [170, 84, 66]);
+    r(x - 34, y - 56, 68, 6, [110, 76, 50]); r(x - 34, y - 56, 68, 1, [150, 110, 76]); r(x - 18, y - 34, 36, 34, [30, 20, 20]);
+    r(x - 12, y - 6, 24, 4, [110, 70, 40]); const f = Math.floor(c.a * 10) % 3;
+    lit(() => { for (let k = 0; k < 5; k++) { const hh = 8 + ((k * 5 + f * 3) % 9); r(x - 11 + k * 5, y - 6 - hh, 3, hh, k % 2 ? [255, 160, 60] : [255, 220, 120]); } });
+    Gsoft(x, y - 14, 8, 44, [255, 150, 60], 0.35);
+    for (const sx of [-20, 4]) { r(x + sx, y - 54, 8, 12, [214, 44, 56]); r(x + sx, y - 54, 8, 2, K.WHITE); r(x + sx - 2, y - 44, 7, 3, [214, 44, 56]); } } },
+  { id: 'stocking', name: 'STOCKING', price: 6, w: 14, h: 22, layer: 'wall', season: 'winter', draw(x, y) {
+    r(x - 5, y - 22, 9, 4, K.WHITE); r(x - 4, y - 18, 7, 12, [214, 44, 56]); r(x - 4, y - 8, 11, 5, [214, 44, 56]); r(x + 5, y - 6, 3, 3, [214, 44, 56]); r(x - 3, y - 14, 5, 1, [60, 170, 90]); r(x - 3, y - 11, 5, 1, K.WHITE);
+    r(x - 2, y - 26, 3, 5, [255, 200, 60]); r(x + 1, y - 25, 3, 4, [90, 130, 230]); } },
+  { id: 'sglobe', name: 'SNOW GLOBE', price: 8, w: 20, h: 22, layer: 'floor', season: 'winter', draw(x, y, _f, c) {
+    r(x - 8, y - 5, 16, 5, [110, 70, 40]); r(x - 8, y - 5, 16, 1, [150, 110, 76]);
+    for (let j = -8; j <= 8; j++) { const w = Math.round(Math.sqrt(64 - j * j)); r(x - w, y - 14 + j, w * 2, 1, [170, 214, 240]); }
+    r(x - 3, y - 12, 6, 6, [38, 124, 76]); r(x - 1, y - 16, 2, 4, [38, 124, 76]); r(x - 5, y - 7, 10, 2, [240, 244, 250]);
+    lit(() => { for (let k = 0; k < 8; k++) { const t = (c.a * 0.4 + h1(k)) % 1, px = x - 6 + Math.floor(h1(k * 3) * 12) + Math.round(Math.sin(c.a * 2 + k) * 1.5), py = y - 21 + Math.floor(t * 14); if ((px - x) ** 2 + (py - (y - 14)) ** 2 < 56) r(px, py, 1, 1, K.WHITE); } r(x - 5, y - 19, 2, 2, K.WHITE); }); } },
   { id: 'pframe', name: 'PHOTO FRAME', price: 10, w: 40, h: 40, layer: 'wall', draw(x, y, _f, c) {
     r(x - 20, y - 40, 40, 38, [120, 84, 54]); r(x - 19, y - 39, 38, 36, [184, 136, 90]); r(x - 18, y - 38, 36, 34, [250, 248, 240]);
     if (c.photo) PX.ctx.drawImage(c.photo, x - 16, y - 36); else { r(x - 16, y - 36, 32, 30, [200, 204, 214]); txt('PHOTO', x - tw('PHOTO') / 2, y - 26, [120, 126, 140]); txt('WALL', x - tw('WALL') / 2, y - 19, [120, 126, 140]); }

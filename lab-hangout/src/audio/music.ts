@@ -115,6 +115,22 @@ export const LOFI: Track[] = [
   },
 ];
 
+/** Winter only: two more tracks on the Lab's jukebox (appended after TRACKS, see world/winter.ts). */
+export const WINTER_TRACKS: Track[] = [
+  {
+    name: 'SNOWFALL SHUFFLE', bpm: 124, wave: 'square',
+    lead: 'G4 C5 E5 G5 - E5 C5 - A4 C5 F5 A5 - F5 C5 - G4 B4 D5 G5 - F5 D5 - E5 - C5 - . . . .',
+    bass: 'C3 . G2 . C3 . G2 . F2 . C3 . F2 . C3 . G2 . D3 . G2 . D3 . C3 . G2 . C3 . . .',
+    drums: 'k . h . s . h h k . h . s . h h k . h . s . h h k k s . s s s .',
+  },
+  {
+    name: 'FROSTY NIGHT', bpm: 88, wave: 'triangle',
+    lead: 'E5 - D5 - C5 - G4 - A4 - C5 - D5 - - - E5 - G5 - A5 - G5 - E5 - D5 - C5 - - -',
+    bass: 'A2 - - - E2 - - - F2 - - - G2 - - - A2 - - - C3 - - - F2 - - - G2 - - -',
+    drums: 'k . . . h . . . s . . . h . h . k . . . h . . . s . . . h h h .',
+  },
+];
+
 /** Party games (musical chairs, tag): fast and bouncy. */
 export const PARTY_TRACK: Track = {
   name: 'PARTY TIME', bpm: 140, wave: 'square',

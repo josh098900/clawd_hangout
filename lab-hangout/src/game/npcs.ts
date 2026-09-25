@@ -249,6 +249,10 @@ export class Npcs {
     }
   }
 
+  /** Winter: Santa hats for everyone (except COOKIE, who won't give up the chef's hat). */
+  dressFor(season: string | null): void {
+    for (const n of this.list) { if (n.def.id === 'npc-cookie') continue; n.av.look = season === 'winter' ? { ...n.def.look, hat: 15 } : n.def.look; }
+  }
   /** NPCs who've stepped out for now (COOKIE takes a break while players run a kitchen shift). */
   readonly away = new Set<string>();
   /** NPCs walked by hand in THIS browser only (COOKIE giving you the Diner tour): id -> where to walk to. */

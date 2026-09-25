@@ -33,11 +33,14 @@ migrations 0007-0014). **Step 11, the Space Station, is done and confirmed** (mi
 garden (the roof is now 1860 wide), drift-and-push-off zero g, all four extras (spacewalk, star melon
 hydroponics, mission control's telescope, the SPACE HELMET), free to fly. The station's NPC is COSMO,
 the critter from the Cinema's own film A CRITTER IN SPACE. **Step 12, karaoke, is done and confirmed** (migration 0016): a rhythm game at the mic plus band lanes on keys/drums/bass, 5 original songs, capped tips,
-the ROCK STAR jacket for a 90+, and a crowd HYPE bar (no quest or badge, by choice). **Step 13, the photo wall, is built** (migration 0017;
-waiting for Josh): in-game MODERATE panel for owners (private.admins, `make_admin(email)`), a corkboard of polaroids
+the ROCK STAR jacket for a 90+, and a crowd HYPE bar (no quest or badge, by choice). **Step 13, the photo wall, is done and confirmed** (migration 0017): in-game MODERATE panel for owners (private.admins, `make_admin(email)`), a corkboard of polaroids
 in the Lab (the photo of the week in gold), hearts, stickers + frame colours before pinning, the PHOTO FRAME
 furniture, 3 pins a day. Strips live in the database (small PNG data URLs) instead of Storage: no bucket to set up,
-and the SQL tests cover it all. **Next: step 14, Winter.**
+and the SQL tests cover it all. **Step 14, Winter, is built** (migration 0018;
+waiting for Josh to test it live with `set_season('winter')`, then `set_season(null)`): 1 Dec - 6 Jan by the date. Everything
+Josh picked: the tree + ornaments + hourly lighting, the present hunt, snowball fights, snowman + ice skating, advent
+calendar, Santa's sleigh, the winter wardrobe, festive music + cocoa + a SNOW DAY karaoke song, New Year's Eve, winter
+furniture, Secret Santa, and festive dressing everywhere. **That's the whole plan done**: next ideas are to be discussed.
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

@@ -122,6 +122,9 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 16. `supabase/migrations/0016_karaoke.sql`: karaoke tips on the Stage (capped per song and per day)
 17. `supabase/migrations/0017_photos.sql`: the Lab's PHOTO WALL (pinned strips, owner review, hearts, the flat PHOTO FRAME).
     Then make yourself the moderator once: `select public.make_admin('the-email-you-log-in-with');`
+18. `supabase/migrations/0018_winter.sql`: WINTER (on by itself 1 Dec - 6 Jan): the present hunt, advent calendar, tree ornaments,
+    Santa's sleigh presents, Secret Santa gifts, winter claw prizes and furniture. Try it early with
+    `select public.set_season('winter');` and switch back to the date with `select public.set_season(null);`
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

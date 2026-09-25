@@ -11,7 +11,7 @@ const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace",
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 
 /** Pick a song (or stop the one that's on). */
-export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | null }, onClose: () => void): void {
+export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | null; season: string | null }, onClose: () => void): void {
   const m = openModal('KARAOKE', onClose);
   const hint = document.createElement('div');
   hint.textContent = on.stop ? 'A song is on right now.' : 'Pick a song. Whoever is at the MIC sings the words; KEYS, DRUMS and BASS play along. The crowd cheers with emotes to fill the HYPE bar.';
@@ -20,6 +20,7 @@ export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | 
   if (on.stop) { m.body.append(row(button('STOP THE SONG', () => { m.close(); on.stop!(); }), button('CLOSE', m.close, true))); return; }
   const list = document.createElement('div'); Object.assign(list.style, { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 'min(460px, 86vw)' });
   SONGS.forEach((g, n) => {
+    if (g.season && g.season !== on.season) return;
     const line = document.createElement('div'); Object.assign(line.style, { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', background: 'rgba(255,255,255,.05)', borderLeft: '3px solid #FF5FD2' });
     const name = document.createElement('span'); name.textContent = g.name; Object.assign(name.style, { fontFamily: "'Press Start 2P', monospace", fontSize: '10px', color: '#FFF3D6', minWidth: '150px' });
     const info = document.createElement('span'); info.textContent = g.style.toLowerCase() + ' · ' + mmss(songLen(g)); Object.assign(info.style, font(19, '#E8D8C0'), { flex: '1' });

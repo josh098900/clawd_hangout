@@ -13,7 +13,7 @@
 
 import type { Track } from '../audio/music';
 
-export interface Song { name: string; style: string; bpm: number; wave: OscillatorType; drums: string; bass: string; chords: string; lines: string[] }
+export interface Song { name: string; style: string; bpm: number; wave: OscillatorType; drums: string; bass: string; chords: string; lines: string[]; /** only on the machine in this season */ season?: string }
 
 export const SONGS: Song[] = [
   {
@@ -104,6 +104,24 @@ export const SONGS: Song[] = [
       '4:hands . 3:up . 2:high . 1:and . 0:give . 1:a . 2:ghost~ 4:ly . .',
       '7:boo . . . 6:boo . . . 5:boo . . . 4:boo . . .',
       '4:the . 4:crypt . 5:is . 6:where . 7:the . 6:par~ 5:ty . 4:goes! . .',
+    ],
+  },
+  {
+    name: 'SNOW DAY', style: 'WINTER SPECIAL', bpm: 128, wave: 'square', season: 'winter',
+    drums: 'k . h . s . h . k k h . s . h . k . h . s . h . k . h h s . s h',
+    bass: 'C2 . C3 . A1 . A2 . F1 . F2 . G1 . G2 . C2 . C3 . A1 . A2 . F1 . F2 . G1 . G2 .',
+    chords: 'C A F G',
+    lines: [
+      '5:snow . 5:is . 6:fall~ 5:ing . 4:on . 3:the . 4:square . . . .',
+      '3:lights . 3:are . 4:twink~ 3:ling . 2:on . 1:the . 2:tree . . . .',
+      '5:grab . 5:a . 6:mug . 7:of . 6:co~ 5:coa . 4:and . 3:a . 4:scarf',
+      '4:come . 3:out . 2:and . 1:play . 2:with . 1:me! . . . . .',
+      "5:it's . 5:a . 6:snow . 7:day . . . 6:snow . 5:day . . .",
+      '4:throw . 3:a . 4:snow~ 5:ball . 4:at . 3:your . 2:friends . . . .',
+      "5:it's . 5:a . 6:snow . 7:day . . . 6:snow . 7:day . . .",
+      '6:wish . 5:it . 4:ne~ 5:ver . 4:ev~ 3:er . 2:ends . . . . .',
+      '7:ho . 6:ho . 5:ho . 4:ho . 5:ho . 6:ho . 7:ho! . . .',
+      '5:hap~ . 6:py . 7:snow . 6:day . 5:to . 6:you! . . . . .',
     ],
   },
 ];

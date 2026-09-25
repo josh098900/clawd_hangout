@@ -11,6 +11,8 @@ import type { DoorMode, FlatLayout } from '../net/transport';
 import { SFX } from '../audio/sfx';
 
 export interface DecoHooks {
+  /** The season now ('winter' puts its pieces in the SHOP). */
+  season(): string | null;
   room(): FlatRoomId | null;
   buy(id: string): Promise<boolean>;
   save(): Promise<boolean>;
@@ -74,7 +76,7 @@ export function openDecorate(h: DecoHooks): void {
       if (!mine.length) { const n = document.createElement('div'); n.className = 'dnote'; n.textContent = 'Nothing yet: have a look in the SHOP'; list.appendChild(n); }
       for (const f of mine) { const n = avail(f.id); list.appendChild(tile(f.name, n > 0 ? n + ' TO PLACE' : 'ALL PLACED', preview(f), () => { if (n > 0) hold(f.id); else h.toast('All your ' + f.name + ' are already out. Click one in the room to move it'); }, n <= 0)); }
     } else if (tab === 'shop') {
-      for (const f of FURNITURE) { const own = FLAT.owned[f.id] ?? 0; list.appendChild(tile(f.name, f.price + ' TOKENS' + (own ? ' · HAVE ' + own : ''), preview(f), () => void buyThen(f.id, () => { h.toast('Bought a ' + f.name + '! Put it somewhere'); hold(f.id); }))); }
+      for (const f of FURNITURE) { const own = FLAT.owned[f.id] ?? 0; if (f.season && f.season !== h.season()) continue; list.appendChild(tile(f.name, f.price + ' TOKENS' + (own ? ' · HAVE ' + own : ''), preview(f), () => void buyThen(f.id, () => { h.toast('Bought a ' + f.name + '! Put it somewhere'); hold(f.id); }))); }
     } else if (rid) {
       const list2 = tab === 'walls' ? WALLPAPERS : FLOORS, cur = roomLayout(rid)[tab === 'walls' ? 'w' : 'f'];
       for (const p of list2) {

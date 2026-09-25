@@ -20,7 +20,7 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
  * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor).
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 15, POSE_MAX = 5;
+export const SPOTS_MAX = 40, HOLD_MAX = 17, POSE_MAX = 5;
 
 /**
  * Room state: small shared values that someone arriving later must also get. Each has a
@@ -58,7 +58,8 @@ export type StateVal =
   | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] }
   | { k: 'flat'; v: { n: number; party: number | null } }
   | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } }
-  | { k: 'karaoke'; v: KaraokeState };
+  | { k: 'karaoke'; v: KaraokeState }
+  | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } };
 /**
  * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
  * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
@@ -90,6 +91,7 @@ export type NetEvent =
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'junk'; id: string; n: number }
   | { type: 'kscore'; id: string; k: KScore }
+  | { type: 'snowball'; id: string; b: SnowballMsg }
   | { type: 'status'; text: string };
 
 /** Flats: whose door is how open, and the layout (all from the database). */
@@ -186,6 +188,12 @@ export interface Plot { bed: number; owner: string; ownerName: string; seed: num
  * `i` (0 keys, 1 drums, 2 bass, 3 mic): score so far 0..100, current combo, `f` = 1 when it's final.
  */
 export interface KScore { r: number; i: number; s: number; c: number; f: 0 | 1 }
+/** WINTER: a snowball thrown from (x0, y0) to (x1, y1); `hit` = who it hit ('' = nobody; the thrower decides). */
+export interface SnowballMsg { x0: number; y0: number; x1: number; y1: number; hit: string }
+/** An ornament on the Square's tree: kind 0..7 at (x across from the trunk, y down from the star). */
+export interface Ornament { id: number; kind: number; x: number; y: number; ownerName: string }
+/** A Secret Santa present waiting under the tree (who it's for, not who from). */
+export interface TreeGift { id: number; to: string; toName: string; wrap: number; mine: boolean }
 /** A photo-booth strip on the Lab's photo wall (0017_photos.sql). `png` is a data URL; `at` = epoch s. */
 export interface Photo { id: number; owner: string; ownerName: string; png: string; at: number; hearts: number; mine: boolean }
 /** Your own pinned photos and how they're getting on. */
@@ -246,6 +254,21 @@ export interface Transport {
   spaceDigUp(tray: number): Promise<void>;
   /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
   spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
+  /** WINTER (0018_winter.sql). The present hunt: open present n (0..11) once a day. */
+  findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }>;
+  presentsToday(): Promise<number[]>;
+  /** The advent calendar: open door 1..24 (from its date). prize = 'tokens:N' or an item. */
+  openAdvent(door: number): Promise<{ tokens: number; prize: string }>;
+  adventDoors(): Promise<{ opened: number[]; upto: number }>;
+  /** The Square's tree on your server this winter, and hanging an ornament on it. */
+  ornaments(): Promise<Ornament[]>;
+  hangOrnament(kind: number, x: number, y: number): Promise<number>;
+  /** Catch present n from Santa's sleigh pass `pass`. Resolves with your balance. */
+  catchSleigh(pass: number, n: number): Promise<number>;
+  /** Secret Santa: wrap tokens (3/5/10) for someone; what's under the tree; open one of yours. */
+  sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number>;
+  treeGifts(): Promise<TreeGift[]>;
+  openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }>;
   /** THE PHOTO WALL. Is this player an owner (can moderate)? */
   isAdmin(): Promise<boolean>;
   /** Pin a strip (a PNG data URL) for review; resolves with its id. */
@@ -336,6 +359,8 @@ export interface Transport {
   sendJunk(n: number): void;
   /** Karaoke: your running score (about once a second while you perform, and once at the end). */
   sendKScore(k: KScore): void;
+  /** Winter: you threw a snowball. */
+  sendSnowball(b: SnowballMsg): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -461,6 +486,11 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     if (typeof song !== 'number' || !Number.isInteger(song) || song < -1 || song >= SONGS.length || t0 === null) return null;
     return { id: o.id, s: { k: 'karaoke', v: { song, t0, by: cleanName(v.by) }, ts } };
   }
+  if (o.k === 'snowman' && v && typeof v === 'object') {
+    const day = num(v.day, 0, 1e6), rolls = num(v.rolls, 0, 30), deco = num(v.deco, 0, 31);
+    return day === null || rolls === null || deco === null ? null : { id: o.id, s: { k: 'snowman', v: { day: Math.floor(day), rolls: Math.floor(rolls), deco: Math.floor(deco) }, ts } };
+  }
+  if (o.k === 'snowfight' && v && typeof v === 'object') { const t0 = num(v.t0, 0, 1e14); return t0 === null ? null : { id: o.id, s: { k: 'snowfight', v: { t0, by: cleanName(v.by) }, ts } }; }
   if (o.k === 'trays' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'trays', v: { n }, ts } }; }
   if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
   if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
@@ -528,6 +558,13 @@ export function parseKScore(p: unknown): { id: string; k: KScore } | null {
   const r = num(o.r, 0, 1e14), i = o.i, s = num(o.s, 0, 110), c = num(o.c, 0, 9999);
   if (r === null || s === null || c === null || typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i > 3) return null;
   return { id: o.id, k: { r, i, s: Math.round(s), c: Math.round(c), f: o.f === 1 ? 1 : 0 } };
+}
+export function parseSnowball(p: unknown): { id: string; b: SnowballMsg } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id)) return null;
+  const x0 = num(o.x0, 0, 4000), y0 = num(o.y0, 0, 4000), x1 = num(o.x1, 0, 4000), y1 = num(o.y1, 0, 4000);
+  if (x0 === null || y0 === null || x1 === null || y1 === null || Math.hypot(x1 - x0, y1 - y0) > 320) return null;
+  return { id: o.id, b: { x0, y0, x1, y1, hit: isId(o.hit) ? o.hit : '' } };
 }
 export function parseJunk(p: unknown): { id: string; n: number } | null {
   const o = p as Record<string, unknown> | null;
