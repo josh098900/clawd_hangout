@@ -12,7 +12,7 @@
 --     (The game can't prove what you picked up, so the caps keep it small, like the Diner's tips.)
 --   * Three quests (fly to the station, a spacewalk, spot a comet) and the ASTRONAUT badge.
 -- Keep these in step with src/world/station.ts (TRAY_*), src/world/garden.ts (SEEDS),
--- src/game/space.ts (walk pay) and QUESTS / BADGES in src/game/quests.ts.
+-- payWalk in src/main.ts (walk pay) and QUESTS / BADGES in src/game/quests.ts.
 
 insert into private.seeds (id, name, cost, grow_s, pays) values (5, 'COMET BLOOM', 0, 21600, 20)
 on conflict (id) do update set name = excluded.name, cost = excluded.cost, grow_s = excluded.grow_s, pays = excluded.pays;
