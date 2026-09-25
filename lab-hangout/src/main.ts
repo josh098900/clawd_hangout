@@ -191,6 +191,7 @@ function onNet(e: NetEvent): void {
       let av = others.get(p.id);
       if (!av) {
         av = makeAvatar(p.id, p.name, p.look, clamp(p.x || room.spawn.x, room.floor.x0, room.floor.x1), clamp(p.y || room.spawn.y, room.floor.y0, room.floor.y1), false, t);
+        av.waitMove = t; // (hidden until we hear where they really are)
         others.set(p.id, av);
         if (playing && !switching) { logLine(null, p.name + ' arrived'); SFX.join(); }
       } else { av.name = p.name; av.look = p.look; }
@@ -206,7 +207,12 @@ function onNet(e: NetEvent): void {
       updateCount();
       break;
     }
-    case 'move': { const av = others.get(e.id); if (av && allow(e.id, 'move', 20, 30)) pushSnap(av, e.m, t); break; }
+    case 'move': {
+      const av = others.get(e.id); if (!av || !allow(e.id, 'move', 20, 30)) break;
+      if (av.waitMove) { av.waitMove = 0; av.buf.length = 0; av.x = e.m.x; av.y = e.m.y; av.pet.x = e.m.x - 18; av.pet.y = e.m.y + 2; } // first word: appear right where they are
+      pushSnap(av, e.m, t);
+      break;
+    }
     case 'chat': {
       const av = others.get(e.id); if (!av || e.id === net.selfId || muted.has(e.id) || !allow(e.id, 'chat', 1, 3)) break; // flood guard
       say(e.id, e.text, t, false); logLine(av.name, e.text); SFX.chat();
@@ -785,6 +791,8 @@ function nearestTalker(maxD: number): Talker | null {
   return best;
 }
 /** Click a player: mute or unmute them (this session), or wave at them. */
+/** Someone who's only just arrived and whose real position we don't know yet (shown anyway after 2.5 s, in case their moves never come). */
+const hiddenAv = (av: Avatar, t: number): boolean => !!av.waitMove && t - av.waitMove < 2.5;
 function playerCard(o: Avatar): void {
   const m = openModal(o.name, () => input.clear());
   const mute = button(muted.has(o.id) ? 'UNMUTE' : 'MUTE', () => { if (muted.has(o.id)) muted.delete(o.id); else { muted.add(o.id); dropBubble(o.id); } toast((muted.has(o.id) ? 'Muted ' : 'Unmuted ') + o.name); m.close(); });
@@ -1103,7 +1111,7 @@ function updateMe(dt: number): void {
     const tk = d ? null : (room.talkers ?? []).find((q) => Math.abs(q.x - wx) < 10 && Math.abs(q.y - wy) < 10) ?? null;
     const hitBlob = d ? null : slopTarget(wx, wy, 16);
     if (hitBlob && Math.hypot(hitBlob.x - me.x, hitBlob.y - me.y) < 260) { throwAt(hitBlob); return; }
-    const other = d || tk ? null : [...others.values()].find((o) => { const oy = o.y - liftOf(o); return Math.abs(o.x - wx) < 12 && wy > oy - 36 && wy < oy + 4; }) ?? null;
+    const other = d || tk ? null : [...others.values()].find((o) => { if (hiddenAv(o, now())) return false; const oy = o.y - liftOf(o); return Math.abs(o.x - wx) < 12 && wy > oy - 36 && wy < oy + 4; }) ?? null;
     if (other) { playerCard(other); return; }
     if (!d && !tk) npc = npcs.inRoom(room.id).find((n) => { const ny = n.av.y - liftOf(n.av); return Math.abs(n.av.x - wx) < 14 && wy > ny - 40 && wy < ny + 4; }) ?? null;
     if (!d && !npc && !tk) { let bd = 1e9; room.spots.forEach((s, i) => { if (i !== me.use && !busy.has(i) && inside(s.area, wx, wy) && Math.abs(s.x - wx) < bd) { bd = Math.abs(s.x - wx); spot = i; } }); }
@@ -1295,7 +1303,7 @@ function render(a: number, t: number): void {
   for (const d of ambient.items(room.id, t)) items.push(d);
   if (isHalloween()) for (const p of halloweenProps(room.id)) items.push({ y: p.y, draw: p.draw });
   if (playing) items.push({ y: me.y, av: me });
-  for (const av of others.values()) items.push({ y: av.y, av });
+  for (const av of others.values()) if (!hiddenAv(av, t)) items.push({ y: av.y, av });
   for (const n of npcs.inRoom(room.id)) items.push({ y: n.av.y, av: n.av });
   if (room.id === 'plaza') COINS.forEach(([cx, cy], i) => {
     if (coinsGot.has(coinWindow() + ':' + i)) return;

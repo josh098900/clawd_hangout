@@ -67,6 +67,11 @@ export interface Avatar {
   sips: number;
   /** Hide this one's name tag (the seeker in hide-and-seek has to recognise people by their look). */
   hideName?: boolean;
+  /**
+   * Just seen join (s): not drawn until their first move arrives. The join only carries where they came
+   * in, not where they are now, so drawing it would show them by the door for a moment, then jump.
+   */
+  waitMove?: number;
   /** Non-player character (cyan name tag). */
   npc: boolean;
   /** POSE_NONE / POSE_DANCE / POSE_FLOOR, and when it started. */
