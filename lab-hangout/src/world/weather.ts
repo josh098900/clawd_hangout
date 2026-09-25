@@ -78,6 +78,18 @@ export function lightning(nowMs = Date.now()): { f: number; x: number; id: numbe
 type Cam = { x: number; y: number; w: number; h: number };
 const WHITE: [number, number, number] = [236, 240, 255];
 
+/**
+ * Extra shade over the backdrop (the sky and the buildings), fading out down to where the floor
+ * starts. Anchored to the WORLD, not the view, so it stays put as the camera moves.
+ */
+function skyShade(room: Room, cam: Cam, a: number, col: [number, number, number]): void {
+  const FADE = 160, y0 = room.floor.y0, top = y0 - FADE, y1 = Math.min(y0, cam.y + cam.h);
+  lit(() => {
+    if (cam.y < top) alpha(a, () => r(cam.x, cam.y, cam.w + 1, top - cam.y, col));
+    for (let y = Math.max(top, Math.floor(cam.y / 4) * 4); y < y1; y += 4) alpha(a * (y0 - y) / FADE, () => r(cam.x, y, cam.w + 1, 4, col));
+  });
+}
+
 /** Rain, splashes, a darker sky, fog banks, snow and lightning over room `room` (only the part in view). */
 export function drawWeather(room: Room, cam: Cam, a: number, night: number): void {
   const w = weather(); if (w.kind === 'clear' || w.k <= 0.01) return;
@@ -85,7 +97,7 @@ export function drawWeather(room: Room, cam: Cam, a: number, night: number): voi
   if (w.kind === 'rain' || w.kind === 'storm') {
     const storm = w.kind === 'storm';
     // a heavier, darker sky (darkest at the top of the view)
-    lit(() => { alpha((storm ? 0.3 : 0.17) * k, () => r(X, Y, CW + 1, CH + 1, [22, 28, 46])); alpha((storm ? 0.16 : 0.09) * k, () => r(X, Y, CW + 1, CH * 0.4, [22, 28, 46])); });
+    lit(() => { alpha((storm ? 0.3 : 0.17) * k, () => r(X, Y, CW + 1, CH + 1, [22, 28, 46])); }); skyShade(room, cam, (storm ? 0.16 : 0.09) * k, [22, 28, 46]);
     // streaks: fall at 300-420 px/s, slanted by the wind
     const n = Math.round((storm ? 230 : 130) * k), slant = wd.dx * 0.45 + (storm ? 0.15 : 0), span = CH + 40, wrap = CW + 80;
     const col: [number, number, number] = night > 0.5 ? [120, 140, 190] : [170, 190, 226];
@@ -119,7 +131,7 @@ export function drawWeather(room: Room, cam: Cam, a: number, night: number): voi
     }
   } else if (w.kind === 'fog') {
     const col: [number, number, number] = night > 0.5 ? [80, 90, 112] : [196, 204, 216];
-    lit(() => { alpha(0.3 * k, () => r(X, Y, CW + 1, CH + 1, col)); alpha(0.18 * k, () => r(X, Y, CW + 1, CH * 0.45, col)); });
+    lit(() => { alpha(0.3 * k, () => r(X, Y, CW + 1, CH + 1, col)); }); skyShade(room, cam, 0.18 * k, col);
     // banks drifting on the wind, anchored to the world (walk through them)
     const RW = room.w + 500;
     for (let j = 0; j < 16; j++) {
