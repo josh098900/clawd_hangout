@@ -140,7 +140,7 @@ export const CPU_NAMES = ['ZOOM', 'TURBO', 'NITRO', 'SPARKY'];
 /** CPU kart in grid slot `slot` of the race with this seed, `t` ms after GO: where it is. */
 export function cpuAt(tr: Track, seed: number, slot: number, t: number): { x: number; y: number; a: number; dist: number; fin: number } {
   const CL = tr.CL, TRACK_LEN = tr.LEN;
-  const h = mix(seed * 31 + slot), v = 99 + (h % 1000) / 1000 * 14, amp = 14 + (h % 7) * 3, ph = (h % 628) / 100, lane = ((h >> 10) % 20) - 10;
+  const h = mix(seed * 31 + slot), v = 106 + (h % 1000) / 1000 * 16, amp = 14 + (h % 7) * 3, ph = (h % 628) / 100, lane = ((h >> 10) % 20) - 10;
   const g = gridSpot(tr, slot), s0 = CL[nearest(tr, g.x, g.y)].s - TRACK_LEN;
   const T = Math.max(0, t / 1000), ramp = 1.3;
   const sAt = (T: number) => (T < ramp ? v * T * T / (2 * ramp) : v * (T - ramp / 2)) + amp * Math.sin(T * 0.37 + ph) - amp * Math.sin(ph);
