@@ -6,16 +6,18 @@ import { eIn, eOB, seg, clamp } from '../engine/math';
 const $ = <T extends HTMLElement>(q: string) => document.querySelector(q) as T;
 
 // ---------- speech bubbles ----------
-interface Bub { el: HTMLDivElement; text: string; t0: number; shown: number }
+interface Bub { el: HTMLDivElement; text: string; t0: number; shown: number; /** its size in px, measured when the text changes (measuring every frame makes the page lay itself out again) */ w: number; h: number }
 const bubs = new Map<string, Bub>();
 const layer = () => $('#bubbles');
 export const bubbleLife = (text: string) => 4 + text.length * 0.06;
 
 export function say(id: string, text: string, now: number, self: boolean): void {
   let b = bubs.get(id);
-  if (!b) { const el = document.createElement('div'); el.className = 'bub' + (self ? ' me' : ''); layer().appendChild(el); b = { el, text, t0: now, shown: -1 }; bubs.set(id, b); }
+  if (!b) { const el = document.createElement('div'); el.className = 'bub' + (self ? ' me' : ''); layer().appendChild(el); b = { el, text, t0: now, shown: -1, w: 0, h: 0 }; bubs.set(id, b); }
   b.text = text; b.t0 = now; b.shown = -1;
 }
+// (a bubble measured before the pixel font arrived would keep the wrong size: measure them all again once it has)
+void document.fonts?.ready.then(() => { for (const b of bubs.values()) b.shown = -1; });
 export function dropBubble(id: string): void { const b = bubs.get(id); if (b) { b.el.remove(); bubs.delete(id); } }
 export function clearBubbles(): void { for (const id of [...bubs.keys()]) dropBubble(id); }
 
@@ -25,8 +27,8 @@ export function layoutBubbles(now: number, heads: Map<string, [number, number]>,
     const u = now - b.t0, life = bubbleLife(b.text), head = heads.get(id);
     if (u > life || !head || head[0] < -40 || head[0] > sw + 40) { if (u > life) dropBubble(id); else b.el.style.opacity = '0'; continue; }
     const n = Math.max(1, Math.ceil(seg(u, 0.05, 0.05 + b.text.length * 0.026) * b.text.length));
-    if (n !== b.shown) { b.shown = n; b.el.textContent = b.text.slice(0, n); }
-    const w = b.el.offsetWidth, h = b.el.offsetHeight, k = seg(u, 0, 0.2), out = seg(u, life - 0.25, life);
+    if (n !== b.shown) { b.shown = n; b.el.textContent = b.text.slice(0, n); b.w = b.el.offsetWidth; b.h = b.el.offsetHeight; }
+    const w = b.w, h = b.h, k = seg(u, 0, 0.2), out = seg(u, life - 0.25, life);
     const x = clamp(head[0], w / 2 + 8, sw - w / 2 - 8) - w / 2, y = head[1] - h - 14;
     b.el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + (0.4 + 0.6 * eOB(k)).toFixed(3) + ')';
     b.el.style.opacity = (1 - out).toFixed(3);

@@ -71,6 +71,8 @@ export interface QuestEvents { done(text: string, tokens: number, bonus: boolean
 class Quests {
   day = ''; today: string[] = []; done = new Set<string>(); mine = new Set<string>();
   private net: Transport | null = null; private on: QuestEvents | null = null; private busy = new Set<string>(); private tokens = 0;
+  /** When the server last refused a badge (its own check disagreed): don't ask again for a minute. */
+  private refused = new Map<string, number>();
 
   async init(net: Transport, on: QuestEvents): Promise<void> {
     this.net = net; this.on = on;
@@ -100,9 +102,9 @@ class Quests {
   setTokens(t: number): void { this.tokens = t; this.checkBadges(); }
   checkBadges(): void {
     for (const b of BADGES) {
-      if (this.mine.has(b.id) || this.busy.has('b:' + b.id) || !b.earned(this.tokens)) continue;
+      if (this.mine.has(b.id) || this.busy.has('b:' + b.id) || Date.now() - (this.refused.get(b.id) ?? -1e12) < 60000 || !b.earned(this.tokens)) continue;
       this.busy.add('b:' + b.id);
-      this.net?.claimBadge(b.id).then((isNew) => { this.mine.add(b.id); if (isNew) this.on?.badge(b.name); this.on?.changed(); }).catch(() => {}).finally(() => this.busy.delete('b:' + b.id));
+      this.net?.claimBadge(b.id).then((isNew) => { this.mine.add(b.id); if (isNew) this.on?.badge(b.name); this.on?.changed(); }).catch(() => { this.refused.set(b.id, Date.now()); }).finally(() => this.busy.delete('b:' + b.id));
     }
   }
   private handIn(id: string): void {

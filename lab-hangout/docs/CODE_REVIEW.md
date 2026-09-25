@@ -63,7 +63,17 @@ a push, then Josh's live check.
   - New tests: `test:golden` (drawing fingerprints) and `test:lists`.
   - Each change was checked to draw and behave exactly as before, with two intended exceptions: karaoke's "1:60",
     and the one-frame undimmed flicker the first time a room's snow is drawn.
-- Batch 3 (performance): next. Batch 4 (restructures): to do.
+- **Batch 3 (performance): done.** Measured with a CPU profile on a phone-like CPU (Chrome's CPU slowed 4x):
+  - The busiest scenes use about 15% less main-thread work: the Square in winter with 8 bots went from 39% to 33%
+    busy, and the Park from 45% to 38%.
+  - Fixed: E3 (`r()` works out the lighting without allocating a colour array per call, and uses hex colours),
+    backdrop and snow copies limited to the part in view, U5, G5, N11. Pixels were checked identical: the
+    fingerprints, plus 3,000 random rectangles drawn by the old and new `r()`.
+  - Tried and dropped: skipping `fillStyle` when it's unchanged. Reading `fillStyle` back costs more than setting it
+    (measured: 39% to 41% busy).
+  - Skipped on purpose: G6 and W12 (nowhere in the profile), and a cache for name-tag text (~3% of busy time; it
+    would need to track the night tint and lightning to stay identical).
+- Batch 4 (restructures): next.
 
 ## Findings
 **Summary (Phase 1 done, 25 September 2026).** 78 findings across the 8 areas.

@@ -63,25 +63,26 @@ export function lit(fn: () => void): void {
 
 export const M = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 export const shade = (c: RGB, k: number): RGB => [c[0] * k, c[1] * k, c[2] * k];
-export const css = (c: RGB): string =>
-  'rgb(' + Math.min(255, Math.max(0, c[0] | 0)) + ',' + Math.min(255, Math.max(0, c[1] | 0)) + ',' + Math.min(255, Math.max(0, c[2] | 0)) + ')';
-
-function tint(c: RGB): RGB {
-  if (PX.emit) return c;
-  let x = PX.dim > 0 ? M(c, NIGHT, PX.dim) : c;
-  if (PX.fl > 0) {
-    const k = 0.14 * PX.fl;
-    x = [x[0] + PX.flc[0] * k, x[1] + PX.flc[1] * k, x[2] + PX.flc[2] * k];
-  }
-  return x;
-}
+/** Two hex digits for a colour channel: truncated, then held to 0..255 (the same rounding the game has always used). */
+const HEX = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+const hx = (v: number): string => HEX[v >= 255 ? 255 : v <= 0 ? 0 : v | 0];
+/** A colour as '#rrggbb'. */
+export const css = (c: RGB): string => '#' + hx(c[0]) + hx(c[1]) + hx(c[2]);
 
 /** THE primitive: a whole-pixel rectangle. */
 export function r(x: number, y: number, w: number, h: number, c: RGB): void {
   const x0 = Math.round(x), y0 = Math.round(y), x1 = Math.round(x + w), y1 = Math.round(y + h);
   if (x1 <= x0 || y1 <= y0) return;
-  PX.ctx.fillStyle = css(tint(c));
-  PX.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  // the lighting (inline: this runs thousands of times a frame): fade towards NIGHT by dim, then add the flash
+  let R = c[0], G = c[1], B = c[2];
+  if (!PX.emit) {
+    const d = PX.dim;
+    if (d > 0) { R = R + (NIGHT[0] - R) * d; G = G + (NIGHT[1] - G) * d; B = B + (NIGHT[2] - B) * d; }
+    if (PX.fl > 0) { const k = 0.14 * PX.fl, f = PX.flc; R = R + f[0] * k; G = G + f[1] * k; B = B + f[2] * k; }
+  }
+  const ctx = PX.ctx;
+  ctx.fillStyle = '#' + hx(R) + hx(G) + hx(B);
+  ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
 }
 export function line(x0: number, y0: number, x1: number, y1: number, c: RGB, th = 1): void {
   const dx = x1 - x0, dy = y1 - y0, n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));

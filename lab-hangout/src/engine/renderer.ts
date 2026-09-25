@@ -95,13 +95,26 @@ export class Renderer {
     PX.fl = 0;
   }
 
+  /**
+   * The part of a rw x rh room that present() copies to the screen (the camera's view, clipped to the room).
+   * Anything drawn outside it is never seen, so big backdrops only need copying into this.
+   */
+  viewRect(rw: number, rh: number): { sx0: number; sy0: number; sx1: number; sy1: number } {
+    const cam = this.cam;
+    return { sx0: Math.max(0, Math.floor(cam.x)), sy0: Math.max(0, Math.floor(cam.y)), sx1: Math.min(rw, Math.ceil(cam.x + cam.w) + 1), sy1: Math.min(rh, Math.ceil(cam.y + cam.h) + 1) };
+  }
+  /** Copy a room-sized canvas (a backdrop, the snow) into the world canvas, but only the part in view. */
+  blitView(src: HTMLCanvasElement, rw: number, rh: number): void {
+    const { sx0, sy0, sx1, sy1 } = this.viewRect(rw, rh), w = sx1 - sx0, h = sy1 - sy0;
+    if (w > 0 && h > 0) PX.ctx.drawImage(src, sx0, sy0, w, h, sx0, sy0, w, h);
+  }
+
   present(rw: number, rh: number, fillTop: string, fillLow: string): void {
     const { vx, gvx, cam } = this, sc = cam.sc, cw = this.view.width, ch = this.view.height;
     vx.imageSmoothingEnabled = false;
     vx.fillStyle = fillLow; vx.fillRect(0, 0, cw, ch);
     if (cam.y < 0) { vx.fillStyle = fillTop; vx.fillRect(0, 0, cw, Math.ceil(-cam.y * sc)); }
-    const sx0 = Math.max(0, Math.floor(cam.x)), sy0 = Math.max(0, Math.floor(cam.y));
-    const sx1 = Math.min(rw, Math.ceil(cam.x + cam.w) + 1), sy1 = Math.min(rh, Math.ceil(cam.y + cam.h) + 1);
+    const { sx0, sy0, sx1, sy1 } = this.viewRect(rw, rh);
     const dx = Math.round((sx0 - cam.x) * sc), dy = Math.round((sy0 - cam.y) * sc);
     vx.drawImage(this.world, sx0, sy0, sx1 - sx0, sy1 - sy0, dx, dy, (sx1 - sx0) * sc, (sy1 - sy0) * sc);
     gvx.globalCompositeOperation = 'source-over';

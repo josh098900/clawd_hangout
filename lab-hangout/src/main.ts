@@ -1792,12 +1792,12 @@ function render(a: number, t: number): void {
   R.begin();
   PX.dim = 0;
   PX.gmul = room.glowMul?.() ?? 1;
-  R.wctx.drawImage(room.bg, 0, 0);
+  R.blitView(room.bg, room.w, room.h); // (only the part in view: the rest is never shown)
   const alt = room.bgAlt ? room.altAlpha?.() ?? 0 : 0;
-  if (alt > 0.004) { R.wctx.globalAlpha = alt; R.wctx.drawImage(room.bgAlt!, 0, 0); R.wctx.globalAlpha = 1; }
+  if (alt > 0.004) { R.wctx.globalAlpha = alt; R.blitView(room.bgAlt!, room.w, room.h); R.wctx.globalAlpha = 1; }
   const dim = room.dimNow?.() ?? room.dim;
   PX.dim = dim;
-  if (isWinter()) winterGround(room);
+  if (isWinter()) winterGround(room, (c) => R.blitView(c, room.w, room.h));
   room.drawBack(a);
   if (isHalloween()) halloweenBack(room, a);
   if (isWinter()) winterBack(room, a);

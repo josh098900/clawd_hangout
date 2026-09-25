@@ -338,8 +338,8 @@ export function installWinter(rooms: Record<RoomId, Room>, labTracks?: import('.
 
 // ---------- drawing ----------
 /** Snow lying on the ground outside: straight over the set's backdrop, so everything that moves (the sea, the sandbox, the rocket's smoke) is on top. */
-export function winterGround(room: Room): void {
-  if (OUTDOORS.includes(room.id)) PX.ctx.drawImage(snowLayer(room), 0, 0);
+export function winterGround(room: Room, blit = (c: HTMLCanvasElement): void => PX.ctx.drawImage(c, 0, 0)): void {
+  if (OUTDOORS.includes(room.id)) blit(snowLayer(room));
 }
 /** Behind the players: lights, wreaths, the sleigh, the pond, the advent calendar, New Year's fireworks. */
 export function winterBack(room: Room, a: number): void {

@@ -23,6 +23,7 @@ const buckets = new Map<string, { t: number; n: number }>();
 export function allow(id: string, kind: string, perSec: number, burst: number): boolean {
   const k = id + '|' + kind, now = performance.now() / 1000, b = buckets.get(k) ?? { t: now, n: burst };
   b.n = Math.min(burst, b.n + (now - b.t) * perSec); b.t = now;
+  if (buckets.size > 1000) for (const [key, x] of buckets) if (now - x.t > 60) buckets.delete(key); // (a bucket idle that long is full again anyway)
   if (b.n < 1) { buckets.set(k, b); return false; }
   b.n -= 1; buckets.set(k, b); return true;
 }
