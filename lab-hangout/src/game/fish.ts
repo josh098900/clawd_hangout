@@ -13,12 +13,17 @@ export const FISH: Fish[] = [
 ];
 const ODDS: Record<Fish['rarity'], number> = { JUNK: 0.14, COMMON: 0.44, UNCOMMON: 0.28, RARE: 0.11, LEGENDARY: 0.03 };
 
-export function catchFish(): { fish: Fish; cm: number; isNew: boolean; count: number } {
+/** Roll a catch (LOCAL mode; online the server rolls it, see 0010_fishing.sql, same odds). */
+export function rollFish(): { fish: Fish; cm: number } {
   let u = Math.random(), rarity: Fish['rarity'] = 'COMMON';
   for (const k of Object.keys(ODDS) as Fish['rarity'][]) { if (u < ODDS[k]) { rarity = k; break; } u -= ODDS[k]; }
   const pool = FISH.filter((f) => f.rarity === rarity), fish = pool[Math.floor(Math.random() * pool.length)];
-  const cm = Math.round(fish.cm[0] + Math.random() * (fish.cm[1] - fish.cm[0]));
-  const isNew = !save.data.fish.includes(fish.name);
-  if (isNew) save.update((d) => { d.fish.push(fish.name); });
-  return { fish, cm, isNew, count: save.data.fish.length };
+  return { fish, cm: Math.round(fish.cm[0] + Math.random() * (fish.cm[1] - fish.cm[0])) };
 }
+/** Put a catch in your fish log. */
+export function logFish(name: string): { isNew: boolean; count: number } {
+  const isNew = !save.data.fish.includes(name);
+  if (isNew) save.update((d) => { d.fish.push(name); });
+  return { isNew, count: save.data.fish.length };
+}
+export const fishNamed = (name: string): Fish => FISH.find((f) => f.name === name) ?? FISH[0];

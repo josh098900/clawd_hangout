@@ -72,7 +72,7 @@ Guiding rules (from what already works):
 - [x] 2. Garden plots on the Rooftop (real-time growth, friends can water)
 - [x] 3. The Subway (trains on the shared clock)
 - [x] 4. The Park (boats, kites, ducks, sandbox)
-- [ ] 5. Daily quests and badges
+- [x] 5. Daily quests and badges
 - [ ] 6. Hourly fishing contest
 - [ ] 7. Group dances and shared weather
 - [ ] 8. The Diner (co-op cooking)

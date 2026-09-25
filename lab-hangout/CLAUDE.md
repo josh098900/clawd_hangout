@@ -76,6 +76,7 @@ src/
     park.ts            CITY PARK (1600x760, day/night): pond (onWater, ducks, fountain, dock), kite stand, bandstand
                        music, hot dogs, picnic blankets, the shared sandbox (room state 'sand'), OAK
     weather.ts         the shared wind (kites fly on it), from the wall clock
+    contest.ts         the hourly fishing contest (:30-:40 UTC): contestClock(), the Pier scoreboard prop
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
@@ -96,7 +97,7 @@ src/
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
   game/slop.ts         the slop invasion world event (wall clock waves, blob paths, hits)
-  game/fish.ts         the Pier's fish table and the per-browser fish log
+  game/fish.ts         the Pier's fish table (keep in step with 0010_fishing.sql), rollFish (LOCAL), the fish log
   game/npcs.ts         NPCs (Prof. Fizz, Gus): routines driven by the wall clock, so all players see the same thing
   game/ambient.ts      local-only life: pigeons in the Square, robot vacuum in the Lab, the office cat in the Den
   ui/
@@ -128,7 +129,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0005 servers (caps, seats, per-server channel RLS) · 0006 arcade (play_claw) ·
                        0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes) ·
                        0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock) ·
-                       0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log)
+                       0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log) ·
+                       0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -167,6 +169,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | prizes | RPC `play_claw()` (3 tokens, server rolls, dupes refund 1); table `inventory` read-own | `{ item, dupe, tokens }`, items are `'slot:index'` |
 | seasons | RPCs `current_season()`; owner `set_season(s)`; `trick_or_treat(door 0..7)` (1/door/day, 20% trick, all 8 = costume) | `{ tokens, trick, visited, prize }` |
 | garden | table `plots` (members read, per server); RPCs `plant(bed, seed)`, `water(bed)`, `harvest(bed)`, `dig_up(bed)`; room state `garden` = "look again" | `{ bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at }` |
+| fishing | RPCs `catch_fish()` (server rolls species + size; 2 s apart; entered in a live contest), `contest_board()` (top 5, last winner; settles finished contests: 5 + 5 per other angler, max 25, + TROPHY badge) | `{ fish, rarity, cm, contest, rank }` |
 | quests | RPCs `todays_quests()` (3 a day, same for all), `complete_quest(q)` (5, +10 for the third; coins/claw/water/harvest checked on the server) | `{ day, quests, done }` |
 | badges | table `badges` (members read); RPC `claim_badge(b)` (green/helper/quester/tycoon checked on the server) | badge ids |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |

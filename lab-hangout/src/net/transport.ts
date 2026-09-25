@@ -96,6 +96,8 @@ export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
 /** A garden bed on the Rooftop with something growing in it. Times are ms since 1970, `grown` is seconds of growth credited up to `calcAt` (see world/garden.ts growth()). */
 export interface Plot { bed: number; owner: string; ownerName: string; seed: number; plantedAt: number; lastWater: number; grown: number; calcAt: number }
+/** The Pier's contest scoreboard (see 0010_fishing.sql). */
+export interface ContestBoard { live: boolean; top: { name: string; fish: string; cm: number }[]; last: { name: string; fish: string; cm: number; prize: number; anglers: number; at: number } | null; won: boolean }
 /** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
 export interface ClawResult { item: string; dupe: boolean; tokens: number }
 
@@ -134,6 +136,9 @@ export interface Transport {
   /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
   harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
   digUp(bed: number): Promise<void>;
+  /** Reel one in: the server picks the fish and its size (and enters it in a live contest). */
+  catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }>;
+  contestBoard(): Promise<ContestBoard>;
   /** Today's 3 quests (the same for everyone) and which you've handed in. */
   todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }>;
   /** Hand in a quest (5 tokens; +10 with the third). */

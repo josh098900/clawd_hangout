@@ -32,7 +32,8 @@ import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKn
 import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
 import { openMyPlant, openSeeds } from './ui/garden';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
-import { catchFish } from './game/fish';
+import { fishNamed, logFish } from './game/fish';
+import { CONTEST, contestClock, mmss } from './world/contest';
 import { makeCrypt, platesDown, setDown, blockCenters, resetBlocks, CRYPT_INFO, OPEN_FOR } from './world/crypt';
 import { owns } from './ui/start';
 import { save } from './game/save';
@@ -329,6 +330,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   if (room.id === 'train' && id !== 'train') { quests.stat('rides'); if (id === 'parkstn') quests.bump('ride'); }
   room = ROOMS[id];
   if (id === 'roof') GARDEN.dirty = true;
+  if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
   me.x = p.x; me.y = p.y; me.moving = false; me.born = now(); me.emote = null; me.use = -1; me.pose = 0; booth = null; // your mug comes with you
   if (me.hold === HOLD_KITE && id !== 'park') me.hold = 0; // (the kite goes back on the stand)
@@ -800,12 +802,42 @@ function syncPad(): void {
 }
 function reel(): void {
   if (!fishing || fishing.state !== 'bite') return;
-  const c = catchFish();
-  if (c.fish.rarity === 'RARE' || c.fish.rarity === 'LEGENDARY') quests.bump('fish');
-  say(net.selfId, (c.fish.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + c.fish.name + ' (' + c.cm + 'cm)!', now(), true);
-  toast((c.isNew ? 'NEW! ' : '') + c.fish.rarity + ' · FISH LOG ' + c.count + '/12', 3000);
-  if (c.fish.rarity === 'LEGENDARY' || c.fish.rarity === 'RARE') { SFX.score(); lastEmoteAt = -9; emote('joy'); } else SFX.chime();
   fishing = { bite: now() + 2.5 + Math.random() * 6, state: 'wait' };
+  // the server rolls the catch (so the contest leaderboard can be trusted)
+  net.catchFish().then((c) => {
+    const f = fishNamed(c.fish), log = logFish(f.name), rare = f.rarity === 'RARE' || f.rarity === 'LEGENDARY';
+    if (rare) quests.bump('fish');
+    say(net.selfId, (f.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + f.name + ' (' + c.cm + 'cm)!', now(), true);
+    const contest = c.contest && f.rarity !== 'JUNK' ? ' · CONTEST: ' + (c.rank === 1 ? 'YOU LEAD!' : 'NO. ' + c.rank) : '';
+    toast((log.isNew ? 'NEW! ' : '') + f.rarity + ' · FISH LOG ' + log.count + '/12' + contest, 3500);
+    if (rare || c.rank === 1) { SFX.score(); lastEmoteAt = -9; emote('joy'); } else SFX.chime();
+    if (c.contest) refreshContest();
+  }).catch((e: unknown) => toast(e instanceof Error ? e.message : String(e), 2500));
+}
+// ---------- the fishing contest (world/contest.ts) ----------
+let contestAnnounced = -1, contestAck = '';
+function refreshContest(): void {
+  CONTEST.fetchedAt = Date.now();
+  net.contestBoard().then((b) => {
+    CONTEST.board = b;
+    const key = b.last ? String(b.last.at) : '';
+    let seen = ''; try { seen = localStorage.getItem('labhangout.contestWon') ?? ''; } catch { /* ignore */ }
+    if (b.won && key && seen !== key && key !== contestAck) {
+      contestAck = key; try { localStorage.setItem('labhangout.contestWon', key); } catch { /* ignore */ }
+      SFX.score(); lastEmoteAt = -9; emote('joy'); quests.mine.add('trophy');
+      toast('YOU WON THE FISHING CONTEST! ' + b.last!.fish + ' ' + b.last!.cm + 'cm · +' + b.last!.prize + ' tokens', 6000);
+      net.tokens().then(setTokens).catch(() => {});
+    }
+  }).catch(() => {});
+}
+/** Heads-up to everyone online (whatever room) before and when a contest starts. */
+function contestTick(): void {
+  const cl = contestClock(), hour = Math.floor(Date.now() / 3600000);
+  if (!cl.live && cl.next < 300 && cl.next > 290 && contestAnnounced !== hour * 2) { contestAnnounced = hour * 2; toast('Fishing contest at the Pier in 5 minutes!', 3500); }
+  if (cl.live && cl.left > 590 && contestAnnounced !== hour * 2 + 1) { contestAnnounced = hour * 2 + 1; SFX.chime(); toast('FISHING CONTEST at the Pier! 10 minutes, the biggest catch wins tokens', 5000); }
+  // keep the scoreboard fresh at the Pier (and catch the result just after a contest ends)
+  const every = room.id === 'pier' ? (cl.live ? 8000 : 60000) : 0, justEnded = !cl.live && cl.next > 3000 && cl.next < 3590;
+  if ((every && Date.now() - CONTEST.fetchedAt > every) || (justEnded && Date.now() - CONTEST.fetchedAt > 20000)) refreshContest();
 }
 /** Rowing: get out at the dock. */
 function land(): void {
@@ -1276,13 +1308,15 @@ function frame(nowMs: number): void {
     actNow = currentAction(); syncActionBar(); syncPad();
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
-    hsFrame(); followStep(t);
+    hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine);
+    const cl = contestClock(), lead = CONTEST.board?.top[0];
+    const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine);
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = g && partyMusic(g);
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();

@@ -8,6 +8,7 @@ import { PX, mk, r, line, disc, oval, txt, tw, alpha, lit, G, Gd, Gline, withCtx
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { Room, Prop, Spot } from './room';
+import { scoreboard } from './contest';
 
 const W = 1300, H = 720, HORIZON = 380, SHORE = 548;
 const PIER = { x0: 700, x1: 760, y0: 420 };
@@ -114,7 +115,7 @@ export function makePier(): Room {
     bg: mk(W, H), bgAlt: mk(W, H),
     build: () => build.call(room),
     drawBack,
-    props: [bonfire, log(340, 608), log(420, 608), log(340, 660), log(420, 660), palm(124, 580), palm(1024, 620), cooler],
+    props: [bonfire, log(340, 608), log(420, 608), log(340, 660), log(420, 660), palm(124, 580), palm(1024, 620), cooler, scoreboard],
   };
   return room;
 }

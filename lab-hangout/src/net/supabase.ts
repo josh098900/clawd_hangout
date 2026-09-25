@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -131,6 +131,17 @@ export class SupabaseTransport implements Transport {
   async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: Number(o.tokens) || 0, thanked: o.thanked === true }; }
   async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: Number(o.tokens) || 0, seed: Number(o.seed) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null }; }
   async digUp(bed: number): Promise<void> { const { error } = await this.sb.rpc('dig_up', { bed }); if (error) throw new Error(error.message); }
+  // ---- the fishing contest (0010_fishing.sql) ----
+  async catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }> {
+    const o = await this.rpcJson('catch_fish', {});
+    return { fish: String(o.fish ?? ''), rarity: String(o.rarity ?? 'COMMON'), cm: Number(o.cm) || 0, contest: o.contest === true, rank: typeof o.rank === 'number' ? o.rank : null };
+  }
+  async contestBoard(): Promise<ContestBoard> {
+    const o = await this.rpcJson('contest_board', {});
+    const top = Array.isArray(o.top) ? (o.top as Record<string, unknown>[]).map((e) => ({ name: cleanName(e.name) || 'SOMEONE', fish: String(e.fish ?? '').slice(0, 16), cm: Number(e.cm) || 0 })) : [];
+    const l = o.last as Record<string, unknown> | null;
+    return { live: o.live === true, top, won: o.won === true, last: l ? { name: cleanName(l.name) || 'SOMEONE', fish: String(l.fish ?? '').slice(0, 16), cm: Number(l.cm) || 0, prize: Number(l.prize) || 0, anglers: Number(l.anglers) || 0, at: Number(l.at) || 0 } : null };
+  }
   // ---- daily quests and badges (0009_quests.sql) ----
   async todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }> {
     const o = await this.rpcJson('todays_quests', {});

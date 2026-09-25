@@ -45,6 +45,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'royal', name: 'ROYALTY', hint: 'Find the crown in the Crypt', earned: () => save.has('hat:5') },
   { id: 'commuter', name: 'COMMUTER', hint: 'Ride the subway 10 times', earned: () => stat('rides') >= 10 },
   { id: 'spooked', name: 'SPOOKED', hint: 'Get tricked on Halloween', earned: () => stat('tricks') >= 1 },
+  { id: 'trophy', name: 'TROPHY ANGLER', hint: 'Win a fishing contest at the Pier', earned: () => false }, // the server awards this one
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

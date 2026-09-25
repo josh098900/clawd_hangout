@@ -6,10 +6,12 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { growth, plantState, SEEDS } from '../world/garden';
 import { QUESTS } from '../game/quests';
+import { rollFish } from '../game/fish';
+import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
 type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world'; p: Record<string, unknown> };
@@ -127,6 +129,31 @@ export class LocalTransport implements Transport {
     return { tokens: this.wallet(), seed: p.seed, bonus };
   }
   async digUp(bed: number): Promise<void> { const all = this.beds(); if (!all.some((p) => p.bed === bed && p.owner === this.selfId)) throw new Error('that is not your plant'); this.beds(all.filter((p) => p.bed !== bed)); }
+  // ---- the fishing contest, kept in this browser (other tabs share it) ----
+  private contests(v?: Record<string, { id: string; name: string; fish: string; cm: number }[]>): Record<string, { id: string; name: string; fish: string; cm: number }[]> {
+    if (v) { try { localStorage.setItem('labhangout.localContests', JSON.stringify(v)); } catch { /* ignore */ } return v; }
+    try { return JSON.parse(localStorage.getItem('labhangout.localContests') || '{}'); } catch { return {}; }
+  }
+  async catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }> {
+    const { fish, cm } = rollFish(), cl = contestClock(), hour = String(Math.floor(Date.now() / 3600000));
+    let rank: number | null = null;
+    if (cl.live && fish.rarity !== 'JUNK') {
+      const all = this.contests(), list = all[hour] ?? [], name = (await this.loadProfile())?.name ?? 'YOU';
+      list.push({ id: this.selfId, name, fish: fish.name, cm }); all[hour] = list; this.contests(all);
+      const mine = Math.max(...list.filter((e) => e.id === this.selfId).map((e) => e.cm));
+      rank = 1 + new Set(list.filter((e) => e.id !== this.selfId && e.cm > mine).map((e) => e.id)).size;
+    }
+    return { fish: fish.name, rarity: fish.rarity, cm, contest: cl.live, rank };
+  }
+  async contestBoard(): Promise<ContestBoard> {
+    const all = this.contests(), cl = contestClock(), hour = Math.floor(Date.now() / 3600000);
+    const best = (list: { id: string; name: string; fish: string; cm: number }[]) => { const m = new Map<string, { id: string; name: string; fish: string; cm: number }>(); for (const e of list) if (!m.has(e.id) || m.get(e.id)!.cm < e.cm) m.set(e.id, e); return [...m.values()].sort((p, q) => q.cm - p.cm); };
+    const top = cl.live ? best(all[hour] ?? []).slice(0, 5).map(({ name, fish, cm }) => ({ name, fish, cm })) : [];
+    const past = Object.keys(all).map(Number).filter((h) => h < hour || !cl.live).sort((p, q) => q - p)[0];
+    const lb = past !== undefined ? best(all[past] ?? []) : [], w = lb[0];
+    const prize = Math.min(25, 5 + 5 * (lb.length - 1));
+    return { live: cl.live, top, won: !!w && w.id === this.selfId, last: w ? { name: w.name, fish: w.fish, cm: w.cm, prize, anglers: lb.length, at: past * 3600 } : null };
+  }
   // ---- daily quests and badges, kept in this browser ----
   async todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }> {
     const day = new Date().toISOString().slice(0, 10), seed = Number(day.replace(/-/g, '')), pool = Object.keys(QUESTS);
