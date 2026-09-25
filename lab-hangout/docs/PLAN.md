@@ -27,12 +27,13 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 ---
 
 ## Progress
-Steps 1-9 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
-weather + group dances, the Diner, the Kart Track + tank duel; migrations 0007-0013). **Step 10,
-THE LOFTS (apartments), is built** with migration `0014_apartments.sql`: Josh chose a block on the
-Square, several rooms (living room, bedroom, kitchen), per-door access (locked / friends / open), and
-all four extras (fish tank, trophy cabinet, house parties, the pet at home). Next: step 11, the
-Space Station.
+Steps 1-10 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
+weather + group dances, the Diner + COOKIE's tour, the Kart Track + tank duel, THE LOFTS apartments;
+migrations 0007-0014). **Next: step 11, the Space Station** (below). New SQL, if any, goes in 0015.
+Notes for step 11: the Rooftop is 1500 wide with the garden at its right end, so the launch pad
+needs a spot that fits the camera band; the critter from the film is allowed as an NPC there
+(it's the film's, used with permission, see CLAUDE.md); keep the launch on the wall clock like the
+fireworks and the train.
 
 ## 1. Halloween (1 October to 1 November)  ← next
 
