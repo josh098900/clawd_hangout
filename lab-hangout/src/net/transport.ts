@@ -52,7 +52,8 @@ export type StateVal =
   | { k: 'crypt'; v: { b: number[]; open: number } }
   | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
   | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string }
-  | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } };
+  | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } }
+  | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: { name: string; ms: number } };
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -71,9 +72,21 @@ export type NetEvent =
   | { type: 'note'; id: string; i: number; n: number }
   | { type: 'pong'; id: string; p: PongMsg }
   | { type: 'cook'; id: string; st: number }
+  | { type: 'kart'; id: string; k: KartMsg }
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'status'; text: string };
 
+/**
+ * A kart race at the Kart Track (room state 'race', written by whoever started it): when it goes
+ * (t0, wall ms), the seed for the CPU karts, and the racers in grid order with their colours.
+ */
+export interface RaceState { host: string; t0: number; seed: number; ids: string[]; names: string[]; cols: number[] }
+/**
+ * Your kart during a race `r` (= that race's t0): position, heading, speed, progress round the
+ * track (lap, centreline index, crossed the start yet), finish time (ms after GO, 0 = racing),
+ * best lap (ms), boosting / drifting. `j` = 1 asks the race's host to put you on the grid.
+ */
+export interface KartMsg { r: number; x: number; y: number; a: number; v: number; lap: number; g: number; c: 0 | 1; fin: number; best: number; b: 0 | 1; d: 0 | 1; j?: 1 }
 /**
  * Pong at the Arcade, sent only during a match. Each side sends its paddle (0..1); the left
  * player runs the ball and also sends it (x, y, vx, vy in court units 0..1 per second), the
@@ -192,6 +205,8 @@ export interface Transport {
   sendPong(p: PongMsg): void;
   /** The Diner: "I pressed E at kitchen station st" (to the shift's host, see game/diner.ts). */
   sendCook(st: number): void;
+  /** The Kart Track: your kart, ~12 times a second while racing (see ui/race.ts). */
+  sendKart(k: KartMsg): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -307,6 +322,8 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     return name && typeof wins === 'number' && Number.isInteger(wins) && wins >= 1 && wins <= 9999 ? { id: o.id, s: { k: 'champ', v: { name, wins }, ts } } : null;
   }
   if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
+  if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
+  if (o.k === 'kartbest' && v && typeof v === 'object') { const name = cleanName(v.name), ms = num(v.ms, 1000, 1e6); return name && ms !== null ? { id: o.id, s: { k: 'kartbest', v: { name, ms }, ts } } : null; }
   if (o.k === 'dinerbest' && v && typeof v === 'object') {
     const name = cleanName(v.name), score = v.score;
     return name && typeof score === 'number' && Number.isInteger(score) && score >= 0 && score <= 99999 ? { id: o.id, s: { k: 'dinerbest', v: { name, score }, ts } } : null;
@@ -346,6 +363,20 @@ function parseDiner(v: Record<string, unknown>): DinerState | null {
   const grill = times(v.grill, 2), fry = times(v.fry, 2), served = Array.isArray(v.served) && v.served.length <= 32 && v.served.every((x) => Number.isInteger(x) && x >= 0 && x <= 7) ? (v.served as number[]) : null;
   if (t0 === null || shake === null || seed === null || lvl === null || pts === null || done === null || !grill || !fry || !served) return null;
   return { host: v.host as string, t0, seed, lvl, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), hands: hands as number[], grill, fry, shake, served, pts, done };
+}
+export function parseKart(p: unknown): { id: string; k: KartMsg } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id)) return null;
+  const r = num(o.r, 0, 1e13), x = num(o.x, -50, 1200), y = num(o.y, -50, 900), a = num(o.a, -100, 100), v = num(o.v, -100, 400), fin = num(o.fin, 0, 1e6), best = num(o.best, 0, 1e6);
+  const lap = typeof o.lap === 'number' && Number.isInteger(o.lap) && o.lap >= 0 && o.lap <= 9 ? o.lap : null, g = typeof o.g === 'number' && Number.isInteger(o.g) && o.g >= 0 && o.g < 5000 ? o.g : null;
+  if (r === null || x === null || y === null || a === null || v === null || fin === null || best === null || lap === null || g === null) return null;
+  return { id: o.id, k: { r, x, y, a, v, lap, g, c: o.c === 1 ? 1 : 0, fin, best, b: o.b === 1 ? 1 : 0, d: o.d === 1 ? 1 : 0, ...(o.j === 1 ? { j: 1 as const } : {}) } };
+}
+function parseRace(v: Record<string, unknown>): RaceState | null {
+  const ids = v.ids, names = v.names, cols = v.cols, t0 = num(v.t0, 0, 1e13), seed = v.seed;
+  if (!isId(v.host) || t0 === null || typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 1e6) return null;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(names) || names.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !cols.every((c) => Number.isInteger(c) && c >= 0 && c < 64)) return null;
+  return { host: v.host as string, t0, seed, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), cols: cols as number[] };
 }
 export function parseCook(p: unknown): { id: string; st: number } | null {
   const o = p as Record<string, unknown> | null;

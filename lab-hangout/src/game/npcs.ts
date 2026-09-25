@@ -163,6 +163,17 @@ const DEFS: NpcDef[] = [
     chat: ['welcome to the Greasy Byte!', 'want to cook? CLOCK IN at the time clock by the kitchen', 'fridge for patties, grill them, then BUNS, then the PASS', 'fries: FREEZER, then FRYER. shakes make themselves (almost)', 'burnt stuff goes in the BIN', 'tickets pay tips, and a great shift gets you a hat like mine', 'more cooks means more orders. teamwork!'],
   },
   {
+    id: 'npc-flags', name: 'FLAGS', room: 'karts', speed: 36,
+    look: { c: 8, hat: 3, face: 3, fit: 4, sp: 0 },
+    stops: [
+      { x: 1050, y: 500, wait: 14, pose: 1, say: ['green flag! green flag!', 'and they are OFF', 'woo! look at them go'] },
+      { x: 430, y: 590, wait: 10, say: ['nice kart. well, it WAS nice', 'who left the tyres here', 'fresh tyres, full tank'] },
+      { x: 800, y: 600, wait: 12, say: ['drifting builds a turbo. blue sparks, then orange!', 'the yellow chevrons give you a boost', 'stay off the grass, it is slow'] },
+      { x: 240, y: 530, wait: 8, say: ['checking the tyre stacks...', 'safety first. then speed'] },
+    ],
+    chat: ['welcome to the kart track!', 'press E at a kart to start a race. others can join in the countdown', 'up to 4 racers, CPUs fill the empty spots', 'hold SPACE through a corner to drift, let go for a turbo', 'the yellow chevrons are boost pads', 'three laps. the big screen shows who is winning', 'set the fastest lap and your name goes on the board'],
+  },
+  {
     id: 'npc-fern', name: 'FERN', room: 'roof', speed: 30,
     look: { c: 6, hat: 4, face: 0, fit: 2, sp: 0 },
     stops: [

@@ -23,6 +23,9 @@ import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
 import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
+import { makeKarts, KARTS } from './world/karts';
+import { openRace, type RaceHandle } from './ui/race';
+import { LOBBY_S, MAX_RACERS, RACE_MAX_S, ordinal, raceTime } from './game/kart';
 import { TOUR, BURNT, isBurnt, retryStep, type TourStep } from './game/dinertour';
 import { ST, cookAct, live as shiftLive, newShift, practiceShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
 import { syncTickets } from './ui/tickets';
@@ -54,7 +57,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type RaceState, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -85,7 +88,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -134,7 +137,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -229,6 +232,16 @@ function onNet(e: NetEvent): void {
       if (!av || room.id !== 'diner' || !g || g.host !== net.selfId || !shiftLive(g) || !settled() || !allow(e.id, 'cook', 6, 10)) break;
       const res = cookAct(g, e.id, av.name, e.st);
       if ('g' in res) { setState({ k: 'diner', v: res.g }); if (res.ticket) SFX.bell(); }
+      break;
+    }
+    case 'kart': {
+      const av = others.get(e.id); if (!av || room.id !== 'karts' || !allow(e.id, 'kart', 14, 20)) break;
+      if (e.k.j) { // a racer asking to join the grid: only whoever runs the race answers
+        const rc = KARTS.race;
+        if (rc && e.k.r === rc.t0 && Date.now() < rc.t0 - 500 && runsRace(rc) && !rc.ids.includes(e.id) && rc.ids.length < MAX_RACERS) setState({ k: 'race', v: { ...rc, ids: [...rc.ids, e.id], names: [...rc.names, av.name], cols: [...rc.cols, av.look.c] } });
+        break;
+      }
+      KARTS.live.set(e.id, { k: e.k, t: now() }); raceUI?.recv(e.id, e.k);
       break;
     }
     case 'status': toast(e.text); break;
@@ -557,6 +570,7 @@ function useSpot(i: number): void {
   else if (s.kind === 'board') openBoard((d) => net.sendDraw(d), () => { input.clear(); if (me.use === i) leaveSpot(); });
   else if (s.kind === 'booth') { booth = { t0: t, next: 0, emoted: -1, frames: [] }; toast('Smile! 3 photos coming up'); }
   else if (s.kind === 'desk') { SFX.sit(); openCode(); }
+  else if (s.kind === 'kart') useKart(i);
   else if (s.kind === 'kanban') openKanban(() => DEN_INFO.notes, (notes) => setState({ k: 'notes', v: notes }), () => { input.clear(); if (me.use === i) leaveSpot(); });
   else if (s.kind === 'rack') { fixEnd = t + 3; SFX.blip(); toast('Fixing the build...'); }
   else if (s.kind === 'scope') openStars(() => { input.clear(); if (me.use === i) leaveSpot(); });
@@ -1413,6 +1427,55 @@ function dinerLine(): string {
   return 'KITCHEN SHIFT · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
 }
 
+// ---------- the Kart Track (game/kart.ts, ui/race.ts, world/karts.ts) ----------
+let raceUI: RaceHandle | null = null;
+/** Your finish in the race with this t0 (so we know when everyone's done). */
+let myRaceFin = { r: 0, fin: 0 };
+/** Whoever started the race answers join requests (or, if they've gone, the first racer still here). */
+const runsRace = (rc: RaceState): boolean => rc.host === net.selfId || (!others.has(rc.host) && [net.selfId, ...rc.ids.filter((id) => others.has(id))].sort()[0] === net.selfId);
+/** Is this race over (everyone home, gone, or out of time)? */
+function raceDone(rc: RaceState): boolean {
+  const t = Date.now() - rc.t0; if (t < 0) return false; if (t > RACE_MAX_S * 1000) return true;
+  return rc.ids.every((id) => {
+    if (id === net.selfId) return (myRaceFin.r === rc.t0 && myRaceFin.fin > 0) || !raceUI;
+    const L = KARTS.live.get(id); return !L || now() - L.t > 6 || (L.k.r === rc.t0 && L.k.fin > 0);
+  });
+}
+function newRace(): void {
+  setState({ k: 'race', v: { host: net.selfId, t0: Date.now() + LOBBY_S * 1000, seed: Math.floor(Math.random() * 99999), ids: [net.selfId], names: [me.name], cols: [me.look.c] } });
+  SFX.join(); toast('Race in ' + LOBBY_S + ' seconds! Others can grab a kart to join', 3500);
+}
+function joinRace(rc: RaceState): void {
+  if (rc.ids.includes(net.selfId) || rc.ids.length >= MAX_RACERS || Date.now() > rc.t0 - 500) return;
+  if (runsRace(rc)) setState({ k: 'race', v: { ...rc, ids: [...rc.ids, net.selfId], names: [...rc.names, me.name], cols: [...rc.cols, me.look.c] } });
+  else net.sendKart({ r: rc.t0, x: 0, y: 0, a: 0, v: 0, lap: 0, g: 0, c: 0, fin: 0, best: 0, b: 0, d: 0, j: 1 });
+}
+/** E at a kart in the pits: start a race, join the one about to start, or wait for the one on track. */
+function useKart(i: number): void {
+  const rc = KARTS.race, t = rc ? Date.now() - rc.t0 : Infinity;
+  if (rc && t < 0) {
+    if (!rc.ids.includes(net.selfId) && rc.ids.length >= MAX_RACERS) { toast('The grid is full! Watch this one on the big screen'); leaveSpot(); return; }
+    joinRace(rc);
+  } else if (rc && !raceDone(rc)) { toast('A race is on! Watch it on the big screen, then grab a kart for the next one', 3500); leaveSpot(); return; }
+  else newRace();
+  SFX.sit();
+  raceUI = openRace({
+    selfId: net.selfId, myName: me.name, myCol: me.look.c,
+    race: () => KARTS.race,
+    send: (k) => { net.sendKart(k); KARTS.live.set(net.selfId, { k, t: now() }); },
+    join: joinRace,
+    finished: (place, ms, best) => {
+      const rc2 = KARTS.race; myRaceFin = { r: rc2?.t0 ?? 0, fin: ms };
+      quests.bump('kart'); quests.stat('kartRaces');
+      if (place === 1) { quests.stat('kartWins'); lastEmoteAt = -9; emote('joy'); }
+      toast((place === 1 ? 'YOU WIN! ' : 'FINISHED ' + ordinal(place) + '! ') + raceTime(ms) + (best ? ' · best lap ' + raceTime(best) : ''), 5000);
+      if (best && (!KARTS.best || best < KARTS.best.ms)) { setState({ k: 'kartbest', v: { name: me.name, ms: best } }); setTimeout(() => toast('FASTEST LAP EVER! Your name is on the board', 4000), 5200); }
+    },
+    again: () => { const r2 = KARTS.race; if (r2 && Date.now() < r2.t0) return; if (r2 && !raceDone(r2)) { toast('Wait for everyone to cross the line'); return; } newRace(); },
+    onClose: () => { raceUI = null; input.clear(); if (me.use === i) leaveSpot(); },
+  });
+}
+
 // ---------- COOKIE's tour of the kitchen (game/dinertour.ts) ----------
 /** The tour: which step, the private practice kitchen, when this step started, and the step to go back to after a burn. */
 let tour: { step: number; g: DinerState; t0: number; said: string; back: number } | null = null;
@@ -1535,7 +1598,7 @@ function frame(nowMs: number): void {
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
     crewStep(dt, t); weatherStep(t); dinerStep(dt, t);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
-    if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn' || room.id === 'dinerstn') subwaySounds();
+    if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
@@ -1677,6 +1740,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     doorsOpen: () => room.doors.map((d) => !!doorDest(d)),
     talkCookie: () => { const n = npcs.byId('npc-cookie'); if (n) talkTo(n); },
     tour: () => (tour ? { step: tour.step, back: tour.back, bar: tourStepNow().bar } : null), tourDone: () => !!save.data.stats.dinerTour,
+    race: () => KARTS.race, kartLive: () => [...KARTS.live.entries()].map(([id, v]) => [id, v.k.lap, v.k.g, v.k.fin]),
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },

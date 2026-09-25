@@ -6,7 +6,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { raining } from '../world/weather';
@@ -15,7 +15,7 @@ import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook'; p: Record<string, unknown> };
+type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
@@ -301,6 +301,7 @@ export class LocalTransport implements Transport {
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'world', p: { id: this.selfId, ...w } } satisfies Wire); }
+  sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
   sendCook(st: number): void { this.post('cook', { id: this.selfId, st }); }
   sendPong(p: PongMsg): void { this.post('pong', { id: this.selfId, ...p }); }
   private expireLobby(): void {
@@ -338,6 +339,7 @@ export class LocalTransport implements Transport {
       case 'emote': { const v = parseEmote(w.p); if (v) this.on({ type: 'emote', id: v.id, kind: v.kind }); break; }
       case 'state': { const v = parseState(w.p); if (v) this.on({ type: 'state', id: v.id, s: v.s }); break; }
       case 'note': { const v = parseNote(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); break; }
+      case 'kart': { const v = parseKart(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kart', id: v.id, k: v.k }); break; }
       case 'cook': { const v = parseCook(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'cook', id: v.id, st: v.st }); break; }
       case 'pong': { const v = parsePong(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'pong', id: v.id, p: v.p }); break; }
       case 'draw': { const v = parseDraw(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'draw', id: v.id, d: v.d }); break; }

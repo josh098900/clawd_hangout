@@ -4,7 +4,7 @@
 // it together), with the tunnel and then the city rushing past the windows, and an EXIT that
 // opens at each station.
 //
-// The line is a loop: SQUARE -> PARK -> DINER -> (back to the SQUARE). Stations without a room yet are OPENING SOON: the train
+// The line is a loop: SQUARE -> PARK -> DINER -> KARTS -> (back to the SQUARE). Stations without a room yet are OPENING SOON: the train
 // stops but keeps its doors shut. Each station takes STOP_S seconds (4 s pulling in, doors open,
 // 4 s pulling out) and the ride to the next one takes RIDE_S.
 
@@ -19,8 +19,9 @@ export const STATIONS: { name: string; room: RoomId | null; arrive: { x: number;
   { name: 'SQUARE', room: 'subway', arrive: { x: 0, y: 500 }, exit: { to: 'plaza', arrive: { x: 760, y: 664 } }, tile: [226, 222, 204], tileLn: [196, 190, 170] },
   { name: 'PARK', room: 'parkstn', arrive: { x: 0, y: 500 }, exit: { to: 'park', arrive: { x: 170, y: 668 } }, tile: [206, 226, 200], tileLn: [172, 196, 166] },
   { name: 'DINER', room: 'dinerstn', arrive: { x: 0, y: 500 }, exit: { to: 'diner', arrive: { x: 70, y: 650 } }, tile: [236, 206, 200], tileLn: [206, 170, 164] },
+  { name: 'KARTS', room: 'kartstn', arrive: { x: 0, y: 500 }, exit: { to: 'karts', arrive: { x: 110, y: 612 } }, tile: [226, 226, 234], tileLn: [70, 70, 84] },
 ];
-const IN_S = 4, OPEN_S = 16, OUT_S = 4, STOP_S = IN_S + OPEN_S + OUT_S, RIDE_S = 36, LEG = STOP_S + RIDE_S;
+const IN_S = 4, OPEN_S = 16, OUT_S = 4, STOP_S = IN_S + OPEN_S + OUT_S, RIDE_S = 28, LEG = STOP_S + RIDE_S;
 export type TrainPhase = 'in' | 'open' | 'out' | 'ride';
 /** Where the train is right now: at station `at` (pulling in, doors open, pulling out) or riding towards `next`. `u` = 0..1 through that phase, `left` = seconds left in it. */
 export function train(nowMs = Date.now()): { at: number; next: number; phase: TrainPhase; u: number; left: number } {

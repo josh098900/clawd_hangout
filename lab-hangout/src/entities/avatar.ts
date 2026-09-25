@@ -155,7 +155,7 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     if (ps < 0.5) P.sy -= 0.14 * Math.exp(-ps * 8) * Math.cos(ps * 20);
     if ((a * 0.21 + av.seed) % 1 < 0.05) P.eyes = 'b';
   }
-  if (using === 'sit') {
+  if (using === 'sit' || using === 'kart') {
     // settle into the seat, then idly swing both feet
     P.sy = 0.96 + 0.015 * Math.sin(a * 2.2 + av.seed * 6); P.lean = 0;
     if (us < 0.5) P.sy -= 0.12 * Math.exp(-us * 8) * Math.cos(us * 20);
