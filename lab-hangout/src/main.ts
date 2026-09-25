@@ -1485,7 +1485,7 @@ function useKart(i: number): void {
   if (rc && t < 0) {
     if (!rc.ids.includes(net.selfId) && rc.ids.length >= MAX_RACERS) { toast('The grid is full! Watch this one on the big screen'); leaveSpot(); return; }
     joinRace(rc);
-  } else if (rc && !raceDone(rc)) { toast('A race is on! Watch it on the big screen, then grab a kart for the next one', 3500); leaveSpot(); return; }
+  } else if (rc && !raceDone(rc)) toast('A race is on: you are watching this one. RACE AGAIN when it ends to start the next!', 4000);
   else newRace();
   SFX.sit();
   raceUI = openRace({

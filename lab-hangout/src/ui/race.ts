@@ -177,8 +177,8 @@ export function openRace(h: RaceHooks): RaceHandle {
     // the start lights beep
     if (t < 0 && t > -3500) { const n = Math.ceil(-t / 1000); if (n !== lastBeep) { lastBeep = n; SFX.blip(); } } else if (t >= 0 && lastBeep !== 0) { lastBeep = 0; SFX.chime(); }
     for (let k = sparks.length - 1; k >= 0; k--) { const s = sparks[k]; s.t -= dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.t <= 0) sparks.splice(k, 1); }
-    const over = t > RACE_MAX_S * 1000 || (!!kart?.fin && es.filter((e) => !e.cpu).every((e) => e.fin));
-    if (over || kart?.fin) againBtn.style.display = over ? '' : 'none';
+    const over = t > RACE_MAX_S * 1000 || ((!!kart?.fin || (!kart && t >= 0)) && es.filter((e) => !e.cpu).every((e) => e.fin));
+    if (over || kart?.fin || (!kart && t >= 0)) againBtn.style.display = over ? '' : 'none';
     // the camera: ahead of your kart (or on the leader if you're watching)
     const focus = es.find((e) => e.me) ?? standings(es)[0];
     if (focus) { const tx = focus.x + (kart ? Math.cos(kart.md) * kart.v * 0.35 : 0), ty = focus.y + (kart ? Math.sin(kart.md) * kart.v * 0.35 : 0); camX += (tx - camX) * Math.min(1, dt * 5); camY += (ty - camY) * Math.min(1, dt * 5); }
@@ -205,7 +205,7 @@ export function openRace(h: RaceHooks): RaceHandle {
       const me = es.find((e) => e.me), myPos = me ? order.indexOf(me) + 1 : 0;
       r(0, 0, VW, 13, [10, 12, 18]);
       if (kart) { txt('LAP ' + Math.min(LAPS, kart.lap + 1) + ' OF ' + LAPS, 4, 4, K.WHITE); txt(ordinal(myPos), 68, 4, myPos === 1 ? K.GOLD : [124, 242, 156]); txt(raceTime(kart.fin || Math.max(0, t)), 104, 4, [200, 210, 230]); if (kart.best) txt('BEST ' + raceTime(kart.best), 156, 4, [150, 160, 180]); }
-      else txt(rc.ids.includes(h.selfId) ? '' : 'JOINING...', 4, 4, [200, 210, 230]);
+      else { const lead = order[0]; txt(t < 0 ? 'JOINING...' : 'WATCHING  ' + (lead ? lead.name.slice(0, 10) + ' LEADS' : ''), 4, 4, [200, 210, 230]); txt(raceTime(Math.max(0, t)), VW - 60, 4, [200, 210, 230]); }
       if (kart && kart.charge > 0.55) { const c = kart.charge > 1.2 ? [255, 150, 40] as RGB : [90, 200, 255] as RGB; txt('TURBO', 230, 4, c); }
       // the minimap
       g.drawImage(bk.mini, VW - 106, VH - 74); r(VW - 106, VH - 74, 104, 1, [60, 70, 80]);
