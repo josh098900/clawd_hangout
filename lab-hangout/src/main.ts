@@ -1459,6 +1459,14 @@ function raceDone(rc: RaceState): boolean {
     const L = KARTS.live.get(id); return !L || now() - L.t > 6 || (L.k.r === rc.t0 && L.k.fin > 0);
   });
 }
+/** Someone started a race while you're in the pits: tell you, so you can grab a kart and join. */
+let raceSeen = 0;
+function raceNews(): void {
+  const rc = KARTS.race; if (!rc || room.id !== 'karts' || !playing || rc.t0 === raceSeen) return;
+  raceSeen = rc.t0;
+  const left = (rc.t0 - Date.now()) / 1000;
+  if (left > 1.5 && rc.host !== net.selfId && !rc.ids.includes(net.selfId) && !raceUI) { toast(rc.names[0] + ' started a race! Grab a kart in the next ' + Math.floor(left) + 's to join', 4000); SFX.join(); }
+}
 function newRace(): void {
   setState({ k: 'race', v: { host: net.selfId, t0: Date.now() + LOBBY_S * 1000, seed: Math.floor(Math.random() * 99999), ids: [net.selfId], names: [me.name], cols: [me.look.c] } });
   SFX.join(); toast('Race in ' + LOBBY_S + ' seconds! Others can grab a kart to join', 3500);
@@ -1614,7 +1622,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t);
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }

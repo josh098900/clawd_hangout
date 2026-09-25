@@ -183,6 +183,7 @@ body:has(#start:not(.hidden)) :is(#bar, #hud, #log) { visibility: hidden; }
 .ink { width: 26px; height: 26px; border: 0; cursor: pointer; box-shadow: 0 0 0 2px #160C2C; padding: 0; }
 .ink[aria-pressed="true"] { box-shadow: 0 0 0 2px #160C2C, 0 0 0 4px #FFD65A; }
 .hold { user-select: none; -webkit-user-select: none; touch-action: none; }
+@media (pointer: coarse) { .mbtn.hold { min-width: 52px; min-height: 46px; font-size: 12px; } }
 #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; transition: opacity .35s ease-out; }
 #flash.on { opacity: .9; transition: none; }
 

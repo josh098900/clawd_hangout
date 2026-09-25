@@ -209,6 +209,26 @@ export class MusicPlayer {
 }
 
 /** Looping rain on the window (the Dev Den). Filtered noise; volume 0 to stop. */
+/** A kart's engine: a buzzy note that rises with speed (the Kart Track). set(0) fades it out. */
+export class Engine {
+  private o: OscillatorNode | null = null; private o2: OscillatorNode | null = null; private g: GainNode | null = null;
+  /** speed 0..1 (and boosting makes it scream a little). */
+  set(speed: number, boost = false): void {
+    const au = audio();
+    if (!au || !soundOn) { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.1); return; }
+    if (!this.g) {
+      const { AC, master } = au, f = AC.createBiquadFilter();
+      this.o = AC.createOscillator(); this.o.type = 'sawtooth'; this.o2 = AC.createOscillator(); this.o2.type = 'square';
+      f.type = 'lowpass'; f.frequency.value = 700; this.g = AC.createGain(); this.g.gain.value = 0;
+      this.o.connect(f); this.o2.connect(f); f.connect(this.g); this.g.connect(master); this.o.start(); this.o2.start();
+    }
+    const t = this.g.context.currentTime, hz = 48 + speed * 95 + (boost ? 25 : 0);
+    this.o!.frequency.setTargetAtTime(hz, t, 0.06); this.o2!.frequency.setTargetAtTime(hz * 0.5 + 1.5, t, 0.06);
+    this.g.gain.setTargetAtTime(speed > 0 || boost ? 0.018 + speed * 0.02 : 0.008, t, 0.08);
+  }
+  stop(): void { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.1); }
+}
+
 export class Rain {
   private g: GainNode | null = null;
   set(vol: number): void {

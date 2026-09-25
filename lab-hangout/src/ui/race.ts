@@ -11,6 +11,9 @@ import { h1 } from '../engine/math';
 import { CL, HALF, LAPS, PADS, TRACK_H, TRACK_W, CPU_NAMES, MAX_RACERS, RACE_MAX_S, cpuAt, kartDist, newKart, ordinal, raceTime, stepKart, type Kart, type KartInput } from '../game/kart';
 import type { KartMsg, RaceState } from '../net/transport';
 import { SFX } from '../audio/sfx';
+import { Engine } from '../audio/music';
+
+const engine = new Engine();
 import { button, openModal, row } from './modal';
 
 const VW = 320, VH = 180;
@@ -97,7 +100,7 @@ interface Entry { id: string; name: string; col: RGB; x: number; y: number; a: n
 export function openRace(h: RaceHooks): RaceHandle {
   if (!TRACK) bake();
   const S = Math.max(1, Math.min(4, Math.floor(Math.min((innerWidth - 40) / VW, (innerHeight - 250) / VH))));
-  const cv = mk(VW, VH); cv.style.width = Math.min(VW * S, innerWidth - 24) + 'px'; cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
+  const cv = mk(VW, VH); cv.style.width = (S < 2 ? innerWidth - 24 : Math.min(VW * S, innerWidth - 24)) + 'px'; // phones: fill the width cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
   const g = cv.getContext('2d')!;
   const info = document.createElement('div'); Object.assign(info.style, { fontFamily: "'VT323', monospace", fontSize: '19px', color: '#9FEFFF', minHeight: '22px', textAlign: 'center' });
   const touch = matchMedia('(pointer: coarse)').matches;
@@ -107,7 +110,7 @@ export function openRace(h: RaceHooks): RaceHandle {
   const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
   addEventListener('keydown', kd, true); addEventListener('keyup', ku, true);
   let raf = 0;
-  const m = openModal('KART RACE', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); h.onClose(); });
+  const m = openModal('KART RACE', () => { engine.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); h.onClose(); });
   const hold = (label: string, k: string) => { const b = button(label, () => {}); b.classList.add('hold'); b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => keys.delete(k)); return b; };
   const againBtn = button('RACE AGAIN', () => h.again()); againBtn.style.display = 'none';
   m.body.append(cv, info, ...(touch ? [row(hold('◀', 'ArrowLeft'), hold('DRIFT', ' '), hold('▶', 'ArrowRight'), hold('BRAKE', 'ArrowDown'))] : []), row(againBtn, button('LEAVE', m.close, true)));
@@ -152,6 +155,7 @@ export function openRace(h: RaceHooks): RaceHandle {
     const es = entries(rc, t);
     if (kart) {
       const ev = stepKart(kart, input(), dt, t, es.filter((e) => !e.me).map((e) => ({ x: e.x, y: e.y })));
+      engine.set(t < 0 ? 0 : Math.min(1, Math.abs(kart.v) / 124), kart.boost > 0);
       if (ev.boost) { SFX.zap(); }
       if (ev.lap && !ev.finished) { SFX.chime(); }
       if (ev.finished) SFX.score();
@@ -200,7 +204,7 @@ export function openRace(h: RaceHooks): RaceHandle {
       // countdown: five lights, then GO
       if (t < 0) {
         const n = Math.ceil(-t / 1000);
-        if (n > 3) { const s = 'RACE STARTS IN ' + n; txtOutlined(s, VW / 2 - tw(s, 2) / 2, 40, K.WHITE, 2); const j = rc.ids.length + ' RACER' + (rc.ids.length === 1 ? '' : 'S') + ' + ' + (MAX_RACERS - rc.ids.length) + ' CPU'; txtOutlined(j, VW / 2 - tw(j) / 2, 62, [180, 220, 255]); }
+        if (n > 3) { const s = 'RACE STARTS IN ' + n; txtOutlined(s, VW / 2 - tw(s, 2) / 2, 22, K.WHITE, 2); const j = rc.ids.length + ' RACER' + (rc.ids.length === 1 ? '' : 'S') + ' + ' + (MAX_RACERS - rc.ids.length) + ' CPU' + (rc.ids.length < MAX_RACERS ? '  (OTHERS CAN STILL JOIN)' : ''); txtOutlined(j, VW / 2 - tw(j) / 2, 40, [180, 220, 255]); }
         else { r(VW / 2 - 40, 34, 80, 22, [20, 20, 26]); for (let k = 0; k < 3; k++) disc(VW / 2 - 24 + k * 24, 45, 7, k >= n - 0 ? [230, 50, 50] : [60, 30, 30]); }
       } else if (t < 1200) txtOutlined('GO!', VW / 2 - tw('GO!', 4) / 2, 36, [124, 242, 156], 4);
       if (kart?.fin) {

@@ -18,6 +18,8 @@ export const TW = 160, TH = 100, TANK_WIN = 5;
 /** The arena's cover blocks [x0, y0, x1, y1] (walls round the edge too). */
 export const BLOCKS: [number, number, number, number][] = [[74, 38, 86, 62], [34, 16, 42, 42], [118, 58, 126, 84], [52, 74, 70, 80], [90, 20, 108, 26]];
 const SPAWN = [{ x: 16, y: 50, a: 0 }, { x: 144, y: 50, a: Math.PI }];
+/** Where you come back after being hit: your side's corners and middle, whichever is furthest from the other tank. */
+const RESPAWN = [[{ x: 16, y: 50, a: 0 }, { x: 16, y: 12, a: 0 }, { x: 16, y: 88, a: 0 }], [{ x: 144, y: 50, a: Math.PI }, { x: 144, y: 12, a: Math.PI }, { x: 144, y: 88, a: Math.PI }]];
 const SEND = 1 / 15, SPEED = 30, TURN = 2.6, SHELL = 62, RELOAD = 0.55, R = 4;
 export const TANK_COLS: RGB[] = [K.CYAN, K.MAG];
 
@@ -63,7 +65,7 @@ export function drawTank(x: number, y: number, a: number, col: RGB, blink = fals
 
 export function openTanks(h: TankHooks): TankHandle {
   const S = Math.max(2, Math.min(5, Math.floor(Math.min((innerWidth - 60) / TW, (innerHeight - 280) / TH))));
-  const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; cv.style.width = Math.min(TW * S, innerWidth - 24) + 'px'; cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
+  const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; cv.style.width = (innerWidth < 560 ? innerWidth - 24 : Math.min(TW * S, innerWidth - 24)) + 'px'; cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
   const g = cv.getContext('2d')!;
   const info = document.createElement('div'); Object.assign(info.style, { fontFamily: "'VT323', monospace", fontSize: '20px', color: '#9FEFFF', minHeight: '22px', textAlign: 'center' });
   const keys = new Set<string>();
@@ -87,7 +89,11 @@ export function openTanks(h: TankHooks): TankHandle {
   const setPh = (p: number) => { ph = p; phT = performance.now() / 1000; if (p === 1) { Object.assign(me, SPAWN[h.side], { inv: 0, dead: 0 }); shells = []; sc = 0; hits = 0; reported = false; if (cpu) { Object.assign(cpu, SPAWN[1 - h.side], { inv: 0, dead: 0 }); cpuSc = 0; cpuShells = []; } } };
   const blowUp = (t: Tank) => { t.dead = performance.now() / 1000; booms.push({ x: t.x, y: t.y, t: t.dead }); SFX.boom(); };
   const fire = (t: Tank, list: Shell[]) => { list.push({ x: t.x + Math.cos(t.a) * 7, y: t.y + Math.sin(t.a) * 7, vx: Math.cos(t.a) * SHELL, vy: Math.sin(t.a) * SHELL, b: 0, t: 0 }); SFX.zap(); };
-  const respawn = (t: Tank, side: number, now: number) => { if (t.dead && now - t.dead > 1.2) { Object.assign(t, SPAWN[side]); t.dead = 0; t.inv = now + 1.5; } };
+  const respawn = (t: Tank, side: number, now: number, from: { x: number; y: number } | null) => {
+    if (!t.dead || now - t.dead < 1.2) return;
+    const spots = RESPAWN[side], best = from ? spots.reduce((p, q) => (Math.hypot(q.x - from.x, q.y - from.y) > Math.hypot(p.x - from.x, p.y - from.y) ? q : p)) : spots[0];
+    Object.assign(t, best); t.dead = 0; t.inv = now + 1.5;
+  };
 
   const step = () => {
     raf = requestAnimationFrame(step);
@@ -106,7 +112,7 @@ export function openTanks(h: TankHooks): TankHandle {
     if (ph === 0 && !cpu && now - waitT > 2) cpuBtn.style.display = ''; else if (ph !== 0) { cpuBtn.style.display = 'none'; waitT = now; }
     if (ph === 3 && !reported) { reported = true; if (sc >= TANK_WIN) { h.won(!!cpu); SFX.score(); } else SFX.hurt(); }
     // me
-    respawn(me, h.side, now);
+    respawn(me, h.side, now, cpu ?? them);
     if (ph === 2 && !me.dead) {
       drive(me, (keys.has('ArrowUp') || keys.has('w') ? 1 : 0) - (keys.has('ArrowDown') || keys.has('s') ? 0.7 : 0), (keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0), dt);
       cool -= dt;
@@ -124,7 +130,7 @@ export function openTanks(h: TankHooks): TankHandle {
     });
     // the CPU: pick a spot, turn towards you, fire when it's lined up
     if (cpu && ph === 2) {
-      respawn(cpu, 1 - h.side, now);
+      respawn(cpu, 1 - h.side, now, me);
       if (!cpu.dead) {
         if (now > cpuGoalT) { cpuGoalT = now + 2 + Math.random() * 2; for (let k = 0; k < 20; k++) { const x = 12 + Math.random() * (TW - 24), y = 10 + Math.random() * (TH - 20); if (!solid(x, y, R + 2)) { cpuGoal = { x, y }; break; } } }
         const toMe = Math.atan2(me.y - cpu.y, me.x - cpu.x), toGoal = Math.atan2(cpuGoal.y - cpu.y, cpuGoal.x - cpu.x), far = Math.hypot(cpuGoal.x - cpu.x, cpuGoal.y - cpu.y) > 6;
