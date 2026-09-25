@@ -17,7 +17,8 @@ import { makeRoof, showStart } from './world/roof';
 import { makeStage, stageNote, INST_COL } from './world/stage';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
-import { makeArcade, ARCADE_INFO, PONG_SPOTS, pongSeen } from './world/arcade';
+import { makeArcade, ARCADE_INFO, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
+import { openTanks, type TankHandle } from './ui/tanks';
 import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
@@ -232,6 +233,11 @@ function onNet(e: NetEvent): void {
       if (!av || room.id !== 'diner' || !g || g.host !== net.selfId || !shiftLive(g) || !settled() || !allow(e.id, 'cook', 6, 10)) break;
       const res = cookAct(g, e.id, av.name, e.st);
       if ('g' in res) { setState({ k: 'diner', v: res.g }); if (res.ticket) SFX.bell(); }
+      break;
+    }
+    case 'tank': {
+      const av = others.get(e.id); if (!av || room.id !== 'arcade' || av.use !== TANK_SPOTS[e.t.s] || !allow(e.id, 'tank', 20, 30)) break;
+      tankSeen(e.t); tank?.recv(e.id, e.t);
       break;
     }
     case 'kart': {
@@ -562,6 +568,7 @@ function useSpot(i: number): void {
   else if (s.kind === 'arcade') openArcade(Math.max(save.data.hi, roomHi()?.score ?? 0), endArcade);
   else if (s.kind === 'claw') openClawMachine(i);
   else if (s.kind === 'pong') startPong(i);
+  else if (s.kind === 'tank') startTank(i);
   else if (s.kind === 'decor') {
     SFX.blip();
     openDesk(me.look.desk ?? 0, (bits) => { me.look = { ...me.look, desk: bits }; net.updateMe(peerState()); }, () => { applyProfile(me.name, me.look); input.clear(); if (me.use === i) leaveSpot(); });
@@ -704,6 +711,17 @@ function startPong(i: number): void {
     },
     won: () => { quests.bump('pong'); quests.stat('pongWins'); },
     onClose: () => { pong = null; input.clear(); if (me.use === i) leaveSpot(); },
+  });
+}
+let tank: TankHandle | null = null;
+function startTank(i: number): void {
+  const side = (TANK_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = TANK_SPOTS[1 - side];
+  tank = openTanks({
+    side, myName: me.name,
+    opponent: () => { for (const o of others.values()) if (o.use === other) return { id: o.id, name: o.name }; return null; },
+    send: (m) => { net.sendTank(m); tankSeen(m); },
+    won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); lastEmoteAt = -9; emote('joy'); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
+    onClose: () => { tank = null; input.clear(); if (me.use === i) leaveSpot(); },
   });
 }
 function leaveSpot(): void {

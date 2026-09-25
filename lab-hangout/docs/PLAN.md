@@ -27,10 +27,10 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 ---
 
 ## Progress
-Steps 1-7 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
-weather + group dances; migrations 0007-0011). **Step 8, the Diner, is built** (migration
-`0012_diner.sql`: tips), waiting for Josh's live check. Then step 9, the Kart Track and the tank duel.
-(Apartments and photos take the next free migration numbers, not the ones written below.)
+Steps 1-8 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
+weather + group dances, the Diner + COOKIE's tour; migrations 0007-0012). **Step 9, the Kart Track
+and the tank duel, is built** (migration `0013_karts.sql`: quests + badges), waiting for Josh's live
+check. Then step 10, apartments (it will use migration 0014, not the number written below).
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

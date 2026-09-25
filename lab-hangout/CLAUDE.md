@@ -12,7 +12,8 @@ Room map (doors):
                                                                                   ├── grate → CRYPT
                                                                                   ├── right edge → PIER
                                                                                   └── stairs → SUBWAY (Square station) ── train ── PARK station → CITY PARK
-                                                                                                                    └── DINER station → THE GREASY BYTE
+                                                                                                                    ├── DINER station → THE GREASY BYTE
+                                                                                                                    └── KARTS station → THE KART TRACK
 ```
 
 **The plan lives in `docs/ROADMAP.md`** (phases, what's done, what must happen before a
@@ -83,6 +84,8 @@ src/
                        rain, storm + lightning, fog; snow in winter; roll() must match 0011_weather.sql), umbrellas
     diner.ts           THE GREASY BYTE (1400x700, the Subway's DINER stop): booths, counter + stools, soda fountain, jukebox,
                        and the KITCHEN (stations along the back wall, drawn live from DINER.g), ticket rail, time clock, COOKIE
+    karts.ts           THE KART TRACK (1300x660, the KARTS stop): pit boxes with 4 karts (E = start / join a race), the
+                       grandstand BIG SCREEN (the race live: map + order, from KARTS.live and cpuAt), fastest lap board, FLAGS
     contest.ts         the hourly fishing contest (:30-:40 UTC): contestClock(), the Pier scoreboard prop
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
@@ -106,6 +109,8 @@ src/
                        missed tickets / shift end / score all derived from the clock
   game/dinertour.ts    COOKIE's hands-on kitchen tour for first-timers (TOUR steps; a local practice kitchen, lvl 0;
                        COOKIE is a local 'puppet' NPC meanwhile). TALK to COOKIE to replay it
+  game/kart.ts         the kart circuit (Catmull-Rom centreline CL), stepKart physics (drift -> mini-turbo, pads, grass),
+                       laps (must pass halfway), places, and the CPU karts: cpuAt(seed, slot, t) from the clock, no messages
   game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
@@ -122,6 +127,8 @@ src/
     prizes.ts          the prize counter: your collection
     garden.ts          the seed picker and your-plant card (water / harvest / dig up)
     sandbox.ts         the Park sandbox editor (pile / dig / tower)
+    race.ts            a kart race, top down (baked track, rotated pixel sprites, HUD, minimap, results)
+    tanks.ts           TANK DUEL: 2 players (or vs the CPU); shooter decides hits, P1 runs the phases (like Pong)
     tickets.ts         the Diner's order tickets as a HUD strip during a shift
     quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
@@ -146,7 +153,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log) ·
                        0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests) ·
                        0011 weather (private.weather(), rain_water(), the crew quest + DANCE CREW / STORM CHASER badges) ·
-                       0012 diner (diner_tip: 1 + score/40, max 5 a shift, 15 a day; the diner quest + HEAD CHEF badge)
+                       0012 diner (diner_tip: 1 + score/40, max 5 a shift, 15 a day; the diner quest + HEAD CHEF badge) ·
+                       0013 karts (the kart + tank quests, SPEED DEMON + TANK ACE badges)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -191,6 +199,8 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | badges | table `badges` (members read); RPC `claim_badge(b)` (green/helper/quester/tycoon checked on the server) | badge ids |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
 | diner | room state `diner` (the shift: host, t0, seed, hands, grill, fry, shake, served bitmasks, pts; only its host writes it) + broadcast `cook` `{ id, st }` ("E at station st", the host applies it with `cookAct`); `dinerbest`; RPC `diner_tip(score)` at the end | see game/diner.ts |
+| kart race | room state `race` (host: t0 = GO, seed, ids/names/cols in grid order; others ask to join with a `kart` msg `j: 1`, the host adds them) + broadcast `kart` (your kart, 12 Hz racing, 6-8 with 3-4 racers, 2 Hz on the grid) + `kartbest`; CPU karts from `cpuAt` | `{ r, x, y, a, v, lap, g, c, fin, best, b, d, j? }` |
+| tank duel | broadcast `tank` ~15/s per side during a match (shells in flight, score, hits landed, P1's phase; vs CPU also the CPU tank) | `{ s, x, y, a, sh, sc, hit, inv, ph?, o?, osc? }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |

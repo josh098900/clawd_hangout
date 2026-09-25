@@ -1,20 +1,21 @@
 // THE ARCADE — down the neon stairs on the Square. A glowing basement of cabinets on a
 // cosmic carpet: the CLAW machine (spend 3 tokens, the server picks a capsule prize), a
 // 2-player PONG table everyone can watch live, a SLOP INVADERS cabinet with its own high
-// score, the PRIZE COUNTER (your collection) run by PIXEL, and an air hockey table that
-// nobody ever finishes a game on.
+// score, the TANK DUEL cabinet (2 players or you vs the CPU, watchable live), a jukebox, the PRIZE
+// COUNTER (your collection) run by PIXEL, and an air hockey table that nobody ever finishes a game on.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
 import { PX, mk, r, line, disc, oval, txt, tw, lit, G, Gd, withCtx, M, shade, alpha } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { CHIPTUNES } from '../audio/music';
 import { itemName } from '../entities/critter';
-import type { PongMsg, StateMsg } from '../net/transport';
+import type { PongMsg, StateMsg, TankMsg } from '../net/transport';
+import { BLOCKS, TANK_COLS, TH, TW } from '../ui/tanks';
 import type { Room, Prop, Spot } from './room';
 
 const W = 1100, H = 612, LF = 466;
 const STAIRS = { x: 10, y: 360, w: 56, h: 106 };
-export const CLAW_X = 250, PONG_X = 468, INV_X = 640, COUNTER = { x0: 850, x1: 1070 };
+export const CLAW_X = 250, PONG_X = 468, INV_X = 640, TANK_X = 774, JUKE_X = 150, COUNTER = { x0: 850, x1: 1070 };
 /** What everyone in the room sees: the last claw win, the Pong champ, the live Pong table, the radio. */
 export const ARCADE_INFO = {
   juke: 0, jukeT0: 0,
@@ -23,9 +24,12 @@ export const ARCADE_INFO = {
   champ: null as { name: string; wins: number } | null,
   /** Latest Pong messages per side, and when they arrived (s). */
   pong: [null, null] as [(PongMsg & { t: number }) | null, (PongMsg & { t: number }) | null],
+  /** Latest TANK DUEL messages per side, and when they arrived (s). */
+  tank: [null, null] as [(TankMsg & { t: number }) | null, (TankMsg & { t: number }) | null],
   /** Someone's playing the claw right now (local animation for the cabinet). */
   clawT: -9,
 };
+export function tankSeen(m: TankMsg): void { ARCADE_INFO.tank[m.s] = { ...m, t: performance.now() / 1000 }; }
 export function pongSeen(p: PongMsg): void { ARCADE_INFO.pong[p.s] = { ...p, t: performance.now() / 1000 }; }
 
 // ---------- the set ----------
@@ -63,12 +67,18 @@ function build(this: Room): void {
     r(ix - 26, 300, 52, 170, [30, 110, 70]); r(ix - 26, 300, 52, 2, [80, 180, 120]); r(ix - 26, 300, 2, 170, [60, 150, 100]); r(ix + 24, 300, 2, 170, [16, 70, 40]);
     r(ix - 26, 300, 52, 20, [16, 70, 40]); r(ix - 20, 330, 40, 50, [8, 12, 10]);
     r(ix - 24, 386, 48, 16, [20, 80, 50]); r(ix - 6, 382, 2, 8, [180, 180, 190]); disc(ix - 5, 381, 3, K.GOLD); disc(ix + 10, 392, 3, K.RED);
-    // two decorative cabinets (one is OUT OF ORDER, obviously)
-    for (const [dx, c] of [[740, [110, 60, 180]], [808, [180, 110, 40]]] as [number, RGB][]) {
-      r(dx - 26, 310, 52, 160, c); r(dx - 26, 310, 52, 2, M(c, [255, 255, 255], 0.35)); r(dx + 24, 310, 2, 160, shade(c, 0.6)); r(dx - 20, 336, 40, 44, [8, 10, 14]);
-      r(dx - 24, 386, 48, 14, shade(c, 0.8)); disc(dx - 8, 392, 3, K.CYAN); disc(dx + 8, 392, 3, K.MAG);
-    }
-    r(794, 346, 30, 16, [240, 236, 220]); txt('OUT OF', 809 - tw('OUT OF') / 2, 348, K.RED); txt('ORDER', 809 - tw('ORDER') / 2, 355, K.RED);
+    // TANK DUEL: a wide army-green two-player cabinet (the live battle is drawn in drawBack)
+    const tx = TANK_X, tc: RGB = [70, 96, 50];
+    r(tx - 60, 310, 120, 160, tc); r(tx - 60, 310, 120, 2, M(tc, [255, 255, 255], 0.35)); r(tx - 60, 310, 2, 160, M(tc, [255, 255, 255], 0.2)); r(tx + 58, 310, 2, 160, shade(tc, 0.6));
+    r(tx - 60, 298, 120, 16, shade(tc, 0.7)); for (let k = 0; k < 10; k++) r(tx - 56 + k * 12, 300, 6, 3, k % 2 ? [220, 190, 60] : [40, 40, 44]);
+    r(tx - 56, 328, 112, 70, [8, 10, 8]);
+    r(tx - 58, 402, 116, 18, shade(tc, 0.8)); r(tx - 58, 402, 116, 2, M(tc, [255, 255, 255], 0.25));
+    for (const [sx, c] of [[tx - 30, K.CYAN], [tx + 30, K.MAG]] as [number, RGB][]) { r(sx - 1, 398, 3, 10, [180, 180, 190]); disc(sx, 397, 3, c); disc(sx + 12, 410, 3, K.RED); }
+    r(tx - 54, 424, 108, 40, shade(tc, 0.9)); txt('P1', tx - 42, 440, K.CYAN); txt('P2', tx + 32, 440, K.MAG);
+    // the jukebox by the stairs
+    const jx = JUKE_X;
+    r(jx - 20, 380, 40, 90, [120, 40, 90]); for (let y = 380; y < 394; y++) { const w = Math.round(20 * Math.sqrt(Math.max(0, 1 - ((394 - y) / 16) ** 2))); r(jx - w, y - 10, w * 2, 1, [150, 60, 120]); }
+    r(jx - 13, 396, 26, 18, [30, 20, 40]); r(jx - 12, 418, 24, 30, [230, 210, 170]); for (let k = 0; k < 4; k++) r(jx - 10, 422 + k * 6, 20, 2, [150, 120, 80]); r(jx - 18, 462, 36, 8, [80, 26, 60]);
     // prize counter: shelves of plushies behind a glass counter
     const C = COUNTER;
     r(C.x0, 250, C.x1 - C.x0, 100, [40, 26, 60]); for (const y of [280, 318, 350]) r(C.x0, y, C.x1 - C.x0, 4, [120, 80, 50]);
@@ -146,11 +156,25 @@ function drawBack(a: number): void {
     const hi = ARCADE_INFO.hi; const s = hi ? 'HI ' + hi.score : 'HI ----'; txt(s, ix - tw(s) / 2, 410, K.GOLD);
   });
   Gd(ix, 356, 30, [124, 242, 156], 0.14);
-  // decorative attract screens
+  // TANK DUEL: the battle live (or two tanks circling in attract mode), the marquee
+  const tx = TANK_X, [T1, T2] = ARCADE_INFO.tank, t1 = T1 && now - T1.t < 2 ? T1 : null, t2 = T2 && now - T2.t < 2 ? T2 : null, sx0 = tx - 52, sy0 = 332, k = 104 / TW;
   lit(() => {
-    for (let y = 0; y < 44; y += 2) r(720, 336 + y, 40, 1, CONFETTI[(Math.floor(y / 4) + Math.floor(a * 8)) % CONFETTI.length].map((v) => v * 0.6) as RGB);
-    if ((a * 1.3) % 1 < 0.1) r(788, 336, 40, 44, [30, 30, 40]);
+    const X = (u: number) => Math.round(sx0 + u * k), Y = (v: number) => Math.round(sy0 + v * k);
+    r(sx0, sy0, 104, Math.round(TH * k), [18, 24, 14]);
+    for (const [x0, y0, x1, y1] of BLOCKS) r(X(x0), Y(y0), Math.max(1, X(x1) - X(x0)), Math.max(1, Y(y1) - Y(y0)), [110, 100, 80]);
+    const tank = (x: number, y: number, an: number, c: RGB) => { r(X(x) - 2, Y(y) - 2, 5, 5, c); r(Math.round(X(x) + Math.cos(an) * 4), Math.round(Y(y) + Math.sin(an) * 4), 1, 1, K.WHITE); };
+    const live = !!(t1 || t2);
+    if (live) {
+      for (const m of [t1, t2]) if (m) { tank(m.x, m.y, m.a, TANK_COLS[m.s]); for (let j = 0; j + 3 < m.sh.length; j += 4) r(X(m.sh[j]), Y(m.sh[j + 1]), 1, 1, K.WHITE); if (m.o) tank(m.o[0], m.o[1], m.o[2], TANK_COLS[1 - m.s]); }
+      const s1 = t1 ? t1.sc : t2?.osc ?? 0, s2 = t2 ? t2.sc : t1?.osc ?? 0;
+      txt(String(s1), sx0 + 3, sy0 + 2, K.CYAN); txt(String(s2), sx0 + 98, sy0 + 2, K.MAG);
+    } else { const u = a * 0.8; tank(80 + Math.cos(u) * 50, 50 + Math.sin(u) * 30, u + Math.PI / 2, K.CYAN); tank(80 - Math.cos(u) * 50, 50 - Math.sin(u) * 30, u - Math.PI / 2, K.MAG); if ((a * 2) % 1 < 0.5) r(X(80), Y(50), 1, 1, K.WHITE); }
+    txt(live ? 'LIVE!' : 'TANKS', tx - tw(live ? 'LIVE!' : 'TANKS', 2) / 2, 313, live && (a % 0.6) < 0.3 ? K.GOLD : [220, 190, 60], 2);
   });
+  Gd(tx, 362, 50, [140, 220, 100], 0.12);
+  // the jukebox's bubbling lights
+  lit(() => { for (let j = 0; j < 4; j++) { const ph = (a * 0.8 + j / 4) % 1; r(JUKE_X - 16 + (j % 2) * 30, 400 + Math.round(ph * 50), 2, 2, CONFETTI[j]); } r(JUKE_X - 10, 400, 20, 4, ARCADE_INFO.juke >= 0 ? K.GOLD : [110, 100, 90]); });
+  Gd(JUKE_X, 420, 24, [255, 120, 200], 0.14);
   // prize counter: glass case lit from inside, the collection on show
   const C = COUNTER;
   lit(() => { for (let k = 0; k < 9; k++) { const x = C.x0 + 22 + k * 22, c = CAPS[k % CAPS.length]; disc(x, 432 + (k % 2) * 4, 5, c); r(x - 4, 432 + (k % 2) * 4, 9, 1, K.WHITE); } txt('PRIZES', (C.x0 + C.x1) / 2 - tw('PRIZES', 2) / 2, 256, K.GOLD, 2); });
@@ -180,8 +204,12 @@ export const ARCADE_SPOTS: Spot[] = [
   { kind: 'pong', x: PONG_X + 34, y: 480, sx: PONG_X + 34, sy: 490, lift: 0, label: 'PONG P2', area: { x0: PONG_X, y0: 300, x1: PONG_X + 60, y1: 470 } },
   { kind: 'arcade', x: INV_X, y: 480, sx: INV_X, sy: 490, lift: 0, label: 'PLAY', area: { x0: INV_X - 26, y0: 300, x1: INV_X + 26, y1: 470 } },
   { kind: 'prizes', x: 960, y: 484, sx: 960, sy: 492, lift: 0, label: 'PRIZES', area: { x0: COUNTER.x0, y0: 250, x1: COUNTER.x1, y1: 470 } },
-  { kind: 'juke', x: 774, y: 480, sx: 774, sy: 490, lift: 0, label: 'MUSIC', area: { x0: 714, y0: 310, x1: 834, y1: 470 } },
+  { kind: 'juke', x: JUKE_X, y: 480, sx: JUKE_X, sy: 490, lift: 0, label: 'MUSIC', area: { x0: JUKE_X - 22, y0: 368, x1: JUKE_X + 22, y1: 470 } },
+  { kind: 'tank', x: TANK_X - 30, y: 480, sx: TANK_X - 30, sy: 490, lift: 0, label: 'TANKS P1', area: { x0: TANK_X - 60, y0: 300, x1: TANK_X, y1: 470 } },
+  { kind: 'tank', x: TANK_X + 30, y: 480, sx: TANK_X + 30, sy: 490, lift: 0, label: 'TANKS P2', area: { x0: TANK_X, y0: 300, x1: TANK_X + 60, y1: 470 } },
 ];
+/** Spot indexes of the two TANK DUEL sides. */
+export const TANK_SPOTS: [number, number] = [6, 7];
 /** Spot indexes of the two Pong sides. */
 export const PONG_SPOTS: [number, number] = [1, 2];
 
@@ -193,7 +221,7 @@ export function makeArcade(): Room {
     blockers: [{ x0: 500, y0: 540, x1: 620, y1: 572 }, { x0: 1078, y0: 470, x1: 1094, y1: 480 }],
     doors: [{ trigger: { x0: 14, y0: 476, x1: 60, y1: 484 }, to: 'plaza', arrive: { x: 186, y: 668 }, label: 'SQUARE', area: { x0: 6, y0: 350, x1: 70, y1: 470 } }],
     spots: ARCADE_SPOTS, inUse: new Map(),
-    music: { x: 774, tracks: CHIPTUNES, current: () => ({ n: ARCADE_INFO.juke, t0: ARCADE_INFO.jukeT0 }) },
+    music: { x: JUKE_X, tracks: CHIPTUNES, current: () => ({ n: ARCADE_INFO.juke, t0: ARCADE_INFO.jukeT0 }) },
     onState(s: StateMsg) {
       if (s.k === 'juke') { ARCADE_INFO.juke = s.v.n; ARCADE_INFO.jukeT0 = s.v.t0; }
       else if (s.k === 'hi') ARCADE_INFO.hi = s.v;

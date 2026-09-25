@@ -113,9 +113,9 @@ const DEFS: NpcDef[] = [
       { x: 300, y: 530, wait: 8, say: ['restocking the capsules...', 'this claw is TOTALLY fair', 'wiggle wiggle'] },
       { x: 468, y: 540, wait: 10, say: ['ooh, good rally', 'who is the champ today?'] },
       { x: 640, y: 590, wait: 8, say: ['nobody ever finishes air hockey', 'the puck has a mind of its own'] },
-      { x: 780, y: 520, wait: 6, say: ['still out of order. classic', 'have you tried turning it off and on'] },
+      { x: 780, y: 520, wait: 6, say: ['the tank cabinet finally works!', 'bounce your shells off the walls', 'no one there? play the CPU'] },
     ],
-    chat: ['welcome to the arcade!', 'the claw costs 3 tokens', 'coins spawn on the Square every 5 minutes', 'got a dupe? you get a token back', 'pong is first to 5', 'check your collection at the prize counter', 'the MUSIC cabinet changes the tune'],
+    chat: ['welcome to the arcade!', 'the claw costs 3 tokens', 'coins spawn on the Square every 5 minutes', 'got a dupe? you get a token back', 'pong is first to 5', 'check your collection at the prize counter', 'the jukebox by the stairs changes the tune', 'TANK DUEL: first to 5 hits. shells bounce once'],
   },
   {
     id: 'npc-roxy', name: 'ROXY', room: 'subway', speed: 30,

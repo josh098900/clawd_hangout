@@ -73,6 +73,7 @@ export type NetEvent =
   | { type: 'pong'; id: string; p: PongMsg }
   | { type: 'cook'; id: string; st: number }
   | { type: 'kart'; id: string; k: KartMsg }
+  | { type: 'tank'; id: string; t: TankMsg }
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'status'; text: string };
 
@@ -87,6 +88,13 @@ export interface RaceState { host: string; t0: number; seed: number; ids: string
  * best lap (ms), boosting / drifting. `j` = 1 asks the race's host to put you on the grid.
  */
 export interface KartMsg { r: number; x: number; y: number; a: number; v: number; lap: number; g: number; c: 0 | 1; fin: number; best: number; b: 0 | 1; d: 0 | 1; j?: 1 }
+/**
+ * TANK DUEL at the Arcade: side s's tank (x, y, heading a), its shells in flight as flat
+ * [x, y, vx, vy]..., its score, how many hits it has landed (the other side blows up when this
+ * goes up), whether it can't be hit right now (inv), P1's match phase, and (vs the CPU) the CPU's
+ * tank and score so the cabinet can show it.
+ */
+export interface TankMsg { s: 0 | 1; x: number; y: number; a: number; sh: number[]; sc: number; hit: number; inv: 0 | 1; ph?: number; o?: [number, number, number]; osc?: number }
 /**
  * Pong at the Arcade, sent only during a match. Each side sends its paddle (0..1); the left
  * player runs the ball and also sends it (x, y, vx, vy in court units 0..1 per second), the
@@ -207,6 +215,8 @@ export interface Transport {
   sendCook(st: number): void;
   /** The Kart Track: your kart, ~12 times a second while racing (see ui/race.ts). */
   sendKart(k: KartMsg): void;
+  /** The Arcade's TANK DUEL: your tank ~15 times a second during a match (see ui/tanks.ts). */
+  sendTank(t: TankMsg): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -377,6 +387,18 @@ function parseRace(v: Record<string, unknown>): RaceState | null {
   if (!isId(v.host) || t0 === null || typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 1e6) return null;
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(names) || names.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !cols.every((c) => Number.isInteger(c) && c >= 0 && c < 64)) return null;
   return { host: v.host as string, t0, seed, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), cols: cols as number[] };
+}
+export function parseTank(p: unknown): { id: string; t: TankMsg } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id) || (o.s !== 0 && o.s !== 1)) return null;
+  const x = num(o.x, 0, 160), y = num(o.y, 0, 100), a = num(o.a, -1000, 1000), fin = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1000;
+  const int = (v: unknown, hi: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= hi ? v : null);
+  const sc = int(o.sc, 99), hit = int(o.hit, 999);
+  if (x === null || y === null || a === null || sc === null || hit === null || !Array.isArray(o.sh) || o.sh.length > 8 || o.sh.length % 4 || !o.sh.every(fin)) return null;
+  const t: TankMsg = { s: o.s, x, y, a, sh: o.sh as number[], sc, hit, inv: o.inv === 1 ? 1 : 0 };
+  if (o.ph !== undefined) { const ph = int(o.ph, 3); if (ph === null) return null; t.ph = ph; }
+  if (o.o !== undefined) { if (!Array.isArray(o.o) || o.o.length !== 3 || !o.o.every(fin)) return null; t.o = [o.o[0], o.o[1], o.o[2]]; const osc = int(o.osc, 99); if (osc !== null) t.osc = osc; }
+  return { id: o.id, t };
 }
 export function parseCook(p: unknown): { id: string; st: number } | null {
   const o = p as Record<string, unknown> | null;

@@ -75,7 +75,7 @@ Guiding rules (from what already works):
 - [x] 5. Daily quests and badges
 - [x] 6. Hourly fishing contest
 - [x] 7. Group dances and shared weather
-- [ ] 8. The Diner (co-op cooking)
+- [x] 8. The Diner (co-op cooking)
 - [ ] 9. The Kart Track and the tank duel
 - [ ] 10. Your own apartment
 - [ ] 11. The Space Station
