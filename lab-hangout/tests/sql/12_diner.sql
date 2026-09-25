@@ -1,0 +1,28 @@
+\set QUIET on
+create or replace function pg_temp.ok(label text, cond boolean) returns void language plpgsql as $$ begin raise notice '% %', case when cond then 'PASS' else 'FAIL' end, label; end $$;
+insert into auth.users (id) values ('aaaaaaaa-0000-0000-0000-000000000001'), ('bbbbbbbb-0000-0000-0000-000000000002');
+select public.set_invite_code('letmein');
+set role authenticated;
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false); select public.join_world('letmein');
+select pg_temp.ok('score 0: no tip, no record', (public.diner_tip(0)->>'paid')::int = 0);
+select pg_temp.ok('score 130: 1 + 3 = 4 tokens', (public.diner_tip(130)->>'paid')::int = 4);
+select pg_temp.ok('balance is 4', public.my_tokens() = 4);
+do $$ begin perform public.diner_tip(50); raise notice 'FAIL two tips in one shift'; exception when raise_exception then raise notice 'PASS one tip per shift: %', sqlerrm; end $$;
+reset role; update private.diner_tips set at = at - interval '3 minutes'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('huge score still caps at 5', (public.diner_tip(999999)->>'paid')::int = 5);
+reset role; update private.diner_tips set at = at - interval '3 minutes'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('third: 5 more (14 today)', (public.diner_tip(400)->>'paid')::int = 5);
+reset role; update private.diner_tips set at = at - interval '3 minutes'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('daily cap: only 1 left of 15', (public.diner_tip(400)->>'paid')::int = 1);
+reset role; update private.diner_tips set at = at - interval '3 minutes'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('capped for today: 0, balance 15', (public.diner_tip(400)->>'paid')::int = 0 and public.my_tokens() = 15);
+reset role; update private.diner_tips set at = at - interval '1 day'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('tomorrow it pays again', (public.diner_tip(40)->>'paid')::int = 2);
+select set_config('test.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
+do $$ begin perform public.diner_tip(100); raise notice 'FAIL non-member tipped'; exception when raise_exception then raise notice 'PASS members only'; end $$;
+do $$ begin update private.diner_tips set paid = 99; raise notice 'FAIL player touched tips'; exception when insufficient_privilege then raise notice 'PASS tips table is private'; end $$;
+reset role;
+set role anon;
+do $$ begin perform public.diner_tip(10); raise notice 'FAIL anon tipped'; exception when insufficient_privilege then raise notice 'PASS anon cannot call it'; end $$;
+reset role;
+select pg_temp.ok('diner quest + chef badge listed', exists (select 1 from private.quest_pool where id = 'diner') and exists (select 1 from private.badge_list where id = 'chef'));

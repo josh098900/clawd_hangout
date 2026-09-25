@@ -1,0 +1,26 @@
+\set QUIET on
+create or replace function pg_temp.ok(label text, cond boolean) returns void language plpgsql as $$ begin raise notice '% %', case when cond then 'PASS' else 'FAIL' end, label; end $$;
+insert into auth.users (id) values ('aaaaaaaa-0000-0000-0000-000000000001'), ('bbbbbbbb-0000-0000-0000-000000000002');
+select public.set_invite_code('letmein');
+set role authenticated;
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false); select public.join_world('letmein');
+select pg_temp.ok('score 0: nothing', (public.karaoke_tip(0)->>'paid')::int = 0);
+select pg_temp.ok('score 30: under 40 pays nothing', (public.karaoke_tip(30)->>'paid')::int = 0);
+reset role; update private.karaoke_tips set at = at - interval '1 minute'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('score 75: 1 + 2 = 3', (public.karaoke_tip(75)->>'paid')::int = 3);
+do $$ begin perform public.karaoke_tip(90); raise notice 'FAIL two tips in one song'; exception when raise_exception then raise notice 'PASS one tip a song'; end $$;
+reset role; update private.karaoke_tips set at = at - interval '1 minute'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('huge score caps at 4', (public.karaoke_tip(99999)->>'paid')::int = 4);
+reset role; update private.karaoke_tips set at = at - interval '1 minute'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('4 more (11 today)', (public.karaoke_tip(100)->>'paid')::int = 4);
+reset role; update private.karaoke_tips set at = at - interval '1 minute'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('daily cap: 1 left of 12', (public.karaoke_tip(100)->>'paid')::int = 1);
+select pg_temp.ok('balance 12', public.my_tokens() = 12);
+reset role; update private.karaoke_tips set at = at - interval '1 day'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('tomorrow it pays again', (public.karaoke_tip(40)->>'paid')::int = 2);
+select set_config('test.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
+do $$ begin perform public.karaoke_tip(100); raise notice 'FAIL non-member tipped'; exception when raise_exception then raise notice 'PASS members only'; end $$;
+do $$ begin update private.karaoke_tips set paid = 99; raise notice 'FAIL player touched tips'; exception when insufficient_privilege then raise notice 'PASS tips table is private'; end $$;
+reset role; set role anon;
+do $$ begin perform public.karaoke_tip(10); raise notice 'FAIL anon tipped'; exception when insufficient_privilege then raise notice 'PASS anon cannot call it'; end $$;
+reset role;

@@ -1,0 +1,70 @@
+\set QUIET on
+create or replace function pg_temp.ok(label text, cond boolean) returns void language plpgsql as $$ begin raise notice '% %', case when cond then 'PASS' else 'FAIL' end, label; end $$;
+insert into auth.users (id, email) values ('aaaaaaaa-0000-0000-0000-000000000001', 'anna@x.com'), ('bbbbbbbb-0000-0000-0000-000000000002', 'Boss@X.com'), ('cccccccc-0000-0000-0000-000000000003', 'cal@x.com');
+select public.set_invite_code('letmein');
+select pg_temp.ok('make_admin by email (any case)', public.make_admin(' boss@x.com ') = 1);
+select pg_temp.ok('make_admin twice is fine', public.make_admin('BOSS@x.com') = 1);
+select pg_temp.ok('make_admin: unknown email matches nobody', public.make_admin('nobody@x.com') = 0);
+create temp table png as select 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='::text as v;
+grant select on png to authenticated;
+set role authenticated;
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false); select public.join_world('letmein');
+insert into public.profiles (id, name, look) values ('aaaaaaaa-0000-0000-0000-000000000001', 'ANNA', '{}');
+select pg_temp.ok('not an admin', not public.is_admin());
+do $$ begin perform public.pin_photo('data:image/jpeg;base64,AAAA'); raise notice 'FAIL pinned a jpeg'; exception when raise_exception then raise notice 'PASS only PNG data urls'; end $$;
+do $$ begin perform public.pin_photo('data:image/png;base64,PGh0bWw+PHNjcmlwdD4='); raise notice 'FAIL pinned html'; exception when raise_exception then raise notice 'PASS the bytes must really be a PNG'; end $$;
+do $$ begin perform public.pin_photo('data:image/png;base64,' || repeat('A', 90000)); raise notice 'FAIL pinned a huge one'; exception when raise_exception or check_violation then raise notice 'PASS size limit'; end $$;
+select set_config('test.p1', public.pin_photo((select v from png))::text, false);
+select pg_temp.ok('pinned: pending, with my name', (select status = 'pending' and owner_name = 'ANNA' from public.photos where id = current_setting('test.p1')::bigint));
+select public.pin_photo((select v from png)); select public.pin_photo((select v from png));
+do $$ begin perform public.pin_photo((select v from png)); raise notice 'FAIL 4th pin'; exception when raise_exception then raise notice 'PASS at most 3 waiting / 3 a day: %', sqlerrm; end $$;
+do $$ begin perform public.review_photo(current_setting('test.p1')::bigint, true); raise notice 'FAIL non-admin approved'; exception when raise_exception then raise notice 'PASS only the owner reviews'; end $$;
+do $$ begin perform public.pending_photos(); raise notice 'FAIL non-admin saw the queue'; exception when raise_exception then raise notice 'PASS only the owner sees the queue'; end $$;
+do $$ begin update public.photos set status = 'approved'; raise notice 'FAIL player approved own photo by hand'; exception when insufficient_privilege then raise notice 'PASS photos table is read-only'; end $$;
+select pg_temp.ok('wall is empty before approval', jsonb_array_length(public.wall_photos(10)->'photos') = 0);
+select pg_temp.ok('my_photos shows my 3 pending', jsonb_array_length(public.my_photos()) = 3);
+-- C can't see A's pending photos
+select set_config('test.uid', 'cccccccc-0000-0000-0000-000000000003', false); select public.join_world('letmein');
+select pg_temp.ok('others cannot see pending photos', (select count(*) from public.photos) = 0);
+-- the boss approves one, rejects one
+select set_config('test.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false); select public.join_world('letmein');
+select pg_temp.ok('boss is admin', public.is_admin());
+select pg_temp.ok('boss sees the queue (3)', jsonb_array_length(public.pending_photos()) = 3);
+select public.review_photo(current_setting('test.p1')::bigint, true);
+select public.review_photo(current_setting('test.p1')::bigint + 1, false);
+select pg_temp.ok('queue down to 1', jsonb_array_length(public.pending_photos()) = 1);
+-- C sees the approved one and hearts it
+select set_config('test.uid', 'cccccccc-0000-0000-0000-000000000003', false);
+select pg_temp.ok('wall shows the approved photo', (public.wall_photos(10)->'photos'->0->>'id')::bigint = current_setting('test.p1')::bigint and (public.wall_photos(10)->'photos'->0->>'owner_name') = 'ANNA');
+select pg_temp.ok('heart: 1, mine', (public.heart_photo(current_setting('test.p1')::bigint)->>'hearts')::int = 1);
+select pg_temp.ok('photo of the week', (public.wall_photos(10)->>'week')::bigint = current_setting('test.p1')::bigint);
+select pg_temp.ok('heart again = un-heart', (public.heart_photo(current_setting('test.p1')::bigint)->>'hearts')::int = 0);
+select public.heart_photo(current_setting('test.p1')::bigint);
+do $$ begin perform public.heart_photo(current_setting('test.p1')::bigint + 1); raise notice 'FAIL hearted a rejected photo'; exception when raise_exception then raise notice 'PASS only approved photos get hearts'; end $$;
+do $$ begin perform public.delete_photo(current_setting('test.p1')::bigint); raise notice 'FAIL deleted someone else''s'; exception when raise_exception then raise notice 'PASS cannot delete others'' photos'; end $$;
+do $$ begin perform public.feature_photo(current_setting('test.p1')::bigint); raise notice 'FAIL featured someone else''s'; exception when raise_exception then raise notice 'PASS only your own photo in your frame'; end $$;
+select pg_temp.ok('flat_photo of ANNA = the approved one', public.flat_photo('aaaaaaaa-0000-0000-0000-000000000001') = (select v from png));
+select pg_temp.ok('photo_by_id works for approved', (public.photo_by_id(current_setting('test.p1')::bigint)->>'hearts')::int = 1);
+select pg_temp.ok('photo_by_id null for rejected', public.photo_by_id(current_setting('test.p1')::bigint + 1) is null);
+-- A: feature it, rejected one is invisible to others but A sees its status, delete own
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select public.feature_photo(current_setting('test.p1')::bigint);
+select pg_temp.ok('featured', (select featured from public.photos where id = current_setting('test.p1')::bigint));
+select pg_temp.ok('my_photos says approved / rejected / pending', (select string_agg(x->>'status', ',' order by (x->>'id')::bigint) from jsonb_array_elements(public.my_photos()) x) = 'approved,rejected,pending');
+select public.delete_photo(current_setting('test.p1')::bigint + 2);
+select pg_temp.ok('deleted my pending one', jsonb_array_length(public.my_photos()) = 2);
+do $$ begin perform public.pin_photo((select v from png)); raise notice 'FAIL 4th pin today'; exception when raise_exception then raise notice 'PASS 3 a day even after deleting: %', sqlerrm; end $$;
+reset role; update private.photo_pins set at = at - interval '1 day'; set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('tomorrow you can pin again', public.pin_photo((select v from png)) > 0);
+-- boss takes an approved photo down
+select set_config('test.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
+select public.review_photo(current_setting('test.p1')::bigint, false);
+select pg_temp.ok('taken down: off the wall, unfeatured', jsonb_array_length(public.wall_photos(10)->'photos') = 0 and not (select featured from public.photos where id = current_setting('test.p1')::bigint));
+reset role;
+set role anon;
+do $$ begin perform public.pin_photo('x'); raise notice 'FAIL anon pinned'; exception when insufficient_privilege then raise notice 'PASS anon cannot pin'; end $$;
+do $$ begin perform public.make_admin('x'); raise notice 'FAIL anon made admin'; exception when insufficient_privilege then raise notice 'PASS anon cannot make admins'; end $$;
+reset role; set role authenticated; select set_config('test.uid', 'cccccccc-0000-0000-0000-000000000003', false);
+do $$ begin perform public.make_admin('cal@x.com'); raise notice 'FAIL player made themselves admin'; exception when insufficient_privilege then raise notice 'PASS players cannot make admins'; end $$;
+reset role;
+select pg_temp.ok('the PHOTO FRAME furniture is for sale', exists (select 1 from private.furniture where id = 'pframe' and price = 10));

@@ -1,0 +1,36 @@
+\set QUIET on
+create or replace function pg_temp.ok(label text, cond boolean) returns void language plpgsql as $$ begin raise notice '% %', case when cond then 'PASS' else 'FAIL' end, label; end $$;
+insert into auth.users (id) values ('aaaaaaaa-0000-0000-0000-000000000001'), ('bbbbbbbb-0000-0000-0000-000000000002');
+select public.set_invite_code('letmein');
+set role authenticated;
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select public.join_world('letmein');
+-- out of season (the test DB clock is September), unless the owner forces it
+do $$ begin if public.current_season() is null then perform public.trick_or_treat(0); raise notice 'FAIL knocked out of season'; else raise notice 'PASS (skipped: real clock is in season)'; end if; exception when raise_exception then raise notice 'PASS no trick-or-treat out of season: %', sqlerrm; end $$;
+do $$ begin perform public.set_season('halloween'); raise notice 'FAIL player set the season'; exception when insufficient_privilege then raise notice 'PASS players cannot set the season'; end $$;
+reset role; select public.set_season('halloween'); set role authenticated;
+select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+select pg_temp.ok('season forced on', public.current_season() = 'halloween');
+select set_config('test.r', public.trick_or_treat(0)::text, false);
+select pg_temp.ok('first knock: 1 token unless tricked', (current_setting('test.r')::jsonb->>'tokens')::int = case when (current_setting('test.r')::jsonb->>'trick')::boolean then 0 else 1 end and (current_setting('test.r')::jsonb->>'visited')::int = 1);
+do $$ begin perform public.trick_or_treat(0); raise notice 'FAIL knocked twice'; exception when raise_exception then raise notice 'PASS once per door per day: %', sqlerrm; end $$;
+do $$ begin perform public.trick_or_treat(8); raise notice 'FAIL made-up door'; exception when raise_exception then raise notice 'PASS made-up door refused'; end $$;
+select public.trick_or_treat(1), public.trick_or_treat(2), public.trick_or_treat(3), public.trick_or_treat(4), public.trick_or_treat(5), public.trick_or_treat(6);
+select set_config('test.r', public.trick_or_treat(7)::text, false);
+select pg_temp.ok('8th door: a halloween prize', (current_setting('test.r')::jsonb->>'prize') in ('face:6','hat:11','face:7','fit:7','fit:6','pet:6'));
+select pg_temp.ok('prize is in the inventory', (select count(*) from public.inventory where item = current_setting('test.r')::jsonb->>'prize') = 1);
+select set_config('test.bal', public.my_tokens()::text, false);
+reset role;
+select pg_temp.ok('tokens = untricked knocks', current_setting('test.bal')::int = (select count(*) from private.treat_claims where not trick));
+select pg_temp.ok('only one prize a day', (select count(*) from private.treat_prizes) = 1);
+select private.add_tokens('aaaaaaaa-0000-0000-0000-000000000001', 300);
+set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+reset role;
+do $$ declare i int; begin for i in 1..80 loop update private.claw_plays set at = at - interval '1 minute'; perform set_config('role', 'authenticated', true); perform public.play_claw(); perform set_config('role', 'postgres', true); end loop; end $$;
+select pg_temp.ok('in season the claw can give halloween prizes', exists (select 1 from private.claw_plays p join private.claw_prizes z using (item) where z.season = 'halloween'));
+select public.set_season(null);
+delete from private.claw_plays;
+select private.add_tokens('aaaaaaaa-0000-0000-0000-000000000001', 300);
+do $$ declare i int; begin for i in 1..80 loop update private.claw_plays set at = at - interval '1 minute'; perform set_config('role', 'authenticated', true); perform public.play_claw(); perform set_config('role', 'postgres', true); end loop; end $$;
+select pg_temp.ok('out of season it never does (80 plays)', (select count(*) from private.claw_plays) = 80 and not exists (select 1 from private.claw_plays p join private.claw_prizes z using (item) where z.season = 'halloween'));
+select pg_temp.ok('season back to the date', public.current_season() is distinct from 'halloween' or to_char(now(), 'MM') = '10');

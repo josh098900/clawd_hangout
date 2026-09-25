@@ -201,6 +201,22 @@ Moderation, from the SQL editor:
   previews the decorations in your own browser only.
 - Public launch: `select public.set_world_open(true);` lets everyone in without a code.
 
+## Tests
+
+```bash
+npm run test:sql     # every migration run twice on a throwaway local Postgres, then the SQL suites in tests/sql (~5 s)
+npm run test:smoke   # every room in normal / winter / halloween dressing + a two-player check, in headless Chrome (~2 min)
+npm test             # typecheck + both
+```
+
+- `test:sql` needs Postgres 14 or newer installed (`brew install postgresql@14`). It never touches Supabase:
+  `tests/sql/stubs.sql` stands in for Supabase's auth and realtime. `npm run test:sql -- 18` runs just
+  the suites whose name contains `18`.
+- `test:smoke` uses your installed Google Chrome (set `CHROME_PATH` if it lives somewhere unusual), and
+  runs the game in LOCAL mode.
+- A new migration gets a matching suite, `tests/sql/NN_name.sql`, which prints `PASS ...` / `FAIL ...` notices
+  (copy the `pg_temp.ok` helper from any suite).
+
 ## Deploying
 
 This is a static site. `npm run build` outputs `dist/`. On **Vercel**: import the repo, set the root

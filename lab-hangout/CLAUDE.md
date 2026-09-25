@@ -35,6 +35,8 @@ npm install
 npm run dev          # http://localhost:5173 (LOCAL mode if no .env.local)
 npm run typecheck    # tsc --noEmit — run after every change
 npm run build        # typecheck + production build to dist/
+npm run test:sql     # migrations x2 on a local Postgres + the suites in tests/sql (add one per new migration)
+npm run test:smoke   # every room x (normal, winter, halloween) + two players, headless Chrome, LOCAL mode
 ```
 
 Handy URLs while developing:
