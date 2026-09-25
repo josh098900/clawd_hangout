@@ -124,7 +124,7 @@ const DEFS: NpcDef[] = [
       { x: 700, y: 630, wait: 50, pose: 1, say: ['this one is called SUBWAY SERENADE', 'tips welcome! (i take smiles)', 'la la la... mind the gap...'] },
       { x: 1100, y: 600, wait: 10, say: ['snack break', 'the red machine never runs out of crisps'] },
     ],
-    chat: ['hop on the next train!', 'the ride past the city is the best bit', 'the Park station is opening soon, they say', 'stand behind the yellow line', 'i busk here every day. the acoustics!', 'the board says when the next train is'],
+    chat: ['hop on the next train!', 'the ride past the city is the best bit', 'the line goes Square, Park, Diner, then the Kart Track', 'stand behind the yellow line', 'i busk here every day. the acoustics!', 'the board says when the next train is', 'the Diner does a mean milkshake. if you make it yourself'],
   },
   {
     id: 'npc-oak', name: 'OAK', room: 'park', speed: 26,

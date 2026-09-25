@@ -26,7 +26,7 @@ import { quests } from './game/quests';
 import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
 import { makeKarts, KARTS } from './world/karts';
 import { openRace, type RaceHandle } from './ui/race';
-import { LOBBY_S, MAX_RACERS, RACE_MAX_S, ordinal, raceTime } from './game/kart';
+import { LOBBY_S, MAX_RACERS, RACE_MAX_S, TRACKS, ordinal, raceTime, trackOf } from './game/kart';
 import { TOUR, BURNT, isBurnt, retryStep, type TourStep } from './game/dinertour';
 import { ST, cookAct, live as shiftLive, newShift, practiceShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
 import { syncTickets } from './ui/tickets';
@@ -1468,8 +1468,11 @@ function raceNews(): void {
   if (left > 1.5 && rc.host !== net.selfId && !rc.ids.includes(net.selfId) && !raceUI) { toast(rc.names[0] + ' started a race! Grab a kart in the next ' + Math.floor(left) + 's to join', 4000); SFX.join(); }
 }
 function newRace(): void {
-  setState({ k: 'race', v: { host: net.selfId, t0: Date.now() + LOBBY_S * 1000, seed: Math.floor(Math.random() * 99999), ids: [net.selfId], names: [me.name], cols: [me.look.c] } });
-  SFX.join(); toast('Race in ' + LOBBY_S + ' seconds! Others can grab a kart to join', 3500);
+  // the circuits take turns: the seed picks the track (and the CPU karts' pace)
+  const next = KARTS.race ? (KARTS.race.seed + 1) % TRACKS.length : Math.floor(Math.random() * TRACKS.length);
+  const seed = Math.floor(Math.random() * 9999) * TRACKS.length + next;
+  setState({ k: 'race', v: { host: net.selfId, t0: Date.now() + LOBBY_S * 1000, seed, ids: [net.selfId], names: [me.name], cols: [me.look.c] } });
+  SFX.join(); toast(trackOf(seed).name + ': race in ' + LOBBY_S + ' seconds! Others can grab a kart to join', 3500);
 }
 function joinRace(rc: RaceState): void {
   if (rc.ids.includes(net.selfId) || rc.ids.length >= MAX_RACERS || Date.now() > rc.t0 - 500) return;
@@ -1495,7 +1498,8 @@ function useKart(i: number): void {
       quests.bump('kart'); quests.stat('kartRaces');
       if (place === 1) { quests.stat('kartWins'); lastEmoteAt = -9; emote('joy'); }
       toast((place === 1 ? 'YOU WIN! ' : 'FINISHED ' + ordinal(place) + '! ') + raceTime(ms) + (best ? ' · best lap ' + raceTime(best) : ''), 5000);
-      if (best && (!KARTS.best || best < KARTS.best.ms)) { setState({ k: 'kartbest', v: { name: me.name, ms: best } }); setTimeout(() => toast('FASTEST LAP EVER! Your name is on the board', 4000), 5200); }
+      const ti = rc2 ? TRACKS.indexOf(trackOf(rc2.seed)) : 0, rec = KARTS.best[ti];
+      if (best && (!rec || best < rec.ms)) { const recs = TRACKS.map((_, i) => KARTS.best[i] ?? null); recs[ti] = { name: me.name, ms: best }; setState({ k: 'kartbest', v: recs }); setTimeout(() => toast('FASTEST LAP ON ' + TRACKS[ti].name + '! Your name is on the board', 4000), 5200); }
     },
     again: () => { const r2 = KARTS.race; if (r2 && Date.now() < r2.t0) return; if (r2 && !raceDone(r2)) { toast('Wait for everyone to cross the line'); return; } newRace(); },
     onClose: () => { raceUI = null; input.clear(); if (me.use === i) leaveSpot(); },

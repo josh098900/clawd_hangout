@@ -7,13 +7,13 @@
 import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
 import { PX, mk, r, txt, tw, lit, G, Gd, withCtx, M, shade, disc } from '../engine/pixel';
 import { h1 } from '../engine/math';
-import { CL, CPU_NAMES, LAPS, MAX_RACERS, RACE_MAX_S, TRACK_H, TRACK_W, cpuAt, raceTime } from '../game/kart';
-import type { KartMsg, RaceState, StateMsg } from '../net/transport';
+import { CPU_NAMES, LAPS, MAX_RACERS, RACE_MAX_S, TRACKS, TRACK_H, TRACK_W, cpuAt, raceTime, trackOf } from '../game/kart';
+import type { KartMsg, KartRecord, RaceState, StateMsg } from '../net/transport';
 import type { Prop, Room, Spot } from './room';
 
 const W = 1300, H = 660, FL = 470;
 /** The race (room state 'race'), the fastest lap, and the latest word from each racer (for the big screen). */
-export const KARTS = { race: null as RaceState | null, best: null as { name: string; ms: number } | null, live: new Map<string, { k: KartMsg; t: number }>() };
+export const KARTS = { race: null as RaceState | null, /** fastest lap per circuit */ best: [] as KartRecord[], live: new Map<string, { k: KartMsg; t: number }>() };
 export const PIT_X = [330, 520, 710, 900];
 const SCREEN = { x: 470, y: 304, w: 360, h: 96 };
 
@@ -69,28 +69,30 @@ function drawBack(a: number): void {
   const S = SCREEN;
   lit(() => {
     r(S.x, S.y, S.w, S.h, [8, 12, 20]);
+    const tr = rc ? trackOf(rc.seed) : TRACKS[Math.floor(now / 60000) % TRACKS.length], CL = tr.CL;
     const mx = S.x + 6, my = S.y + 6, sc = Math.min((S.w * 0.55) / TRACK_W, (S.h - 12) / TRACK_H);
     CL.forEach((p, i) => { if (i % 3 === 0) r(Math.round(mx + p.x * sc), Math.round(my + p.y * sc), 2, 2, [70, 80, 96]); });
     r(Math.round(mx + CL[0].x * sc) - 2, Math.round(my + CL[0].y * sc), 5, 1, K.WHITE);
     const lx = S.x + S.w * 0.6;
     if (!rc || t > RACE_MAX_S * 1000 + 60000) {
-      txt('KART TRACK', lx, S.y + 8, K.GOLD, 2); txt('GRAB A KART IN', lx, S.y + 30, [220, 226, 240]); txt('THE PIT BOXES', lx, S.y + 40, [220, 226, 240]); txt('TO START A RACE', lx, S.y + 50, [220, 226, 240]);
+      txt(tr.name, lx, S.y + 8, K.GOLD, 2); txt('GRAB A KART IN', lx, S.y + 30, [220, 226, 240]); txt('THE PIT BOXES', lx, S.y + 40, [220, 226, 240]); txt('TO START A RACE', lx, S.y + 50, [220, 226, 240]);
       txt(LAPS + ' LAPS, UP TO 4', lx, S.y + 66, [150, 160, 180]); txt('CPUS FILL THE GRID', lx, S.y + 76, [150, 160, 180]);
       return;
     }
     // everyone on the map, and the order
     const es: { name: string; col: RGB; x: number; y: number; dist: number; fin: number }[] = [];
     rc.ids.forEach((id, i) => { const L = KARTS.live.get(id), k = L && L.k.r === rc.t0 ? L.k : null; es.push({ name: rc.names[i], col: BODY[rc.cols[i] % BODY.length].c, x: k ? k.x : CL[0].x, y: k ? k.y : CL[0].y, dist: k ? (k.c ? k.lap + k.g / CL.length : k.g / CL.length - 1) : -1, fin: k?.fin ?? 0 }); });
-    for (let s = rc.ids.length; s < MAX_RACERS; s++) { const c = cpuAt(rc.seed, s, t); es.push({ name: CPU_NAMES[s - rc.ids.length], col: [200, 200, 210], x: c.x, y: c.y, dist: c.dist, fin: c.fin }); }
+    for (let s = rc.ids.length; s < MAX_RACERS; s++) { const c = cpuAt(tr, rc.seed, s, t); es.push({ name: CPU_NAMES[s - rc.ids.length], col: [200, 200, 210], x: c.x, y: c.y, dist: c.dist, fin: c.fin }); }
     for (const e of es) { const x = Math.round(mx + e.x * sc), y = Math.round(my + e.y * sc); r(x - 2, y - 2, 5, 5, e.col); r(x - 1, y - 1, 3, 3, M(e.col, [255, 255, 255], 0.5)); }
     es.sort((p, q) => (p.fin && q.fin ? p.fin - q.fin : p.fin ? -1 : q.fin ? 1 : q.dist - p.dist));
-    if (t < 0) { txt('RACE IN ' + Math.ceil(-t / 1000), lx, S.y + 8, (a % 1) < 0.5 ? K.GOLD : K.WHITE, 2); }
+    if (t < 0) { txt('RACE IN ' + Math.ceil(-t / 1000), lx, S.y + 8, (a % 1) < 0.5 ? K.GOLD : K.WHITE, 2); txt(tr.name, lx, S.y + S.h - 10, [150, 160, 180]); }
     else { const lead = es[0], lap = lead.fin ? LAPS : Math.min(LAPS, Math.max(1, Math.floor(lead.dist) + 1)); txt(es.every((e) => e.fin) || lead.fin ? 'FINISH!' : 'LAP ' + lap + ' OF ' + LAPS, lx, S.y + 8, lead.fin ? K.GOLD : K.WHITE, 2); }
     es.forEach((e, i) => { const y = S.y + 30 + i * 12; r(lx, y, 5, 5, e.col); txt((i + 1) + ' ' + e.name.slice(0, 9), lx + 8, y, i === 0 ? K.GOLD : [220, 226, 240]); if (e.fin) txt(raceTime(e.fin), S.x + S.w - 6 - tw(raceTime(e.fin)), y, [150, 200, 255]); });
   });
   G(S.x, S.y, S.w, S.h, [120, 170, 255], 0.08);
   // the fastest lap board
-  lit(() => { txt('FASTEST LAP', 1167 - tw('FASTEST LAP') / 2, 326, K.GOLD); const b = KARTS.best; txt(b ? raceTime(b.ms) : '-:--.--', 1167 - tw(b ? raceTime(b.ms) : '-:--.--', 2) / 2, 340, K.WHITE, 2); if (b) txt(b.name.slice(0, 16), 1167 - tw(b.name.slice(0, 16)) / 2, 362, [180, 220, 255]); });
+  const bt = rc ? trackOf(rc.seed) : TRACKS[Math.floor(now / 60000) % TRACKS.length];
+  lit(() => { txt(bt.name, 1167 - tw(bt.name) / 2, 324, K.GOLD); const b = KARTS.best[TRACKS.indexOf(bt)] ?? null; txt('FASTEST LAP', 1167 - tw('FASTEST LAP') / 2, 332, [150, 160, 180]); txt(b ? raceTime(b.ms) : '-:--.--', 1167 - tw(b ? raceTime(b.ms) : '-:--.--', 2) / 2, 344, K.WHITE, 2); if (b) txt(b.name.slice(0, 16), 1167 - tw(b.name.slice(0, 16)) / 2, 364, [180, 220, 255]); });
   // the start lights on the gantry over the pit exit
   lit(() => { for (let k = 0; k < 5; k++) { const on = rc && t < 0 && t > -3500 ? k < Math.floor((3500 + t) / 700) : false, go = rc && t >= 0 && t < 3000; disc(1030 + k * 12, 470, 3, go ? [124, 242, 156] : on ? [240, 50, 50] : [60, 30, 30]); } });
 }

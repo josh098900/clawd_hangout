@@ -53,7 +53,9 @@ export type StateVal =
   | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
   | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string }
   | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } }
-  | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: { name: string; ms: number } };
+  | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] };
+/** The fastest lap on each circuit (index = track, see game/kart.ts TRACKS), or null. */
+export type KartRecord = { name: string; ms: number } | null;
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -333,7 +335,11 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   }
   if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
   if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
-  if (o.k === 'kartbest' && v && typeof v === 'object') { const name = cleanName(v.name), ms = num(v.ms, 1000, 1e6); return name && ms !== null ? { id: o.id, s: { k: 'kartbest', v: { name, ms }, ts } } : null; }
+  if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
+    const recs: KartRecord[] = [];
+    for (const x of o.v as unknown[]) { if (x === null) { recs.push(null); continue; } const q = x as Record<string, unknown>, name = cleanName(q?.name), ms = num(q?.ms, 1000, 1e6); if (!name || ms === null) return null; recs.push({ name, ms }); }
+    return { id: o.id, s: { k: 'kartbest', v: recs, ts } };
+  }
   if (o.k === 'dinerbest' && v && typeof v === 'object') {
     const name = cleanName(v.name), score = v.score;
     return name && typeof score === 'number' && Number.isInteger(score) && score >= 0 && score <= 99999 ? { id: o.id, s: { k: 'dinerbest', v: { name, score }, ts } } : null;

@@ -8,7 +8,7 @@
 import { BODY, K, CONFETTI, type RGB } from '../engine/palette';
 import { PX, mk, r, disc, txt, tw, withCtx, M, shade, txtOutlined, line } from '../engine/pixel';
 import { h1 } from '../engine/math';
-import { CL, HALF, LAPS, PADS, TRACK_H, TRACK_W, CPU_NAMES, MAX_RACERS, RACE_MAX_S, cpuAt, kartDist, newKart, ordinal, raceTime, stepKart, type Kart, type KartInput } from '../game/kart';
+import { HALF, LAPS, TRACKS, TRACK_H, TRACK_W, CPU_NAMES, MAX_RACERS, RACE_MAX_S, cpuAt, kartDist, newKart, ordinal, raceTime, stepKart, trackOf, type Kart, type KartInput, type Track } from '../game/kart';
 import type { KartMsg, RaceState } from '../net/transport';
 import { SFX } from '../audio/sfx';
 import { Engine } from '../audio/music';
@@ -33,16 +33,19 @@ export interface RaceHooks {
 export interface RaceHandle { recv(id: string, k: KartMsg): void }
 
 // ---------- the track, baked once ----------
-let TRACK: HTMLCanvasElement | null = null, MINI: HTMLCanvasElement | null = null;
-const GRASS: RGB = [74, 150, 70], GRASS2: RGB = [66, 138, 62], ASPH: RGB = [84, 86, 96], CURB_R: RGB = [214, 50, 50], CURB_W: RGB = [236, 236, 236];
-function bake(): void {
-  TRACK = mk(TRACK_W, TRACK_H);
+const BAKED = new Map<Track, { track: HTMLCanvasElement; mini: HTMLCanvasElement }>();
+const ASPH: RGB = [84, 86, 96], CURB_R: RGB = [214, 50, 50], CURB_W: RGB = [236, 236, 236];
+/** The ground by theme: two stripe colours, tufts, run-off. */
+const GROUND = { grass: { a: [74, 150, 70] as RGB, b: [66, 138, 62] as RGB, tuft: [96, 176, 84] as RGB, run: [214, 196, 150] as RGB, mini: [20, 30, 24] as RGB }, desert: { a: [222, 186, 120] as RGB, b: [212, 176, 112] as RGB, tuft: [190, 150, 90] as RGB, run: [180, 120, 80] as RGB, mini: [44, 34, 24] as RGB } };
+function baked(tr: Track): { track: HTMLCanvasElement; mini: HTMLCanvasElement } {
+  const got = BAKED.get(tr); if (got) return got;
+  const CL = tr.CL, gr = GROUND[tr.theme], TRACK = mk(TRACK_W, TRACK_H);
   withCtx(TRACK.getContext('2d')!, () => {
     PX.dim = 0; PX.emit = false; PX.fl = 0;
-    for (let y = 0; y < TRACK_H; y += 24) r(0, y, TRACK_W, 24, (y / 24) % 2 ? GRASS : GRASS2); // mowed stripes
-    for (let i = 0; i < 900; i++) r(Math.floor(h1(i * 2.3) * TRACK_W), Math.floor(h1(i * 5.9) * TRACK_H), 1, 2, [96, 176, 84]);
-    // run-off sand on the outside of the tight corners
-    for (const f of [0.14, 0.4, 0.62, 0.76]) { const p = CL[Math.floor(CL.length * f)]; disc(Math.round(p.x), Math.round(p.y), HALF + 22, [214, 196, 150]); }
+    for (let y = 0; y < TRACK_H; y += 24) r(0, y, TRACK_W, 24, (y / 24) % 2 ? gr.a : gr.b); // mowed stripes / wind-blown sand
+    for (let i = 0; i < 900; i++) r(Math.floor(h1(i * 2.3) * TRACK_W), Math.floor(h1(i * 5.9) * TRACK_H), tr.theme === 'desert' ? 2 : 1, tr.theme === 'desert' ? 1 : 2, gr.tuft);
+    // run-off on the outside of the tight corners (sand, or red gravel in the desert)
+    for (const f of tr.runoff) { const p = CL[Math.floor(CL.length * f)]; disc(Math.round(p.x), Math.round(p.y), HALF + 22, gr.run); }
     // curbs (red / white stripes), then the tarmac over them
     CL.forEach((p, i) => disc(Math.round(p.x), Math.round(p.y), HALF + 4, Math.floor(i / 3) % 2 ? CURB_R : CURB_W));
     CL.forEach((p) => disc(Math.round(p.x), Math.round(p.y), HALF, ASPH));
@@ -55,19 +58,25 @@ function bake(): void {
     // grid boxes
     for (let g = 0; g < MAX_RACERS; g++) { const i = (CL.length - 5 - Math.floor(g / 2) * 6 + CL.length) % CL.length, p = CL[i], side = g % 2 ? 1 : -1, x = p.x - p.ty * side * 13, y = p.y + p.tx * side * 13; for (let k = -5; k <= 5; k++) r(Math.round(x - p.ty * k + p.tx * 6), Math.round(y + p.tx * k + p.ty * 6), 1, 1, K.WHITE); }
     // boost pads: yellow chevrons
-    for (const [i0, i1] of PADS) for (let i = i0; i <= i1; i++) { const p = CL[i]; for (let k = -12; k <= 12; k += 1) { const w = Math.abs(k); const x = p.x - p.ty * k - p.tx * (w * 0.4), y = p.y + p.tx * k - p.ty * (w * 0.4); if ((i - i0) % 2 === 0) r(Math.round(x), Math.round(y), 2, 2, [255, 214, 60]); } }
+    for (const [i0, i1] of tr.PADS) for (let i = i0; i <= i1; i++) { const p = CL[i]; for (let k = -12; k <= 12; k += 1) { const w = Math.abs(k); const x = p.x - p.ty * k - p.tx * (w * 0.4), y = p.y + p.tx * k - p.ty * (w * 0.4); if ((i - i0) % 2 === 0) r(Math.round(x), Math.round(y), 2, 2, [255, 214, 60]); } }
     // trees and tyre stacks around the outside (never on the track)
     for (let i = 0; i < 140; i++) {
       const x = 20 + Math.floor(h1(i * 7.7) * (TRACK_W - 40)), y = 20 + Math.floor(h1(i * 3.1 + 2) * (TRACK_H - 40));
       if (CL.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 < (HALF + 30) ** 2)) continue;
       if (i % 5 === 0) { for (let k = 0; k < 3; k++) { disc(x + k * 7, y, 3, [30, 30, 36]); disc(x + k * 7, y, 1, [70, 70, 80]); } continue; }
+      if (tr.theme === 'desert') { // cacti and rocks
+        if (i % 3) { r(x - 2, y - 12, 5, 16, [60, 140, 70]); r(x - 2, y - 12, 1, 16, [90, 170, 90]); r(x - 7, y - 6, 3, 7, [60, 140, 70]); r(x - 7, y - 6, 5, 2, [60, 140, 70]); r(x + 5, y - 9, 3, 6, [60, 140, 70]); r(x + 2, y - 5, 5, 2, [60, 140, 70]); r(x - 3, y + 3, 7, 2, [180, 140, 90]); }
+        else { disc(x, y, 6, [150, 120, 100]); disc(x - 2, y - 2, 3, [180, 150, 126]); }
+        continue;
+      }
       disc(x + 2, y + 3, 9, [40, 90, 44]); disc(x, y, 9, [48, 120, 56]); disc(x - 3, y - 3, 4, [80, 160, 80]);
     }
     // the grandstand by the start straight, with a crowd
     r(22, 280, 44, 120, [120, 120, 136]); for (let y = 284; y < 396; y += 6) for (let x = 26; x < 62; x += 4) r(x, y, 3, 3, CONFETTI[Math.floor(h1(x * 3 + y) * CONFETTI.length)]);
   });
-  MINI = mk(104, 72);
-  withCtx(MINI.getContext('2d')!, () => { r(0, 0, 104, 72, [20, 30, 24]); CL.forEach((p, i) => { if (i % 2 === 0) r(Math.round(p.x / 10), Math.round(p.y / 10), 2, 2, [150, 160, 170]); }); r(Math.round(CL[0].x / 10) - 1, Math.round(CL[0].y / 10), 4, 1, K.WHITE); });
+  const MINI = mk(104, 72);
+  withCtx(MINI.getContext('2d')!, () => { r(0, 0, 104, 72, gr.mini); CL.forEach((p, i) => { if (i % 2 === 0) r(Math.round(p.x / 10), Math.round(p.y / 10), 2, 2, [150, 160, 170]); }); r(Math.round(CL[0].x / 10) - 1, Math.round(CL[0].y / 10), 4, 1, K.WHITE); });
+  const out = { track: TRACK, mini: MINI }; BAKED.set(tr, out); return out;
 }
 
 // ---------- kart sprites: drawn facing right, rotated by nearest-neighbour into 32 headings ----------
@@ -98,7 +107,6 @@ interface Remote { k: KartMsg; t: number; x: number; y: number }
 interface Entry { id: string; name: string; col: RGB; x: number; y: number; a: number; dist: number; fin: number; best: number; me: boolean; cpu: boolean; boost: boolean; drift: boolean }
 
 export function openRace(h: RaceHooks): RaceHandle {
-  if (!TRACK) bake();
   const S = Math.max(1, Math.min(4, Math.floor(Math.min((innerWidth - 40) / VW, (innerHeight - 250) / VH))));
   const cv = mk(VW, VH); cv.style.width = (S < 2 ? innerWidth - 24 : Math.min(VW * S, innerWidth - 24)) + 'px'; // phones: fill the width cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
   const g = cv.getContext('2d')!;
@@ -118,7 +126,7 @@ export function openRace(h: RaceHooks): RaceHandle {
   const remotes = new Map<string, Remote>();
   let kart: Kart | null = null, raceKey = 0, slot = -1, last = performance.now(), lastSend = 0, joinAsk = 0, reported = false, lastBeep = 99;
   const sparks: { x: number; y: number; vx: number; vy: number; t: number; c: RGB }[] = [];
-  let camX = CL[0].x, camY = CL[0].y;
+  let tr: Track = TRACKS[0], camX = tr.CL[0].x, camY = tr.CL[0].y;
 
   const input = (): KartInput => ({
     gas: touch ? !keys.has('ArrowDown') : keys.has('ArrowUp') || keys.has('w'),
@@ -130,14 +138,14 @@ export function openRace(h: RaceHooks): RaceHandle {
   const entries = (rc: RaceState, t: number): Entry[] => {
     const out: Entry[] = [], now = performance.now() / 1000;
     rc.ids.forEach((id, i) => {
-      if (id === h.selfId) { if (kart) out.push({ id, name: h.myName, col: colOf(h.myCol), x: kart.x, y: kart.y, a: kart.a, dist: kartDist(kart), fin: kart.fin, best: kart.best, me: true, cpu: false, boost: kart.boost > 0, drift: kart.drift }); return; }
+      if (id === h.selfId) { if (kart) out.push({ id, name: h.myName, col: colOf(h.myCol), x: kart.x, y: kart.y, a: kart.a, dist: kartDist(tr, kart), fin: kart.fin, best: kart.best, me: true, cpu: false, boost: kart.boost > 0, drift: kart.drift }); return; }
       const rm = remotes.get(id);
-      if (!rm) { const gs = newKart(i); out.push({ id, name: rc.names[i], col: colOf(rc.cols[i]), x: gs.x, y: gs.y, a: gs.a, dist: -0.05, fin: 0, best: 0, me: false, cpu: false, boost: false, drift: false }); return; }
+      if (!rm) { const gs = newKart(tr, i); out.push({ id, name: rc.names[i], col: colOf(rc.cols[i]), x: gs.x, y: gs.y, a: gs.a, dist: -0.05, fin: 0, best: 0, me: false, cpu: false, boost: false, drift: false }); return; }
       const dt = Math.min(0.25, now - rm.t), k = rm.k, px = k.x + Math.cos(k.a) * k.v * dt, py = k.y + Math.sin(k.a) * k.v * dt;
       rm.x += (px - rm.x) * 0.35; rm.y += (py - rm.y) * 0.35;
-      out.push({ id, name: rc.names[i], col: colOf(rc.cols[i]), x: rm.x, y: rm.y, a: k.a, dist: k.c ? k.lap + k.g / CL.length : k.g / CL.length - 1, fin: k.fin, best: k.best, me: false, cpu: false, boost: !!k.b, drift: !!k.d });
+      out.push({ id, name: rc.names[i], col: colOf(rc.cols[i]), x: rm.x, y: rm.y, a: k.a, dist: k.c ? k.lap + k.g / tr.CL.length : k.g / tr.CL.length - 1, fin: k.fin, best: k.best, me: false, cpu: false, boost: !!k.b, drift: !!k.d });
     });
-    for (let s = rc.ids.length; s < MAX_RACERS; s++) { const c = cpuAt(rc.seed, s, t), n = s - rc.ids.length; out.push({ id: 'cpu' + s, name: CPU_NAMES[n], col: CPU_COLS[n], x: c.x, y: c.y, a: c.a, dist: c.dist, fin: c.fin, best: 0, me: false, cpu: true, boost: false, drift: false }); }
+    for (let s = rc.ids.length; s < MAX_RACERS; s++) { const c = cpuAt(tr, rc.seed, s, t), n = s - rc.ids.length; out.push({ id: 'cpu' + s, name: CPU_NAMES[n], col: CPU_COLS[n], x: c.x, y: c.y, a: c.a, dist: c.dist, fin: c.fin, best: 0, me: false, cpu: true, boost: false, drift: false }); }
     return out;
   };
   const standings = (es: Entry[]) => [...es].sort((a, b) => (a.fin && b.fin ? a.fin - b.fin : a.fin ? -1 : b.fin ? 1 : b.dist - a.dist));
@@ -148,13 +156,13 @@ export function openRace(h: RaceHooks): RaceHandle {
     const rc = h.race();
     if (!rc) { draw(null, 0, []); return; }
     const t = Date.now() - rc.t0;
-    if (rc.t0 !== raceKey) { raceKey = rc.t0; kart = null; slot = -1; reported = false; remotes.clear(); againBtn.style.display = 'none'; }
+    if (rc.t0 !== raceKey) { raceKey = rc.t0; tr = trackOf(rc.seed); kart = null; slot = -1; reported = false; remotes.clear(); againBtn.style.display = 'none'; camX = tr.CL[0].x; camY = tr.CL[0].y; }
     slot = rc.ids.indexOf(h.selfId);
     if (slot < 0 && t < 0 && nowP - joinAsk > 1000) { joinAsk = nowP; h.join(rc); }
-    if (slot >= 0 && !kart) kart = newKart(slot);
+    if (slot >= 0 && !kart) kart = newKart(tr, slot);
     const es = entries(rc, t);
     if (kart) {
-      const ev = stepKart(kart, input(), dt, t, es.filter((e) => !e.me).map((e) => ({ x: e.x, y: e.y })));
+      const ev = stepKart(tr, kart, input(), dt, t, es.filter((e) => !e.me).map((e) => ({ x: e.x, y: e.y })));
       engine.set(t < 0 ? 0 : Math.min(1, Math.abs(kart.v) / 124), kart.boost > 0);
       if (ev.boost) { SFX.zap(); }
       if (ev.lap && !ev.finished) { SFX.chime(); }
@@ -181,7 +189,8 @@ export function openRace(h: RaceHooks): RaceHandle {
     withCtx(g, () => {
       g.imageSmoothingEnabled = false;
       const ox = Math.round(Math.max(0, Math.min(TRACK_W - VW, camX - VW / 2))), oy = Math.round(Math.max(0, Math.min(TRACK_H - VH, camY - VH / 2)));
-      g.drawImage(TRACK!, ox, oy, VW, VH, 0, 0, VW, VH);
+      const bk = baked(tr);
+      g.drawImage(bk.track, ox, oy, VW, VH, 0, 0, VW, VH);
       if (!rc) { txtOutlined('WAITING FOR A RACE...', VW / 2 - tw('WAITING FOR A RACE...') / 2, VH / 2, K.WHITE); return; }
       for (const s of sparks) r(Math.round(s.x - ox), Math.round(s.y - oy), 2, 2, s.c);
       const order = standings(es);
@@ -199,7 +208,7 @@ export function openRace(h: RaceHooks): RaceHandle {
       else txt(rc.ids.includes(h.selfId) ? '' : 'JOINING...', 4, 4, [200, 210, 230]);
       if (kart && kart.charge > 0.55) { const c = kart.charge > 1.2 ? [255, 150, 40] as RGB : [90, 200, 255] as RGB; txt('TURBO', 230, 4, c); }
       // the minimap
-      g.drawImage(MINI!, VW - 106, VH - 74); r(VW - 106, VH - 74, 104, 1, [60, 70, 80]);
+      g.drawImage(bk.mini, VW - 106, VH - 74); r(VW - 106, VH - 74, 104, 1, [60, 70, 80]);
       for (const e of es) r(VW - 106 + Math.round(e.x / 10) - 1, VH - 74 + Math.round(e.y / 10) - 1, 3, 3, e.me ? K.GOLD : e.cpu ? [180, 180, 190] : e.col);
       // countdown: five lights, then GO
       if (t < 0) {
@@ -213,12 +222,12 @@ export function openRace(h: RaceHooks): RaceHandle {
         const head = myPos === 1 ? 'YOU WIN!' : 'FINISHED ' + ordinal(myPos); txt(head, VW / 2 - tw(head, 2) / 2, 29, myPos === 1 ? K.GOLD : K.WHITE, 2);
         order.forEach((e, i) => { const y = 44 + i * 11, c: RGB = e.me ? [255, 214, 120] : [220, 226, 240]; txt(ordinal(i + 1), VW / 2 - 84, y, c); txt(e.name.slice(0, 10), VW / 2 - 60, y, c); const tm = e.fin ? raceTime(e.fin) : 'RACING'; txt(tm, VW / 2 + 84 - tw(tm), y, c); });
       } else if (kart && kart.lap === LAPS - 1 && kart.crossed && t > 0 && (t - kart.lapT0) < 2500 && kart.lap > 0) txtOutlined('FINAL LAP!', VW / 2 - tw('FINAL LAP!', 2) / 2, 40, K.GOLD, 2);
-      if (kart && t > 0 && !kart.fin && Math.hypot(kart.x - CL[kart.seg].x, kart.y - CL[kart.seg].y) > HALF + 20) txtOutlined('BACK TO THE TRACK!', VW / 2 - tw('BACK TO THE TRACK!') / 2, VH - 20, [255, 120, 120]);
+      if (kart && t > 0 && !kart.fin && Math.hypot(kart.x - tr.CL[kart.seg].x, kart.y - tr.CL[kart.seg].y) > HALF + 20) txtOutlined('BACK TO THE TRACK!', VW / 2 - tw('BACK TO THE TRACK!') / 2, VH - 20, [255, 120, 120]);
       line(0, 13, VW, 13, [40, 44, 60]);
     });
     PX.dim = pd; PX.emit = pe;
   };
   raf = requestAnimationFrame(step);
-  if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) (window as unknown as Record<string, unknown>).__race = { kart: () => kart, CL }; // test autopilot
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) (window as unknown as Record<string, unknown>).__race = { kart: () => kart, get CL() { return tr.CL; } }; // test autopilot
   return { recv(id, k) { if (k.j || k.r !== raceKey) return; const rm = remotes.get(id); if (rm) { rm.k = k; rm.t = performance.now() / 1000; } else remotes.set(id, { k, t: performance.now() / 1000, x: k.x, y: k.y }); } };
 }
