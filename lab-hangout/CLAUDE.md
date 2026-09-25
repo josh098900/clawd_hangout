@@ -10,6 +10,7 @@ Room map (doors):
                                                                                   ├── red doors → CINEMA
                                                                                   ├── tower door → STAGE
                                                                                   ├── grate → CRYPT
+                                                                                  ├── THE LOFTS door → lobby → elevator → your flat (LIVING ROOM, BEDROOM, KITCHEN) or a neighbour's
                                                                                   ├── right edge → PIER
                                                                                   └── stairs → SUBWAY (Square station) ── train ── PARK station → CITY PARK
                                                                                                                     ├── DINER station → THE GREASY BYTE
@@ -63,7 +64,7 @@ src/
   world/
     room.ts            Room/Door/Prop/Spot types, walkable(); doors with `route` open only sometimes (doorDest())
     lab.ts             THE LAB set (960x680), props, animated bits
-    plaza.ts           THE SQUARE set (1200x780), voxel installations, lamps, benches, cinema front, day/night (wall clock)
+    plaza.ts           THE SQUARE set (1400x780; THE LOFTS apartment block at the right end), voxel installations, lamps, benches, cinema front, day/night (wall clock)
     cinema.ts          THE CINEMA set (1100x720): lobby, concession stand, photo booth, screen + the 80 s film, seats
     den.ts             THE DEV DEN (1000x680): desks, build status screen, kanban, rack, DEPLOY, duck; pomodoro + lightning (wall clock)
     roof.ts            THE ROOFTOP GARDEN (1500x700): topiaries, hammocks, telescope, fireworks (state + hourly), day/night
@@ -86,6 +87,12 @@ src/
                        and the KITCHEN (stations along the back wall, drawn live from DINER.g), ticket rail, time clock, COOKIE
     karts.ts           THE KART TRACK (1300x660, the KARTS stop): pit boxes with 4 karts (E = start / join a race), the
                        grandstand BIG SCREEN (the race live: map + order, from KARTS.live and cpuAt), fastest lap board, FLAGS
+    lofts.ts           THE LOFTS lobby (900x640): mailboxes, the residents' DIRECTORY (LOFTS_INFO.dir), the ELEVATOR ('lift' spots)
+    flat.ts            THE FLATS: three Room objects (flat / flatbed / flatkit) that show whichever flat you're in (FLAT.owner);
+                       applyLayout() rebuilds backdrop, props, seats, blockers and music from the layout; placement rules (fits,
+                       rows, doorways); DECORATE's overlay; the owner's pet roaming (petSpot); HOUSE PARTY lights
+    furniture.ts       the furniture catalogue (FURNITURE: price, size, layer floor/rug/wall, what it does, draw), wallpapers,
+                       floors (prices must match private.furniture in 0014_apartments.sql)
     contest.ts         the hourly fishing contest (:30-:40 UTC): contestClock(), the Pier scoreboard prop
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
@@ -130,6 +137,9 @@ src/
     sandbox.ts         the Park sandbox editor (pile / dig / tower)
     race.ts            a kart race, top down (baked track, rotated pixel sprites, HUD, minimap, results)
     tanks.ts           TANK DUEL: 2 players (or vs the CPU); shooter decides hits, P1 runs the phases (like Pong)
+    decorate.ts        DECORATE mode: the panel (MY STUFF / SHOP / WALLS / FLOORS, DOOR, SAVE, CANCEL), click to place / pick up,
+                       R flips, X puts away; zooms the camera out (Renderer.setScaleCap) so the whole room fits
+    flats.ts           the elevator menu (go home, visit, knock), the knock prompt, the aquarium / trophy cards
     tickets.ts         the Diner's order tickets as a HUD strip during a shift
     quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
@@ -155,7 +165,9 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests) ·
                        0011 weather (private.weather(), rain_water(), the crew quest + DANCE CREW / STORM CHASER badges) ·
                        0012 diner (diner_tip: 1 + score/40, max 5 a shift, 15 a day; the diner quest + HEAD CHEF badge) ·
-                       0013 karts (the kart + tank quests, SPEED DEMON + TANK ACE badges)
+                       0013 karts (the kart + tank quests, SPEED DEMON + TANK ACE badges) ·
+                       0014 apartments (furniture_owned, apartments, my_flat/get_flat/flat_doors/buy_furniture/save_flat/
+                       set_door/flat_party/let_in; public.can_enter_flat gates the flat.<owner> channels and chat)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -202,6 +214,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | diner | room state `diner` (the shift: host, t0, seed, hands, grill, fry, shake, served bitmasks, pts; only its host writes it) + broadcast `cook` `{ id, st }` ("E at station st", the host applies it with `cookAct`); `dinerbest`; RPC `diner_tip(score)` at the end | see game/diner.ts |
 | kart race | room state `race` (host: t0 = GO, seed, ids/names/cols in grid order; others ask to join with a `kart` msg `j: 1`, the host adds them) + broadcast `kart` (your kart, 12 Hz racing, 6-8 with 3-4 racers, 2 Hz on the grid) + `kartbest` (fastest lap per circuit); CPU karts from `cpuAt` | `{ r, x, y, a, v, lap, g, c, fin, best, b, d, j? }` |
 | tank duel | broadcast `tank` ~15/s per side during a match (shells in flight, score, hits landed, P1's phase; vs CPU also the CPU tank) | `{ s, x, y, a, sh, sc, hit, inv, ph?, o?, osc? }` |
+| flats | RPCs `my_flat` (made with a starter kit), `get_flat(owner)` (refused if you may not go in), `flat_doors(ids)`, `buy_furniture(what)`, `save_flat(layout)` (only furniture you own), `set_door`, `flat_party(on)`, `let_in(who)`; channels `hangout:<server>:<room>.<owner>` (joinRoom's `inst`); room state `flat` { n: layout revision, party }; lobby broadcast `flat` { k: knock / in / no / party, to, nm, until } | layout `{ rooms: { liv, bed, kit: { w, f, items: [[id, x, row, flip]] } }, show }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |

@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,7 +25,8 @@ export class SupabaseTransport implements Transport {
   private known = new Map<string, string>();
   private me: PeerState | null = null;
   private srv: RealtimeChannel | null = null;
-  private room: RoomId | null = null;
+  /** The room we are in (a flat carries its owner: flat.<id>). */
+  private room: string | null = null;
   private lobbyCh: RealtimeChannel | null = null;
   private lobbyMe: { name: string; room: RoomId } | null = null;
   private lobbyOn: (people: LobbyPerson[]) => void = () => {};
@@ -137,6 +138,22 @@ export class SupabaseTransport implements Transport {
     const o = await this.rpcJson('catch_fish', {});
     return { fish: String(o.fish ?? ''), rarity: String(o.rarity ?? 'COMMON'), cm: Number(o.cm) || 0, contest: o.contest === true, rank: typeof o.rank === 'number' ? o.rank : null };
   }
+  async myFlat(): Promise<MyFlat> {
+    const o = await this.rpcJson('my_flat', {}), owned: Record<string, number> = {};
+    if (o.owned && typeof o.owned === 'object') for (const [k, v] of Object.entries(o.owned as Record<string, unknown>)) if (typeof v === 'number' && v > 0) owned[k] = v;
+    return { name: '', layout: parseLayout(o.layout), door: parseDoor(o.door), party: typeof o.party === 'number' ? o.party : null, owned, tokens: Number(o.tokens) || 0 };
+  }
+  async getFlat(owner: string): Promise<FlatInfo> { const o = await this.rpcJson('get_flat', { owner }); return { name: cleanName(o.name) || '?', layout: parseLayout(o.layout), door: parseDoor(o.door), party: typeof o.party === 'number' ? o.party : null }; }
+  async flatDoors(ids: string[]): Promise<FlatDoor[]> {
+    if (!ids.length) return [];
+    const { data, error } = await this.sb.rpc('flat_doors', { ids }); if (error) throw new Error(error.message);
+    return (Array.isArray(data) ? data : []).map((d: Record<string, unknown>) => ({ owner: String(d.owner), name: cleanName(d.name) || '?', door: parseDoor(d.door), party: typeof d.party === 'number' ? d.party : null, can: d.can === true }));
+  }
+  async buyFurniture(what: string): Promise<{ tokens: number; n: number }> { const o = await this.rpcJson('buy_furniture', { what }); return { tokens: Number(o.tokens) || 0, n: Number(o.n) || 0 }; }
+  async saveFlat(layout: FlatLayout): Promise<void> { const { error } = await this.sb.rpc('save_flat', { layout }); if (error) throw new Error(error.message); }
+  async setDoor(door: DoorMode): Promise<void> { const { error } = await this.sb.rpc('set_door', { door }); if (error) throw new Error(error.message); }
+  async flatParty(on: boolean): Promise<number | null> { const { data, error } = await this.sb.rpc('flat_party', { on_: on }); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
+  async letIn(who: string): Promise<void> { const { error } = await this.sb.rpc('let_in', { who }); if (error) throw new Error(error.message); }
   async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async contestBoard(): Promise<ContestBoard> {
     const o = await this.rpcJson('contest_board', {});
@@ -212,14 +229,15 @@ export class SupabaseTransport implements Transport {
     if (error) console.warn('[profiles] save failed', error.message);
   }
 
-  async joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void): Promise<void> {
+  async joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void, inst?: string): Promise<void> {
     await this.leaveRoom();
     this.on = on;
     this.me = me;
     this.known.clear();
     // private channels: only members get in (RLS on realtime.messages, see supabase/migrations/0002_security.sql)
-    this.room = room;
-    const ch = this.sb.channel(this.topic('hangout', room), { config: { private: true, presence: { key: this.selfId }, broadcast: { self: false } } });
+    const key = inst ? room + '.' + inst : room; // a flat's channels belong to its owner
+    this.room = key;
+    const ch = this.sb.channel(this.topic('hangout', key), { config: { private: true, presence: { key: this.selfId }, broadcast: { self: false } } });
 
     ch.on('presence', { event: 'sync' }, () => {
       const state = ch.presenceState() as Record<string, unknown[]>;
@@ -248,7 +266,7 @@ export class SupabaseTransport implements Transport {
 
     this.ch = ch;
     // the server channel: only the database sends here, so the sender id on chat is real
-    const srv = this.sb.channel(this.topic('hangout-srv', room), { config: { private: true } });
+    const srv = this.sb.channel(this.topic('hangout-srv', key), { config: { private: true } });
     srv.on('broadcast', { event: 'chat' }, ({ payload }) => { const v = parseChat(payload); if (v && v.id !== this.selfId) this.on({ type: 'chat', id: v.id, text: v.text }); });
     srv.subscribe();
     this.srv = srv;
@@ -278,6 +296,7 @@ export class SupabaseTransport implements Transport {
         this.lobbyOn(out);
       });
       ch.on('broadcast', { event: 'world' }, ({ payload }) => { const v = parseWorld(payload); if (v && v.id !== this.selfId) this.worldOn({ type: 'world', id: v.id, w: v.w }); });
+      ch.on('broadcast', { event: 'flat' }, ({ payload }) => { const v = parseFlatMsg(payload); if (v && v.id !== this.selfId) this.worldOn({ type: 'flat', id: v.id, f: v.f }); });
       ch.subscribe(async (status) => { if (status === 'SUBSCRIBED' && this.lobbyMe) await ch.track(this.lobbyMe); });
       this.lobbyCh = ch;
     } else void this.lobbyCh?.track(this.lobbyMe);
@@ -287,6 +306,7 @@ export class SupabaseTransport implements Transport {
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
+  sendFlat(f: FlatMsg): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'flat', payload: { id: this.selfId, ...f } }); }
   sendTank(t: TankMsg): void { void this.ch?.send({ type: 'broadcast', event: 'tank', payload: { id: this.selfId, ...t } }); }
   sendKart(k: KartMsg): void { void this.ch?.send({ type: 'broadcast', event: 'kart', payload: { id: this.selfId, ...k } }); }
   sendCook(st: number): void { void this.ch?.send({ type: 'broadcast', event: 'cook', payload: { id: this.selfId, st } }); }

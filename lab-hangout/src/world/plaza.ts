@@ -2,13 +2,15 @@
 // stage are gone; the three voxel creations she built now stand as permanent installations.
 
 import { K, DK, CK, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, txt, alpha, lit, G, Gd, Gline, withCtx, M, shade, tw } from '../engine/pixel';
+import { PX, mk, r, line, txt, alpha, lit, G, Gd, Gline, withCtx, M, shade, tw } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import type { Room, Prop, Spot } from './room';
 import { FILMS, currentFilm } from './cinema';
 import { CASTLE, COASTER, DRAGON, dragonState, placeCreation, VS } from './voxels';
 
-const W = 1200, H = 780, GROUND = 560;
+const W = 1400, H = 780, GROUND = 560;
+/** THE LOFTS, the apartment block at the right end (its door leads to the lobby, world/lofts.ts). */
+export const LOFTS = { x0: 1206, x1: 1394, top: 236, door: { x: 1288, y: 506, w: 30, h: 54 } };
 const CWIN: [number, number, number, number, RGB][] = [];
 const CASTLE_AT: [number, number] = [214, GROUND];
 const COASTER_AT: [number, number] = [760, GROUND];
@@ -100,6 +102,16 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     r(34, 452, 56, 22, [20, 14, 14]); r(35, 453, 54, 20, [32, 22, 20]);
     r(96, 520, 40, 22, [22, 24, 30]); r(98, 522, 36, 18, [24, 30, 44]); r(96, 540, 40, 3, [150, 150, 158]);
     r(146, 380, 6, GROUND - 380, [44, 48, 56]); r(146, 380, 1, GROUND - 380, [70, 74, 84]);
+    // THE LOFTS: a brick apartment block with a fire escape and a canopy over the front door
+    { const L = LOFTS, bw = L.x1 - L.x0, brick: RGB = day ? [178, 92, 76] : [104, 52, 52], mortar: RGB = day ? [150, 120, 110] : [70, 44, 50];
+      r(L.x0, L.top, bw, GROUND - L.top, brick);
+      for (let y = L.top, row = 0; y < GROUND; y += 6, row++) { r(L.x0, y + 5, bw, 1, mortar); for (let x = L.x0 + (row % 2) * 7; x < L.x1; x += 14) r(x, y, 1, 5, mortar); }
+      r(L.x0 - 4, L.top - 6, bw + 8, 8, day ? [120, 110, 110] : [50, 46, 56]); r(L.x0 - 4, L.top - 6, bw + 8, 1, day ? [170, 160, 160] : [90, 84, 100]);
+      for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) { const wx = L.x0 + 14 + i * 36, wy = L.top + 14 + j * 34; if (wy > GROUND - 70) continue; r(wx - 2, wy - 2, 22, 26, mortar); r(wx, wy, 18, 22, day ? [150, 190, 220] : h1(i * 3.7 + j * 1.3) > 0.45 ? [255, 206, 130] : [30, 34, 60]); r(wx + 8, wy, 2, 22, mortar); r(wx - 2, wy + 22, 22, 3, [200, 190, 180]); }
+      for (let j = 0; j < 5; j++) { const fy = L.top + 38 + j * 34; r(L.x1 - 44, fy, 40, 2, [40, 40, 50]); for (let k = 0; k < 8; k++) r(L.x1 - 44 + k * 5, fy - 10, 1, 10, [40, 40, 50]); r(L.x1 - 44, fy - 10, 40, 1, [40, 40, 50]); if (j < 4) line(L.x1 - 42 + (j % 2) * 36, fy, L.x1 - 6 - (j % 2) * 36, fy + 32, [50, 50, 60]); }
+      const D = L.door; r(D.x - 22, D.y - 26, D.w + 44, 10, [30, 60, 50]); r(D.x - 22, D.y - 26, D.w + 44, 2, [60, 110, 90]); for (let k = 0; k < 6; k++) r(D.x - 20 + k * 13, D.y - 16, 6, 3, [30, 60, 50]);
+      r(D.x - 4, D.y - 4, D.w + 8, D.h + 4, [40, 40, 50]); r(D.x, D.y, D.w, D.h, day ? [120, 160, 190] : [40, 60, 80]); r(D.x + D.w / 2 - 1, D.y, 2, D.h, [40, 40, 50]); r(D.x + 11, D.y + 26, 2, 6, K.GOLD); r(D.x + 17, D.y + 26, 2, 6, K.GOLD);
+      r(D.x - 8, GROUND - 3, D.w + 16, 3, [120, 40, 50]); }
     // pavement
     r(0, GROUND, W, H - GROUND, day ? DK.PAVE : K.PAVE);
     for (let yy = GROUND; yy < H; yy += 10) { r(0, yy, W, 1, day ? DK.PAVE2 : K.PAVE2); const off = ((yy - GROUND) / 10) % 2 ? 15 : 0; for (let xx = off; xx < W; xx += 30) r(xx, yy, 1, 10, day ? DK.PAVE2 : K.PAVE2); }
@@ -113,7 +125,7 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     // the stage door in the base of the tower
     r(574, 506, 38, 54, [20, 16, 30]); r(577, 509, 32, 51, [60, 40, 90]); r(577, 509, 32, 2, [90, 64, 130]); r(592, 509, 2, 51, [40, 28, 60]); r(588, 532, 2, 6, K.GOLD); r(596, 532, 2, 6, K.GOLD);
     // signpost at the open right edge: the beach is that way
-    r(1176, 596, 2, 26, K.STEEL_POST); r(1156, 588, 34, 10, [30, 34, 56]); txt('PIER>', 1173 - tw('PIER>') / 2, 590, [255, 214, 90]);
+    r(1376, 596, 2, 26, K.STEEL_POST); r(1356, 588, 34, 10, [30, 34, 56]); txt('PIER>', 1373 - tw('PIER>') / 2, 590, [255, 214, 90]);
     // the grate down to the Crypt
     r(1100, 684, 40, 14, [20, 22, 30]); for (let x = 1102; x < 1140; x += 5) r(x, 684, 2, 14, [70, 74, 88]); r(1100, 684, 40, 2, [90, 94, 110]); r(1100, 696, 40, 2, [50, 54, 66]);
     r(1146, 660, 2, 38, K.STEEL_POST); r(1140, 652, 30, 10, [30, 34, 56]); txt('CRYPT', 1155 - tw('CRYPT') / 2, 654, [124, 242, 208]);
@@ -133,6 +145,9 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
 
 function drawBack(a: number): void {
   const day = dayness();
+  // THE LOFTS sign over the canopy (it flickers now and then)
+  { const D = LOFTS.door, cx = D.x + D.w / 2, s = 'THE LOFTS', on = (a * 1.3) % 11 > 0.25; r(cx - 34, D.y - 46, 68, 16, [30, 24, 40]);
+    lit(() => txt(s, cx - tw(s) / 2, D.y - 41, on ? [124, 242, 208] : [40, 80, 70])); if (on) G(cx - 34, D.y - 46, 68, 16, [124, 242, 208], 0.18); }
   // dawn and dusk: a warm wash over the sky and skyline
   if (day > 0.01 && day < 0.99) alpha(0.28 * Math.sin(Math.PI * day), () => r(0, 0, W, GROUND, [255, 140, 90]));
   // the stage sign over the tower door
@@ -260,7 +275,8 @@ export function makePlaza(): Room {
     ],
     doors: [
       { trigger: { x0: 42, y0: 570, x1: 82, y1: 578 }, to: 'lab', arrive: { x: 30, y: 456 }, label: 'THE LAB', area: { x0: 34, y0: 448, x1: 90, y1: 576 } },
-      { trigger: { x0: 1184, y0: 600, x1: 1194, y1: 712 }, edge: true, to: 'pier', arrive: { x: 40, y: 620 }, label: 'PIER', area: { x0: 1168, y0: 580, x1: 1200, y1: 712 } },
+      { trigger: { x0: 1384, y0: 600, x1: 1394, y1: 712 }, edge: true, to: 'pier', arrive: { x: 40, y: 620 }, label: 'PIER', area: { x0: 1368, y0: 580, x1: 1400, y1: 712 } },
+      { trigger: { x0: 1288, y0: 570, x1: 1318, y1: 578 }, to: 'lofts', arrive: { x: 90, y: 520 }, label: 'THE LOFTS', area: { x0: 1282, y0: 480, x1: 1324, y1: 576 } },
       { trigger: { x0: 578, y0: 570, x1: 608, y1: 578 }, to: 'stage', arrive: { x: 40, y: 500 }, label: 'STAGE', area: { x0: 572, y0: 494, x1: 614, y1: 576 } },
       { trigger: { x0: 1102, y0: 684, x1: 1138, y1: 694 }, to: 'crypt', arrive: { x: 40, y: 470 }, label: 'CRYPT', area: { x0: 1096, y0: 648, x1: 1172, y1: 698 } },
       { trigger: { x0: 742, y0: 686, x1: 778, y1: 702 }, edge: true, to: 'subway', arrive: { x: 60, y: 640 }, label: 'SUBWAY', area: { x0: 730, y0: 612, x1: 810, y1: 708 } },

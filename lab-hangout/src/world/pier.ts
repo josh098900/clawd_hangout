@@ -104,7 +104,7 @@ export function makePier(): Room {
       { x0: 456, y0: 632, x1: 484, y1: 642 }, // cooler
       { x0: 116, y0: 572, x1: 132, y1: 580 }, { x0: 1016, y0: 612, x1: 1032, y1: 620 }, // palms
     ],
-    doors: [{ trigger: { x0: 6, y0: 556, x1: 16, y1: 690 }, edge: true, to: 'plaza', arrive: { x: 1168, y: 640 }, label: 'SQUARE', area: { x0: 0, y0: 548, x1: 30, y1: 700 } }],
+    doors: [{ trigger: { x0: 6, y0: 556, x1: 16, y1: 690 }, edge: true, to: 'plaza', arrive: { x: 1368, y: 640 }, label: 'SQUARE', area: { x0: 0, y0: 548, x1: 30, y1: 700 } }],
     spots: PIER_SPOTS, inUse: new Map(),
     spawn: { x: 60, y: 620 },
     dim: 0.12,

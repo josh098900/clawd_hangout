@@ -27,10 +27,12 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 ---
 
 ## Progress
-Steps 1-8 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
-weather + group dances, the Diner + COOKIE's tour; migrations 0007-0012). **Step 9, the Kart Track
-and the tank duel, is built** (migration `0013_karts.sql`: quests + badges), waiting for Josh's live
-check. Then step 10, apartments (it will use migration 0014, not the number written below).
+Steps 1-9 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
+weather + group dances, the Diner, the Kart Track + tank duel; migrations 0007-0013). **Step 10,
+THE LOFTS (apartments), is built** with migration `0014_apartments.sql`: Josh chose a block on the
+Square, several rooms (living room, bedroom, kitchen), per-door access (locked / friends / open), and
+all four extras (fish tank, trophy cabinet, house parties, the pet at home). Next: step 11, the
+Space Station.
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

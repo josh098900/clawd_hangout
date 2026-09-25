@@ -35,6 +35,8 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   diner: { text: 'Work a kitchen shift at the Diner', goal: 1 },
   kart: { text: 'Finish a race at the Kart Track', goal: 1 },
   tank: { text: 'Win a TANK DUEL at the Arcade', goal: 1 },
+  home: { text: 'Decorate your flat in THE LOFTS', goal: 1 },
+  visit: { text: "Visit someone else's flat", goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -54,6 +56,8 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'chef', name: 'HEAD CHEF', hint: 'Score 120 points in one Diner shift', earned: () => stat('dinerBest') >= 120 },
   { id: 'racer', name: 'SPEED DEMON', hint: 'Win 5 kart races', earned: () => stat('kartWins') >= 5 },
   { id: 'ace', name: 'TANK ACE', hint: 'Win 5 tank duels', earned: () => stat('tankWins') >= 5 },
+  { id: 'homeowner', name: 'HOMEOWNER', hint: 'Buy 15 pieces of furniture', earned: () => stat('furniture') >= 15 },
+  { id: 'host', name: 'PARTY HOST', hint: 'Throw a house party', earned: () => stat('parties') >= 1 },
   { id: 'storm', name: 'STORM CHASER', hint: 'Catch a fish in a thunderstorm', earned: () => stat('stormFish') >= 1 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;

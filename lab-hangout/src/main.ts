@@ -25,6 +25,10 @@ import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
 import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
 import { makeKarts, KARTS } from './world/karts';
+import { makeLofts, LOFTS_INFO } from './world/lofts';
+import { FLAT, FLAT_ROOMS, applyLayout, drawEditOverlay, flatTitle, isFlat, makeFlatRoom, partyOn, petSpot, roomLayout, type FlatRoomId } from './world/flat';
+import { closeDecorate, decorating, openDecorate } from './ui/decorate';
+import { knockPrompt, openLift, openShow } from './ui/flats';
 import { openRace, type RaceHandle } from './ui/race';
 import { LOBBY_S, MAX_RACERS, RACE_MAX_S, TRACKS, ordinal, raceTime, trackOf } from './game/kart';
 import { TOUR, BURNT, isBurnt, retryStep, type TourStep } from './game/dinertour';
@@ -58,7 +62,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type RaceState, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -89,7 +93,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit') };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -138,7 +142,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -151,6 +155,7 @@ function applyState(s: StateMsg): boolean {
   }
   if (cur && cur.ts >= s.ts) return false;
   m.set(s.k, s);
+  if (s.k === 'flat' && isFlat(room.id)) { FLAT.party = s.v.party; if (s.v.n > flatRev) { flatRev = s.v.n; if (!FLAT.mine) void recheckFlat(); } }
   const prevBuild = DEN_INFO.build;
   room.onState?.(s);
   // someone else's fresh commit / deploy in the Den: show it and make some noise
@@ -217,7 +222,7 @@ function onNet(e: NetEvent): void {
     }
     case 'state': if (allow(e.id, 'state', 6, 12)) applyState(e.s); break;
     case 'note': {
-      const av = others.get(e.id); if (!av || room.id !== 'stage' || !allow(e.id, 'note', 14, 20)) break;
+      const av = others.get(e.id); if (!av || (room.id !== 'stage' && !isFlat(room.id)) || !allow(e.id, 'note', 14, 20)) break;
       av.noteT = t; stageNote(e.i, e.n); noteSpark(av, e.i); if (!muted.has(e.id)) playPad(e.i, e.n, 0.8);
       break;
     }
@@ -361,6 +366,8 @@ async function switchServer(): Promise<void> {
 // ---------- rooms ----------
 async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
   if (room.id === 'diner' && id !== 'diner') { endTour(false); leaveKitchen(); } // (while the others are still here to hand over to)
+  if (decorating() && !isFlat(id)) closeDecorate(true); // walked out while decorating: keep it
+  if (isFlat(id) && FLAT.owner !== flatSeen) { flatSeen = FLAT.owner; for (const f of FLAT_ROOMS) { roomState[f].clear(); FLAT.juke[f] = { n: -1, t0: 0 }; } } // a different flat
   switching = true;
   tapTarget = null;
   await fade(true);
@@ -376,7 +383,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   if (me.hold === HOLD_KITE && id !== 'park') me.hold = 0; // (the kite goes back on the stand)
   R.follow(me.x, me.y, room.w, room.h, 0, true);
   try {
-    await net.joinRoom(id, peerState(), onNet);
+    await net.joinRoom(id, peerState(), onNet, isFlat(id) ? FLAT.owner : undefined);
   } catch (err) {
     console.error(err);
     toast('Could not join room: ' + (err instanceof Error ? err.message : String(err)), 5000);
@@ -384,6 +391,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   bots?.spawn(room);
   net.setLobby(me.name, id);
   updateCount();
+  if (isFlat(id)) { room.title = flatTitle(); if (!FLAT.mine) void recheckFlat(); }
   showPlate(id, room.sub, room.title, now());
   doorCooldown = 0.8;
   forceSend = true;
@@ -448,6 +456,7 @@ const imIn = (g: GameState): boolean => { const i = g.ids.indexOf(net.selfId); r
 let hs: HideSeek | null = null, hsSent = 0, hsKey = '';
 function setHS(h: HideSeek): void { const prev = hs; hs = h; hsSent = now(); net.sendWorld(h); onHS(prev, h); }
 function onWorld(e: NetEvent): void {
+  if (e.type === 'flat') { onFlatMsg(e.id, e.f); return; }
   if (e.type !== 'world' || !allow(e.id, 'world', 3, 6)) return;
   const w = e.w, live = hsLive(hs, net.selfId);
   // during a round only the seeker's browser speaks for it; between rounds anyone can start one
@@ -535,6 +544,18 @@ function useSpot(i: number): void {
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
   if (s.kind === 'shift') { clockIn(); return; }
+  if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.flatDoors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.myFlat().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
+  if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
+  if (s.kind === 'flatparty') {
+    if (!FLAT.mine) { toast((partyOn() ? 'The party is ON! ' : 'Only ' + FLAT.name + ' can start a party here'), 2500); return; }
+    const on = !partyOn();
+    net.flatParty(on).then((u) => {
+      FLAT.party = u; setState({ k: 'flat', v: { n: flatRev, party: u } });
+      if (on) { net.sendFlat({ k: 'party', nm: me.name, until: u ?? 0 }); quests.stat('parties'); SFX.score(); toast('HOUSE PARTY! Everyone on the server has been told. 30 minutes of fun!', 5000); }
+      else toast('Party over. Time to tidy up');
+    }).catch((e) => toast(errText(e)));
+    return;
+  }
   if (s.kind === 'cook') { cook(s.n ?? 0); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
@@ -782,7 +803,8 @@ function playerCard(o: Avatar): void {
     following = o.id; followT = 0; toast('Following ' + o.name + ' (walk to stop)', 2500); SFX.blip();
   }, true);
   const chips = document.createElement('div'); net.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
-  m.body.append(chips, note, row(wave, follow, mute, report, button('CLOSE', m.close, true)));
+  const flat = button('VISIT FLAT', () => { m.close(); net.flatDoors([o.id]).then(([d]) => { if (!d) toast(o.name + " hasn't moved into THE LOFTS yet"); else if (d.can) void visitFlat(o.id); else knockOn(o.id, o.name); }).catch((e) => toast(errText(e))); }, true);
+  m.body.append(chips, note, row(wave, follow, flat), row(mute, report, button('CLOSE', m.close, true)));
 }
 // ---------- follow a player (even through doors) ----------
 let following: string | null = null, followT = 0;
@@ -1325,6 +1347,7 @@ function render(a: number, t: number): void {
   if (playing) { drawDoorHints(a); drawActionHint(a, actNow); if (tour && room.id === 'diner') drawTourArrow(a); }
   for (const c of crews) drawCrewTag(c);
   room.drawFront?.(a);
+  if (FLAT.edit && isFlat(room.id)) drawEditOverlay(room.id, a);
   if (outdoors) drawWeather(room, R.cam, a, 1 - dayness());
   PX.gmul = 1;
   R.present(room.w, room.h, room.fillTop, room.fillLow);
@@ -1506,6 +1529,105 @@ function useKart(i: number): void {
   });
 }
 
+// ---------- THE LOFTS and the flats (world/lofts.ts, world/flat.ts, ui/decorate.ts, ui/flats.ts) ----------
+let flatSeen = '', flatRev = 0, dirAt = 0;
+const flatRooms = () => ({ flat: ROOMS.flat, flatbed: ROOMS.flatbed, flatkit: ROOMS.flatkit });
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** Up the elevator to your own flat. */
+async function goHome(): Promise<void> {
+  try {
+    const f = await net.myFlat();
+    const fresh = !Object.values(f.layout.rooms).some((r) => r && r.items.length);
+    if (fresh) f.layout.rooms = { // move-in day: the starter kit, set out
+      liv: { w: 'wall0', f: 'floor0', items: [['rug', 480, 1, 0], ['armchair', 420, 0, 0], ['lamp', 360, 0, 0], ['plant', 620, 0, 0]].filter((it) => (f.owned[it[0] as string] ?? 0) > 0) as FlatItem[] },
+      bed: { w: 'wall1', f: 'floor1', items: [['bed', 200, 0, 0]].filter((it) => (f.owned[it[0] as string] ?? 0) > 0) as FlatItem[] },
+      kit: { w: 'wall0', f: 'floor0', items: [] }, // (only free wallpapers and floors: the rest are bought)
+    };
+    Object.assign(FLAT, { owner: net.selfId, name: me.name, layout: f.layout, door: f.door, party: f.party, mine: true, owned: f.owned });
+    setTokens(f.tokens); applyLayout(flatRooms());
+    if (fresh) net.saveFlat(f.layout).catch((e) => console.warn('[flat]', e));
+    await enterRoom('flat', { x: 52, y: 500 });
+    void updateShow();
+    toast(fresh ? 'Welcome to your new flat! Press DECORATE to make it yours' : 'Home sweet home', 4000);
+  } catch (e) { toast(errText(e)); }
+}
+/** Into someone's flat (if they'd let you). */
+async function visitFlat(owner: string): Promise<void> {
+  if (owner === net.selfId) { void goHome(); return; }
+  try {
+    const f = await net.getFlat(owner);
+    Object.assign(FLAT, { owner, name: f.name, layout: f.layout, door: f.door, party: f.party, mine: false, owned: {} });
+    applyLayout(flatRooms());
+    await enterRoom('flat', { x: 52, y: 500 });
+    quests.bump('visit');
+  } catch (e) { toast(errText(e)); }
+}
+/** A visitor walking between rooms (or told something changed): fetch the flat again. */
+async function recheckFlat(): Promise<void> {
+  try { const f = await net.getFlat(FLAT.owner); const same = JSON.stringify(f.layout) === JSON.stringify(FLAT.layout); Object.assign(FLAT, { door: f.door, party: f.party }); if (!same) { FLAT.layout = f.layout; applyLayout(flatRooms()); } }
+  catch { /* (the door may have been locked since: you can stay till you leave) */ }
+}
+function knockOn(owner: string, name: string): void {
+  net.sendFlat({ k: 'knock', to: owner, nm: me.name }); SFX.dingdong();
+  toast('You knocked on ' + name + "'s door. Wait for them to answer...", 4000);
+}
+function onFlatMsg(from: string, f: import('./net/transport').FlatMsg): void {
+  if (!allow(from, 'flat', 1, 3)) return;
+  if (f.k === 'knock' && f.to === net.selfId) {
+    SFX.dingdong();
+    knockPrompt(f.nm, () => { net.letIn(from).then(() => net.sendFlat({ k: 'in', to: from, nm: me.name })).catch((e) => toast(errText(e))); }, () => net.sendFlat({ k: 'no', to: from, nm: me.name }));
+  } else if (f.k === 'in' && f.to === net.selfId) { toast(f.nm + ' let you in!', 2500); void visitFlat(from); }
+  else if (f.k === 'no' && f.to === net.selfId) toast(f.nm + " can't have visitors right now", 3000);
+  else if (f.k === 'party' && (f.until ?? 0) > Date.now() / 1000) { SFX.join(); toast(f.nm + ' is throwing a HOUSE PARTY! Go to THE LOFTS (the right end of the Square) and take the elevator', 6500); dirAt = 0; }
+}
+/** Your fish, badges and records, for the aquarium and the trophy cabinet (saved with the flat when they change). */
+async function updateShow(): Promise<void> {
+  if (!FLAT.mine) return;
+  const st = save.data.stats, show = { fish: save.data.fish.slice(0, 30), badges: [...quests.mine].slice(0, 40), best: { diner: st.dinerBest ?? 0, kart: st.kartWins ?? 0, tank: st.tankWins ?? 0, pong: st.pongWins ?? 0 } };
+  if (JSON.stringify(show) === JSON.stringify(FLAT.layout.show)) return;
+  FLAT.layout.show = show;
+  try { await net.saveFlat(FLAT.layout); } catch (e) { console.warn('[flat]', e); }
+}
+function startDecorating(): void {
+  if (!FLAT.mine || !isFlat(room.id)) return;
+  const view = $<HTMLCanvasElement>('#view');
+  openDecorate({
+    room: () => (isFlat(room.id) ? room.id : null),
+    buy: async (id) => { try { const r = await net.buyFurniture(id); FLAT.owned[id] = r.n; setTokens(r.tokens); SFX.chime(); quests.stat('furniture'); return true; } catch (e) { toast(errText(e)); SFX.blip(); return false; } },
+    save: async () => {
+      try { await net.saveFlat(FLAT.layout); setState({ k: 'flat', v: { n: Date.now(), party: FLAT.party } }); toast('Saved! Looking good', 2500); SFX.score(); quests.bump('home'); return true; }
+      catch (e) { toast(errText(e)); return false; }
+    },
+    door: () => FLAT.door,
+    setDoor: async (d) => { try { await net.setDoor(d); FLAT.door = d; toast(d === 'locked' ? 'Door locked: people knock and you let them in' : d === 'friends' ? 'Friends can walk right in' : 'Open house: anyone on this server can visit', 3500); } catch (e) { toast(errText(e)); } },
+    toWorld: (cx, cy) => { const rc = view.getBoundingClientRect(); return R.toWorld(cx - rc.left, cy - rc.top); },
+    changed: () => applyLayout(flatRooms()),
+    toast: (t) => toast(t, 2500),
+    onClose: () => { syncDecoBtn(); },
+  });
+  syncDecoBtn();
+}
+const decoBtn = document.createElement('button');
+decoBtn.type = 'button'; decoBtn.className = 'pill'; decoBtn.textContent = 'DECORATE'; decoBtn.style.display = 'none';
+decoBtn.addEventListener('click', () => { if (decorating()) closeDecorate(true); else startDecorating(); });
+function syncDecoBtn(): void {
+  const show = playing && FLAT.mine && isFlat(room.id);
+  decoBtn.style.display = show && !decorating() ? '' : 'none';
+}
+/** Each frame: the directory in the lobby, the owner's pet roaming the flat, the party. */
+function flatStep(): void {
+  syncDecoBtn();
+  if (room.id === 'lofts' && playing && Date.now() - dirAt > 8000) {
+    dirAt = Date.now();
+    const ppl = [...lobby.map((p) => ({ id: p.id, name: p.name, room: p.room })), { id: net.selfId, name: me.name, room: room.id }];
+    net.flatDoors(ppl.map((p) => p.id)).then((ds) => { LOFTS_INFO.dir = ds.map((d) => ({ name: ppl.find((p) => p.id === d.owner)?.name ?? d.name, door: d.door, party: !!d.party && d.party > Date.now() / 1000, home: isFlat(ppl.find((p) => p.id === d.owner)?.room ?? 'lab') })).sort((a, b) => Number(b.party) - Number(a.party) || Number(b.home) - Number(a.home)); }).catch(() => {});
+  }
+  // the owner's pet has the run of the place
+  const owner = isFlat(room.id) ? (FLAT.mine ? me : others.get(FLAT.owner)) : null;
+  me.petGoal = null; for (const o of others.values()) o.petGoal = null;
+  if (owner && owner.look.pet) owner.petGoal = petSpot(room.id as FlatRoomId, owner.seed * 1000);
+}
+
 // ---------- COOKIE's tour of the kitchen (game/dinertour.ts) ----------
 /** The tour: which step, the private practice kitchen, when this step started, and the step to go back to after a burn. */
 let tour: { step: number; g: DinerState; t0: number; said: string; back: number } | null = null;
@@ -1513,6 +1635,7 @@ const skipBtn = document.createElement('button');
 skipBtn.type = 'button'; skipBtn.className = 'pill'; skipBtn.textContent = 'SKIP TOUR'; skipBtn.style.display = 'none';
 skipBtn.addEventListener('click', () => { endTour(true); toast('Tour skipped. TALK to COOKIE any time to see it again', 3500); });
 emoteBar.appendChild(skipBtn);
+emoteBar.appendChild(decoBtn);
 const tourStepNow = (): TourStep => (tour && tour.back >= 0 ? BURNT : TOUR[tour?.step ?? 0]);
 function startTour(again = false): void {
   if (tour || shiftLive(DINER.g)) return;
@@ -1626,7 +1749,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
@@ -1635,7 +1758,7 @@ function frame(nowMs: number): void {
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
     syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
-    const gm = g && partyMusic(g);
+    const gm = (g && partyMusic(g)) || (isFlat(room.id) && partyOn());
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
     const mu = room.music, cur = mu?.current();
     jukebox.set(mu && cur && cur.n >= 0 ? mu.tracks[cur.n] : null, cur?.t0 ?? 0);
@@ -1666,7 +1789,12 @@ function frame(nowMs: number): void {
     filmScore.volume(room.id === 'cinema' && filmPlaying() && !g ? (me.x > 400 ? 0.8 : 0.35) : 0); filmScore.tick();
     // seated somewhere with a view (the cinema), the camera pans up to frame it
     const view = room.watch && usingOf(me) === 'sit' ? room.watch : null;
-    R.follow(view ? view.x : me.x, me.y, room.w, room.h, dt, false, view?.top);
+    // decorating: zoom out so the whole flat (wall pieces down to the front row: y 320-590) fits between the panel and the chat box
+    if (decorating()) {
+      const panel = $('#deco').getBoundingClientRect().bottom, avail = (R.cssH - panel - 56) * R.dpr, sc = Math.max(1, Math.floor(avail / 275));
+      R.setScaleCap(sc);
+      R.follow(me.x, me.y, room.w, room.h, dt, false, 318 - (panel * R.dpr) / R.cam.sc);
+    } else { R.setScaleCap(null); R.follow(view ? view.x : me.x, me.y, room.w, room.h, dt, false, view?.top); }
     render(t, t);
   } catch (err) { console.error(err); }
 }
@@ -1759,6 +1887,7 @@ addEventListener('pagehide', () => { void net.leaveRoom(); net.leaveSeat(); });
 addEventListener('resize', () => { updateCount(); syncQuestPill(); });
 // Dev-only test hook (npm run dev + ?debug): lets scripts teleport and use things without walking.
 if (import.meta.env.DEV && params.has('debug')) {
+  (window as unknown as Record<string, unknown>).__R = R;
   (window as unknown as Record<string, unknown>).__hangout = {
     get me() { return me; }, get room() { return room.id; },
     go: (id: RoomId, x?: number, y?: number) => enterRoom(id, x !== undefined && y !== undefined ? { x, y } : null),
@@ -1771,6 +1900,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     talkCookie: () => { const n = npcs.byId('npc-cookie'); if (n) talkTo(n); },
     tour: () => (tour ? { step: tour.step, back: tour.back, bar: tourStepNow().bar } : null), tourDone: () => !!save.data.stats.dinerTour,
     race: () => KARTS.race, kartLive: () => [...KARTS.live.entries()].map(([id, v]) => [id, v.k.lap, v.k.g, v.k.fin]),
+    flat: () => FLAT,
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },

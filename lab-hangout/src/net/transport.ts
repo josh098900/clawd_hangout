@@ -53,7 +53,8 @@ export type StateVal =
   | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
   | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string }
   | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } }
-  | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] };
+  | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] }
+  | { k: 'flat'; v: { n: number; party: number | null } };
 /** The fastest lap on each circuit (index = track, see game/kart.ts TRACKS), or null. */
 export type KartRecord = { name: string; ms: number } | null;
 export type StateMsg = StateVal & { ts: number };
@@ -76,8 +77,54 @@ export type NetEvent =
   | { type: 'cook'; id: string; st: number }
   | { type: 'kart'; id: string; k: KartMsg }
   | { type: 'tank'; id: string; t: TankMsg }
+  | { type: 'flat'; id: string; f: FlatMsg }
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'status'; text: string };
+
+/** Flats: whose door is how open, and the layout (all from the database). */
+export type DoorMode = 'locked' | 'friends' | 'open';
+export type FlatRoomKey = 'liv' | 'bed' | 'kit';
+/** A placed piece: [furniture id, centre x, row (-1 wall, 0 back, 1 middle, 2 front), flipped 0/1]. */
+export type FlatItem = [string, number, number, number];
+export interface FlatRoomLayout { w: string; f: string; items: FlatItem[] }
+/** The owner's things on show (the fish tank, the trophy cabinet). */
+export interface FlatShow { fish: string[]; badges: string[]; best: Record<string, number> }
+export interface FlatLayout { rooms: Partial<Record<FlatRoomKey, FlatRoomLayout>>; show: FlatShow }
+export interface FlatInfo { name: string; layout: FlatLayout; door: DoorMode; party: number | null }
+export interface MyFlat extends FlatInfo { owned: Record<string, number>; tokens: number }
+export interface FlatDoor { owner: string; name: string; door: DoorMode; party: number | null; can: boolean }
+/** On the lobby channel: knock on `to`'s door; 'in' / 'no' = their answer; 'party' = a HOUSE PARTY until `until` (epoch s). */
+export interface FlatMsg { k: 'knock' | 'in' | 'no' | 'party'; to?: string; nm: string; until?: number }
+/** Layouts come from other players' saves: check everything. */
+export function parseLayout(v: unknown): FlatLayout {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>, rooms: FlatLayout['rooms'] = {};
+  const ro = (o.rooms && typeof o.rooms === 'object' ? o.rooms : {}) as Record<string, unknown>;
+  for (const k of ['liv', 'bed', 'kit'] as FlatRoomKey[]) {
+    const x = ro[k] as Record<string, unknown> | undefined; if (!x || typeof x !== 'object') continue;
+    const w = typeof x.w === 'string' && /^wall[0-9]$/.test(x.w) ? x.w : 'wall0', f = typeof x.f === 'string' && /^floor[0-9]$/.test(x.f) ? x.f : 'floor0';
+    const items: FlatItem[] = [];
+    if (Array.isArray(x.items)) for (const it of x.items.slice(0, 40)) {
+      if (!Array.isArray(it) || typeof it[0] !== 'string' || !/^[a-z0-9]{1,10}$/.test(it[0]) || typeof it[1] !== 'number' || !Number.isFinite(it[1]) || typeof it[2] !== 'number') continue;
+      items.push([it[0], Math.max(0, Math.min(1400, Math.round(it[1]))), Math.max(-1, Math.min(2, Math.round(it[2]))), it[3] === 1 ? 1 : 0]);
+    }
+    rooms[k] = { w, f, items };
+  }
+  const sh = (o.show && typeof o.show === 'object' ? o.show : {}) as Record<string, unknown>;
+  const strs = (a: unknown, n: number, len: number) => (Array.isArray(a) ? a.filter((s): s is string => typeof s === 'string' && s.length <= len).slice(0, n) : []);
+  const best: Record<string, number> = {};
+  if (sh.best && typeof sh.best === 'object') for (const [k2, v2] of Object.entries(sh.best as Record<string, unknown>).slice(0, 12)) if (/^[a-z0-9]{1,12}$/.test(k2) && typeof v2 === 'number' && Number.isFinite(v2)) best[k2] = v2;
+  return { rooms, show: { fish: strs(sh.fish, 30, 24), badges: strs(sh.badges, 40, 12), best } };
+}
+export const DOORS: DoorMode[] = ['locked', 'friends', 'open'];
+export const parseDoor = (v: unknown): DoorMode => (DOORS.includes(v as DoorMode) ? v as DoorMode : 'locked');
+export function parseFlatMsg(p: unknown): { id: string; f: FlatMsg } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id) || !['knock', 'in', 'no', 'party'].includes(o.k as string)) return null;
+  const f: FlatMsg = { k: o.k as FlatMsg['k'], nm: cleanName(o.nm) || '?' };
+  if (o.to !== undefined) { if (!isId(o.to)) return null; f.to = o.to; }
+  if (o.until !== undefined) { const u = num(o.until, 0, 1e11); if (u === null) return null; f.until = u; }
+  return { id: o.id, f };
+}
 
 /**
  * A kart race at the Kart Track (room state 'race', written by whoever started it): when it goes
@@ -200,7 +247,8 @@ export interface Transport {
   claimDaily(): Promise<number | null>;
   loadProfile(): Promise<{ name: string; look: Look } | null>;
   saveProfile(name: string, look: Look): Promise<void>;
-  joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void): Promise<void>;
+  /** `inst` = whose flat, for the flat rooms (their channels are per owner: hangout:<server>:flat.<owner>). */
+  joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void, inst?: string): Promise<void>;
   leaveRoom(): Promise<void>;
   /** Re-announce name/look (after editing your look). */
   updateMe(me: PeerState): void;
@@ -217,6 +265,22 @@ export interface Transport {
   sendCook(st: number): void;
   /** The Kart Track: your kart, ~12 times a second while racing (see ui/race.ts). */
   sendKart(k: KartMsg): void;
+  // ---- flats (supabase/migrations/0014_apartments.sql) ----
+  /** Your flat (made with a starter kit the first time) and the furniture you own. */
+  myFlat(): Promise<MyFlat>;
+  /** Someone's flat, if you may go in (throws "the door is locked" if not). */
+  getFlat(owner: string): Promise<FlatInfo>;
+  /** Door status for these players (the lobby directory). */
+  flatDoors(ids: string[]): Promise<FlatDoor[]>;
+  buyFurniture(what: string): Promise<{ tokens: number; n: number }>;
+  saveFlat(layout: FlatLayout): Promise<void>;
+  setDoor(door: DoorMode): Promise<void>;
+  /** Start (true) or stop a HOUSE PARTY; returns when it ends (epoch s) or null. */
+  flatParty(on: boolean): Promise<number | null>;
+  /** Let someone who knocked in (30 minutes). */
+  letIn(who: string): Promise<void>;
+  /** A knock / an answer / a party announcement, on the server's lobby channel. */
+  sendFlat(f: FlatMsg): void;
   /** The Arcade's TANK DUEL: your tank ~15 times a second during a match (see ui/tanks.ts). */
   sendTank(t: TankMsg): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
@@ -334,6 +398,7 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     return name && typeof wins === 'number' && Number.isInteger(wins) && wins >= 1 && wins <= 9999 ? { id: o.id, s: { k: 'champ', v: { name, wins }, ts } } : null;
   }
   if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
+  if (o.k === 'flat' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13), party = v.party === null ? null : num(v.party, 0, 1e11); return n === null || party === undefined || (v.party !== null && party === null) ? null : { id: o.id, s: { k: 'flat', v: { n, party }, ts } }; }
   if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
   if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
     const recs: KartRecord[] = [];

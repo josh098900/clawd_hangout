@@ -117,6 +117,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 11. `supabase/migrations/0011_weather.sql`: shared weather (rain waters the Rooftop gardens), the group-dance quest and badges
 12. `supabase/migrations/0012_diner.sql`: the Diner's tips (capped), its daily quest and the HEAD CHEF badge
 13. `supabase/migrations/0013_karts.sql`: the Kart Track and TANK DUEL quests and badges
+14. `supabase/migrations/0014_apartments.sql`: THE LOFTS: furniture you buy, your flat's layout, doors (locked / friends / open), house parties, and private flat channels
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

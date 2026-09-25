@@ -78,6 +78,8 @@ export interface Avatar {
   pet: { x: number; y: number; z: number; t: number; dir: 1 | -1 };
   /** In a group dance (game/dance.ts): place in the line and crew size, set every frame. */
   crew?: { rank: number; n: number } | null;
+  /** The pet's own errand (roaming its owner's flat) instead of trailing behind. */
+  petGoal?: { x: number; y: number } | null;
 }
 
 export function makeAvatar(id: string, name: string, look: Look, x: number, y: number, self: boolean, now: number): Avatar {
@@ -276,7 +278,7 @@ function drawMug(cx: number, cy: number, col: RGB, handle: 1 | -1, a: number, se
 const PET_SAY = ['', 'COO', 'MEOW', 'SNIP', 'QUACK', 'BOO', 'SQUEAK'];
 function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   const p = av.pet, dt = Math.min(0.1, Math.max(0, now - p.t)); p.t = now;
-  const tx = av.x - av.dir * 20, ty = av.y + 3, d = Math.hypot(tx - p.x, ty - p.y);
+  const tx = av.petGoal ? av.petGoal.x : av.x - av.dir * 20, ty = av.petGoal ? av.petGoal.y : av.y + 3, d = Math.hypot(tx - p.x, ty - p.y);
   if (d > 300) { p.x = tx; p.y = ty; } // it teleported (a door): so does the pet
   const k = Math.min(1, dt * (d > 60 ? 5 : 3)); p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
   const flies = kind === 1, ghost = kind === 5 || kind === 6;

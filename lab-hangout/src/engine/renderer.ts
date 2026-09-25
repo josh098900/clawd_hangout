@@ -42,6 +42,12 @@ export class Renderer {
     addEventListener('resize', () => this.layout());
   }
 
+  /** A smaller scale than usual (DECORATE mode zooms out to show a whole flat), or null for the normal one. */
+  scaleCap: number | null = null;
+  setScaleCap(sc: number | null): void { if (sc !== this.scaleCap) { this.scaleCap = sc; this.layout(); } }
+  /** The scale layout() would pick with no cap. */
+  baseScale = 1;
+
   layout(): void {
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     const rc = this.stage.getBoundingClientRect();
@@ -50,7 +56,8 @@ export class Renderer {
     this.view.width = Math.max(1, Math.round(this.cssW * this.dpr)); this.view.height = Math.max(1, Math.round(this.cssH * this.dpr));
     // integer device-pixel scale keeps every world pixel a perfect square
     const portrait = this.view.height > this.view.width * 1.2;
-    const sc = Math.max(1, Math.round(Math.min(this.view.height / TARGET_H, this.view.width / (portrait ? TARGET_W_PORTRAIT : TARGET_W))));
+    this.baseScale = Math.max(1, Math.round(Math.min(this.view.height / TARGET_H, this.view.width / (portrait ? TARGET_W_PORTRAIT : TARGET_W))));
+    const sc = this.scaleCap ? Math.max(1, Math.min(this.baseScale, this.scaleCap)) : this.baseScale;
     this.cam.sc = sc;
     this.cam.w = this.view.width / sc;
     this.cam.h = this.view.height / sc;

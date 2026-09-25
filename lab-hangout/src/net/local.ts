@@ -6,26 +6,29 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
+import { PRICE, STARTER } from '../world/furniture';
 import { raining } from '../world/weather';
 import { QUESTS } from '../game/quests';
 import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: RoomId | 'lobby'; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank'; p: Record<string, unknown> };
+type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
+interface LocalFlat { name: string; layout: unknown; door: string; party: number | null; inv?: Record<string, number> }
 const PROFILE_KEY = 'hangout.localProfile';
 
 export class LocalTransport implements Transport {
   readonly mode = 'local' as const;
   readonly selfId: string;
   private bc: BroadcastChannel | null = null;
-  private room: RoomId | null = null;
+  /** The room we're in (a flat carries its owner: flat.<id>). */
+  private room: string | null = null;
   private on: (e: NetEvent) => void = () => {};
   private me: PeerState | null = null;
   private seen = new Map<string, { t: number; sig: string }>();
@@ -235,9 +238,9 @@ export class LocalTransport implements Transport {
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, look })); } catch { /* ignore */ }
   }
 
-  async joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void): Promise<void> {
+  async joinRoom(room: RoomId, me: PeerState, on: (e: NetEvent) => void, inst?: string): Promise<void> {
     await this.leaveRoom();
-    this.room = room; this.on = on; this.me = me; this.seen.clear();
+    this.room = inst ? room + '.' + inst : room; this.on = on; this.me = me; this.seen.clear();
     this.post('hello', this.state());
     clearInterval(this.timer);
     this.timer = window.setInterval(() => {
@@ -301,6 +304,51 @@ export class LocalTransport implements Transport {
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'world', p: { id: this.selfId, ...w } } satisfies Wire); }
+  sendFlat(f: FlatMsg): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'flat', p: { id: this.selfId, ...f } } satisfies Wire); }
+  // ---- LOCAL flats: a pretend database in localStorage (shared by every tab), with 0014's rules ----
+  private flats(v?: Record<string, LocalFlat>): Record<string, LocalFlat> {
+    if (v) { try { localStorage.setItem('labhangout.localFlats', JSON.stringify(v)); } catch { /* ignore */ } return v; }
+    try { return JSON.parse(localStorage.getItem('labhangout.localFlats') || '{}'); } catch { return {}; }
+  }
+  private furn(v?: Record<string, number>): Record<string, number> {
+    const k = 'labhangout.localFurn.' + this.selfId;
+    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
+    try { return JSON.parse(localStorage.getItem(k) || 'null') ?? {}; } catch { return {}; }
+  }
+  private canEnter(owner: string): boolean {
+    if (owner === this.selfId) return true;
+    const f = this.flats()[owner]; if (!f) return false;
+    if (f.door === 'open' || (f.party ?? 0) > Date.now() / 1000 || (f.inv?.[this.selfId] ?? 0) > Date.now()) return true;
+    if (f.door === 'friends') { try { const sv = JSON.parse(localStorage.getItem('labhangout.save.' + owner) || '{}'); return Array.isArray(sv.friends) && sv.friends.some((x: unknown) => Array.isArray(x) && x[0] === this.selfId); } catch { return false; } }
+    return false;
+  }
+  async myFlat(): Promise<MyFlat> {
+    const all = this.flats(); let f = all[this.selfId];
+    if (!f) { f = { name: (await this.loadProfile())?.name ?? 'YOU', layout: {}, door: 'locked', party: null }; all[this.selfId] = f; this.flats(all); if (!Object.keys(this.furn()).length) this.furn({ ...STARTER }); }
+    return { name: f.name, layout: parseLayout(f.layout), door: parseDoor(f.door), party: f.party ?? null, owned: this.furn(), tokens: this.wallet() };
+  }
+  async getFlat(owner: string): Promise<FlatInfo> {
+    const f = this.flats()[owner]; if (!f) throw new Error('they have not moved in yet');
+    if (!this.canEnter(owner)) throw new Error('the door is locked');
+    return { name: f.name, layout: parseLayout(f.layout), door: parseDoor(f.door), party: f.party ?? null };
+  }
+  async flatDoors(ids: string[]): Promise<FlatDoor[]> { const all = this.flats(); return ids.filter((id) => all[id]).map((id) => ({ owner: id, name: all[id].name, door: parseDoor(all[id].door), party: all[id].party ?? null, can: this.canEnter(id) })); }
+  async buyFurniture(what: string): Promise<{ tokens: number; n: number }> {
+    const price = PRICE(what), own = this.furn();
+    if (!price) throw new Error('that one is free'); if ((/^(wall|floor)/.test(what)) && own[what]) throw new Error('you already have that');
+    if (this.wallet() < price) throw new Error('that costs ' + price + ' tokens');
+    this.wallet(this.wallet() - price); own[what] = (own[what] ?? 0) + 1; this.furn(own);
+    return { tokens: this.wallet(), n: own[what] };
+  }
+  async saveFlat(layout: FlatLayout): Promise<void> {
+    const own = this.furn(), used: Record<string, number> = {};
+    for (const rm of Object.values(layout.rooms)) { if (!rm) continue; for (const k of [rm.w, rm.f]) if (PRICE(k) > 0 && !own[k]) throw new Error('you need to buy ' + k + ' first'); for (const it of rm.items) used[it[0]] = (used[it[0]] ?? 0) + 1; }
+    for (const [k, n] of Object.entries(used)) if ((own[k] ?? 0) < n) throw new Error('you only own ' + (own[k] ?? 0) + ' of ' + k);
+    const all = this.flats(); all[this.selfId] = { ...(all[this.selfId] ?? { name: 'YOU', door: 'locked', party: null }), layout }; this.flats(all);
+  }
+  async setDoor(door: DoorMode): Promise<void> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].door = door; this.flats(all); }
+  async flatParty(on: boolean): Promise<number | null> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].party = on ? Date.now() / 1000 + 1800 : null; this.flats(all); return all[this.selfId].party ?? null; }
+  async letIn(who: string): Promise<void> { const all = this.flats(), f = all[this.selfId]; if (!f) throw new Error('move in first'); f.inv = { ...(f.inv ?? {}), [who]: Date.now() + 1800e3 }; this.flats(all); }
   sendTank(t: TankMsg): void { this.post('tank', { id: this.selfId, ...t }); }
   sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
   sendCook(st: number): void { this.post('cook', { id: this.selfId, st }); }
@@ -314,6 +362,7 @@ export class LocalTransport implements Transport {
     if (w && w.kind === 'who') { this.countMe(); return; }
     if (w && w.kind === 'census' && typeof w.p?.id === 'string' && typeof w.srv === 'string') { this.headcount.set(w.p.id, { srv: w.srv, t: performance.now() }); return; }
     if (!w || w.srv !== this.server) return;
+    if (w.room === 'lobby' && w.kind === 'flat') { const v = parseFlatMsg(w.p); if (v && v.id !== this.selfId && w.srv === this.server) this.worldOn({ type: 'flat', id: v.id, f: v.f }); return; }
     if (w.room === 'lobby' && w.kind === 'world') { const v = parseWorld(w.p); if (v && v.id !== this.selfId) this.worldOn({ type: 'world', id: v.id, w: v.w }); return; }
     if (w.room === 'lobby' && w.kind === 'lobby') {
       const p = parseLobby(w.p); if (!p || p.id === this.selfId) return;
