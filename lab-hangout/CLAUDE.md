@@ -38,6 +38,8 @@ Handy URLs while developing:
 - LOCAL-mode test switches: `?signin` starts signed out (the guest / Discord / Google chooser, all
   faked per tab), `?autherr=identity_already_exists` pretends a provider refused a link (the merge
   path), `?cap=N` shrinks every server to N players (to see FULL)
+- `?weather=rain|storm|fog|snow|clear` pins the weather in this browser (any mode; the server still
+  decides whether rain waters the gardens). `?debug` adds `weather(k)`, `crews()` and `danceBots(x, y)`
 - `/?debug` (dev server only): exposes `window.__hangout` (`go`, `at`, `use`, `pose`, `item`, `feed`,
   `state`, `game`, `gameState`, `bots`, `blocks`, ...) so test scripts can teleport, use things and
   set room state without walking. Headless Chrome + puppeteer-core drives it nicely.
@@ -75,7 +77,8 @@ src/
                        lists the stops (room: null = OPENING SOON, doors stay shut)
     park.ts            CITY PARK (1600x760, day/night): pond (onWater, ducks, fountain, dock), kite stand, bandstand
                        music, hot dogs, picnic blankets, the shared sandbox (room state 'sand'), OAK
-    weather.ts         the shared wind (kites fly on it), from the wall clock
+    weather.ts         the wall-clock sky: the wind (kites) and the WEATHER over the outdoor rooms (15-min slots: clear,
+                       rain, storm + lightning, fog; snow in winter; roll() must match 0011_weather.sql), umbrellas
     contest.ts         the hourly fishing contest (:30-:40 UTC): contestClock(), the Pier scoreboard prop
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
@@ -93,6 +96,8 @@ src/
                        the `saves` table; merging is a union so nothing earned is ever lost
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
                        quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
+  game/dance.ts        group dances: 3+ dancers close together form a crew, dance one routine on the wall-clock
+                       beat (crewPose), and the floor lights up; worked out in every browser, nothing is sent
   game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
@@ -130,7 +135,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0007 halloween (private.season(), set_season, trick_or_treat, seasonal claw prizes) ·
                        0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock) ·
                        0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log) ·
-                       0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests)
+                       0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests) ·
+                       0011 weather (private.weather(), rain_water(), the crew quest + DANCE CREW / STORM CHASER badges)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -170,6 +176,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | seasons | RPCs `current_season()`; owner `set_season(s)`; `trick_or_treat(door 0..7)` (1/door/day, 20% trick, all 8 = costume) | `{ tokens, trick, visited, prize }` |
 | garden | table `plots` (members read, per server); RPCs `plant(bed, seed)`, `water(bed)`, `harvest(bed)`, `dig_up(bed)`; room state `garden` = "look again" | `{ bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at }` |
 | fishing | RPCs `catch_fish()` (server rolls species + size; 2 s apart; entered in a live contest), `contest_board()` (top 5, last winner; settles finished contests: 5 + 5 per other angler, max 25, + TROPHY badge) | `{ fish, rarity, cm, contest, rank }` |
+| weather | none: from the clock (`weather()`); RPC `rain_water()` while it rains waters every dry, living plant on every server (the server checks its own `private.weather()`) | count watered |
 | quests | RPCs `todays_quests()` (3 a day, same for all), `complete_quest(q)` (5, +10 for the third; coins/claw/water/harvest checked on the server) | `{ day, quests, done }` |
 | badges | table `badges` (members read); RPC `claim_badge(b)` (green/helper/quester/tycoon checked on the server) | badge ids |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
@@ -192,7 +199,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 8 hot dog); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
 4 rowing a boat (moves only where `room.water()` is true). Spot lists are append-only, like look options.
 
-**Shared time without a server:** NPC routines, the Square's day/night (20 min loop), the
+**Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the
 cinema film (80 s loop) and jukebox playback are all computed from `Date.now()`, so every
 client agrees without any messages. Room state (`juke`, `hi`, `board`) is what can't be
 derived from the clock; the lowest-id player in the room re-broadcasts it on each join.

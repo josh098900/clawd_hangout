@@ -133,6 +133,8 @@ export interface Transport {
   plant(bed: number, seed: number): Promise<number>;
   /** Water a plant (anyone's). thanked = +1 token for watering someone else's. */
   water(bed: number): Promise<{ tokens: number; thanked: boolean }>;
+  /** It's raining (world/weather.ts): water every dry plant on every server. Returns how many (0 if the server says it isn't raining). */
+  rainWater(): Promise<number>;
   /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
   harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
   digUp(bed: number): Promise<void>;

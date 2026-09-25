@@ -28,8 +28,9 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 
 ## Progress
 Steps 1-6 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest;
-migrations 0007-0010). **Next: step 7, group dances + shared weather** (no SQL needed: both come
-from the wall clock; weather lives in `src/world/weather.ts`, which already has the shared wind).
+migrations 0007-0010). **Step 7 (group dances + shared weather) is built** with migration
+`0011_weather.sql` (rain waters the gardens on the server), waiting for Josh's live check.
+Then step 8, the Diner. (Apartments and photos will take the next free migration numbers.)
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

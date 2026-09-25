@@ -114,6 +114,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 8. `supabase/migrations/0008_gardens.sql`: the Rooftop's community garden
 9. `supabase/migrations/0009_quests.sql`: daily quests and badges
 10. `supabase/migrations/0010_fishing.sql`: the hourly fishing contest (the server rolls every catch)
+11. `supabase/migrations/0011_weather.sql`: shared weather (rain waters the Rooftop gardens), the group-dance quest and badges
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

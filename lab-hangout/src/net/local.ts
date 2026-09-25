@@ -8,7 +8,8 @@ import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
 import { cleanChat, cleanName, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
-import { growth, plantState, SEEDS } from '../world/garden';
+import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
+import { raining } from '../world/weather';
 import { QUESTS } from '../game/quests';
 import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
@@ -118,6 +119,12 @@ export class LocalTransport implements Transport {
     const key = bed + ':' + p.plantedAt, thanked = p.owner !== this.selfId && !this.thanked.has(key) && this.thanked.size < 5;
     if (thanked) { this.thanked.add(key); this.wallet(this.wallet() + 1); }
     return { tokens: this.wallet(), thanked };
+  }
+  async rainWater(): Promise<number> {
+    if (!raining()) return 0;
+    const all = this.beds(), now = Date.now(); let n = 0;
+    for (const p of all) if ((now - p.lastWater) / 1000 * GARDEN.speed >= 1800) { p.grown = growth(p, now); p.calcAt = now; p.lastWater = now; n++; }
+    this.beds(all); return n;
   }
   async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> {
     const all = this.beds(), p = all.find((q) => q.bed === bed);

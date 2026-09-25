@@ -2,13 +2,13 @@
 // sit down, fetch coffee and play the arcade, so you can judge the look of a busy room without
 // opening lots of tabs. They only exist in your browser and never touch the network.
 
-import { EMOTES, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, useEmote, type EmoteKind } from '../entities/avatar';
+import { EMOTES, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, POSE_DANCE, useEmote, type EmoteKind } from '../entities/avatar';
 import { h1 } from '../engine/math';
 import { routeTo, walkable, type Room } from '../world/room';
 import type { NetEvent } from '../net/transport';
 import { botLine } from '../ui/overlay';
 
-interface Bot { id: string; x: number; y: number; tx: number; ty: number; wait: number; dir: 1 | -1; k: number; use: number; goal: number; hold: number; sips: number; sipIn: number; react: number; path: [number, number][]; sent: number }
+interface Bot { id: string; x: number; y: number; tx: number; ty: number; wait: number; dir: 1 | -1; k: number; use: number; goal: number; hold: number; sips: number; sipIn: number; react: number; path: [number, number][]; sent: number; /** dancing (POSE_DANCE) until its wait runs out */ pose: number }
 /** What bots need to know about a running party game. */
 export interface BotGame {
   kind: 'chairs' | 'tag'; phase: string; players: Set<string>; seats: number[]; itId: string | null;
@@ -28,7 +28,7 @@ export class Bots {
     this.bots = [];
     for (let i = 0; i < this.n; i++) {
       const p = this.pick(room, i * 7.3 + 1);
-      const b: Bot = { id: 'bot-' + i, x: p.x, y: p.y, tx: p.x, ty: p.y, wait: h1(i) * 3, dir: 1, k: i * 13, use: -1, goal: -1, hold: 0, sips: 0, sipIn: 3, react: -1, path: [], sent: 0 };
+      const b: Bot = { id: 'bot-' + i, x: p.x, y: p.y, tx: p.x, ty: p.y, wait: h1(i) * 3, dir: 1, k: i * 13, use: -1, goal: -1, hold: 0, sips: 0, sipIn: 3, react: -1, path: [], sent: 0, pose: 0 };
       this.bots.push(b);
       this.emit({ type: 'join', peer: { id: b.id, name: NAMES[i % NAMES.length], look: { c: (i * 3 + 1) % 8, hat: i % 5, face: (i * 2) % 4, fit: (i + 1) % 4, sp: i % 3 === 1 ? 1 : 0 }, x: b.x, y: b.y, dir: 1, moving: false } });
       this.send(b, false);
@@ -40,7 +40,12 @@ export class Bots {
     const t = performance.now() / 1000;
     if (moving && t - b.sent < 0.11) return;
     b.sent = t;
-    this.emit({ type: 'move', id: b.id, m: { x: b.x, y: b.y, dir: b.dir, moving, use: b.use, hold: b.hold, pose: 0 } });
+    this.emit({ type: 'move', id: b.id, m: { x: b.x, y: b.y, dir: b.dir, moving, use: b.use, hold: b.hold, pose: moving ? 0 : b.pose } });
+  }
+
+  /** Debug: every bot dances in a ring around (x, y) for a minute (to see a group dance). */
+  danceAt(x: number, y: number): void {
+    this.bots.forEach((b, i) => { b.x = x + 30 + (i % 4) * 30 - (i >= 4 ? 15 : 60); b.y = y + (i >= 4 ? 22 : -8); b.tx = b.x; b.ty = b.y; b.path = []; b.goal = -1; b.use = -1; b.hold = 0; b.pose = POSE_DANCE; b.wait = 60; this.send(b, false); });
   }
 
   private pick(room: Room, seed: number): { x: number; y: number } {
@@ -53,7 +58,8 @@ export class Bots {
   }
 
   /** `busy` = spots in use by anyone else (you, other players, NPCs). */
-  update(room: Room, dt: number, busy: Set<number>, game: BotGame | null = null): void {
+  /** `dancers` = where anyone else is dancing (bots nearby like to join in: group dances!). */
+  update(room: Room, dt: number, busy: Set<number>, game: BotGame | null = null, dancers: { x: number; y: number }[] = []): void {
     const taken = (i: number) => busy.has(i) || this.bots.some((o) => o.use === i || o.goal === i);
     for (const b of this.bots) {
       if (game && game.players.has(b.id) && this.play(b, room, dt, game, taken)) continue;
@@ -70,6 +76,16 @@ export class Bots {
       if (b.wait > 0) {
         b.wait -= dt;
         if (b.wait <= 0) {
+          if (b.pose) { b.pose = 0; this.send(b, false); }
+          // someone's dancing nearby: often go and join them
+          const d = !game && !b.hold && b.use < 0 ? dancers.find((p) => Math.hypot(p.x - b.x, p.y - b.y) < 260) : undefined;
+          if (d && h1(++this.k * 2.2 + b.k) < 0.6) {
+            for (let t = 0; t < 8; t++) {
+              const x = d.x + (h1(++this.k) < 0.5 ? -1 : 1) * (26 + h1(++this.k) * 26), y = d.y + (h1(++this.k) - 0.5) * 36;
+              if (walkable(room, x, y)) { this.go(b, room, x, y); b.goal = -2; break; }
+            }
+            if (b.goal === -2) continue;
+          }
           if (b.use >= 0) { // done with the spot: step off it (coffee = now holding a mug)
             const s = room.spots[b.use];
             const got = s.kind === 'coffee' ? HOLD_MUG : s.kind === 'popcorn' ? HOLD_POPCORN : s.kind === 'soda' ? HOLD_SODA : 0;
@@ -92,6 +108,7 @@ export class Bots {
       if (d < 2 && b.path.length) { [b.tx, b.ty] = b.path.shift()!; continue; }
       if (d < 2) {
         const g = b.goal; b.goal = -1;
+        if (g === -2) { b.pose = POSE_DANCE; b.wait = 12 + h1(this.k++ + b.k) * 14; this.send(b, false); continue; }
         if (g >= 0 && !busy.has(g)) {
           const s = room.spots[g];
           b.use = g; b.x = s.x; b.y = s.y;

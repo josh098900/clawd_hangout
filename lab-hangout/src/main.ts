@@ -22,6 +22,8 @@ import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
+import { OUTDOORS, WEATHER_NEWS, drawWeather, forceWeather, lightning as stormBolt, raining, weather } from './world/weather';
+import { drawCrewFloor, drawCrewTag, findCrews, type Crew } from './game/dance';
 import { openQuests, badgeChips } from './ui/quests';
 import { openClaw, withItem } from './ui/claw';
 import { openPong, type PongHandle } from './ui/pong';
@@ -86,6 +88,7 @@ const params = new URLSearchParams(location.search);
 const SB_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
 const SB_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 let net: Transport = SB_URL && SB_KEY && !params.has('local') ? new SupabaseTransport(SB_URL, SB_KEY) : new LocalTransport();
+forceWeather(params.get('weather')); // ?weather=rain|storm|fog|snow|clear: preview the weather in this browser
 
 let room: Room = ROOMS.lab;
 let me: Avatar = makeAvatar('me', 'GUEST', DEFAULT_LOOK, room.spawn.x, room.spawn.y, true, 0);
@@ -113,6 +116,10 @@ let gameKey = '', slopToast = -1, fwHeard = 0;
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
 const coinWindow = () => Math.floor(Date.now() / 300000);
 let myTokens = 0, danceT = 0;
+/** Group dances in this room (found every frame), and how long you've been in one. */
+let crews: Crew[] = [], crewT = 0, crewCounted = false, crewToastAt = -99;
+/** Weather: the last kind you were told about, the last thunder heard, and when to make the rain water the gardens. */
+let wxSeen = '', thunderId = -1, rainSlot = -1, rainAt = 0;
 function setTokens(n: number): void { myTokens = n; const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; quests.setTokens(n); }
 /** Fishing: when the bobber went in, when a fish bites, and whether it's biting right now. */
 let fishing: { bite: number; state: 'wait' | 'bite' } | null = null, roast = 0;
@@ -537,7 +544,7 @@ function useSpot(i: number): void {
   else if (s.kind === 'rack') { fixEnd = t + 3; SFX.blip(); toast('Fixing the build...'); }
   else if (s.kind === 'scope') openStars(() => { input.clear(); if (me.use === i) leaveSpot(); });
   else if (s.kind === 'hammock') SFX.sit();
-  else if (s.kind === 'fish') { fishing = { bite: t + 3 + Math.random() * 6, state: 'wait' }; SFX.zap(); toast(isTouch ? 'Wait for a bite, then tap REEL!' : 'Wait for a bite, then press E to REEL!', 3000); }
+  else if (s.kind === 'fish') { fishing = { bite: t + (3 + Math.random() * 6) * biteK(), state: 'wait' }; SFX.zap(); toast((isTouch ? 'Wait for a bite, then tap REEL!' : 'Wait for a bite, then press E to REEL!') + (biteK() < 1 ? ' They bite fast in the rain!' : ''), 3000); }
   else if (s.kind === 'instrument') toast(isTouch ? 'Tap the pads to play' : 'Keys 1-8 play notes. Walk away to stop', 3000);
   else if (s.kind === 'chest') {
     leaveSpot();
@@ -800,13 +807,17 @@ function syncPad(): void {
   pad.replaceChildren(...PAD_LABELS[i].map((lab, n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; const k = document.createElement('kbd'); k.textContent = String(n + 1); b.append(k, ' ' + lab); b.style.boxShadow = '0 0 0 2px ' + ['#5FE7FF', '#FFD65A', '#FF5FD2', '#7CF29C'][i]; b.addEventListener('pointerdown', (e) => { e.preventDefault(); playNote(n); }); return b; }));
   const t = document.createElement('span'); t.className = 'pill quiet'; t.textContent = INSTRUMENTS[i]; pad.prepend(t);
 }
+/** Fish bite about twice as fast in the rain. */
+const biteK = (): number => (raining() ? 0.5 : 1);
 function reel(): void {
   if (!fishing || fishing.state !== 'bite') return;
-  fishing = { bite: now() + 2.5 + Math.random() * 6, state: 'wait' };
+  fishing = { bite: now() + (2.5 + Math.random() * 6) * biteK(), state: 'wait' };
+  const inStorm = weather().kind === 'storm';
   // the server rolls the catch (so the contest leaderboard can be trusted)
   net.catchFish().then((c) => {
     const f = fishNamed(c.fish), log = logFish(f.name), rare = f.rarity === 'RARE' || f.rarity === 'LEGENDARY';
     if (rare) quests.bump('fish');
+    if (inStorm && f.rarity !== 'JUNK') quests.stat('stormFish');
     say(net.selfId, (f.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + f.name + ' (' + c.cm + 'cm)!', now(), true);
     const contest = c.contest && f.rarity !== 'JUNK' ? ' · CONTEST: ' + (c.rank === 1 ? 'YOU LEAD!' : 'NO. ' + c.rank) : '';
     toast((log.isNew ? 'NEW! ' : '') + f.rarity + ' · FISH LOG ' + log.count + '/12' + contest, 3500);
@@ -1046,7 +1057,7 @@ function updateMe(dt: number): void {
   // fishing: wait for the bite, then a second to reel it in
   if (fishing && usingOf(me) === 'fish') {
     if (fishing.state === 'wait' && t >= fishing.bite) { fishing.state = 'bite'; SFX.huh(); }
-    else if (fishing.state === 'bite' && t > fishing.bite + 1.1) { toast('It got away...'); fishing = { bite: t + 2 + Math.random() * 6, state: 'wait' }; }
+    else if (fishing.state === 'bite' && t > fishing.bite + 1.1) { toast('It got away...'); fishing = { bite: t + (2 + Math.random() * 6) * biteK(), state: 'wait' }; }
   } else if (fishing && usingOf(me) !== 'fish') fishing = null;
   // roasting a marshmallow: stand still near the Pier's bonfire
   if (room.id === 'pier' && (me.hold === HOLD_MARSH || me.hold === HOLD_TOAST) && !me.moving && Math.hypot(me.x - PIER_FIRE.x, (me.y - PIER_FIRE.y) * 1.4) < 70) {
@@ -1204,6 +1215,7 @@ function render(a: number, t: number): void {
   PX.dim = dim;
   room.drawBack(a);
   if (isHalloween()) halloweenBack(room.id, a);
+  for (const c of crews) drawCrewFloor(c);
   // tap marker
   if (tapFx) { const u = t - tapFx.t0; if (u > 0.5) tapFx = null; else lit(() => ring(Math.round(tapFx!.x), Math.round(tapFx!.y), Math.round(3 + u * 16), Math.round(1 + u * 5), [255, 236, 170])); }
   const items: { y: number; av?: Avatar; draw?: (a: number) => void }[] = room.props.map((p) => ({ y: p.y, draw: p.draw }));
@@ -1224,10 +1236,14 @@ function render(a: number, t: number): void {
   }
   items.sort((p, q) => p.y - q.y || (p.av?.self ? 1 : 0) - (q.av?.self ? 1 : 0));
   const heads = new Map<string, [number, number]>();
+  const outdoors = OUTDOORS.includes(room.id), brolly = outdoors && raining();
   for (const it of items) {
     PX.dim = dim;
     if (it.draw) it.draw(a);
-    else if (it.av) { const h = drawAvatar(it.av, a, t, dim, usingOf(it.av), liftOf(it.av)); heads.set(it.av.self ? net.selfId : it.av.id, R.toScreen(h.headX, h.headY)); }
+    else if (it.av) {
+      const h = drawAvatar(it.av, a, t, dim, usingOf(it.av), liftOf(it.av), brolly && !it.av.hold && it.av.use < 0 && it.av.pose !== POSE_GHOST && it.av.pose !== POSE_BOAT);
+      heads.set(it.av.self ? net.selfId : it.av.id, R.toScreen(h.headX, h.headY));
+    }
   }
   for (const tk of room.talkers ?? []) heads.set(tk.id, R.toScreen(tk.x, tk.y - 4));
   if (isHalloween()) halloweenFront(room.id, a);
@@ -1256,11 +1272,39 @@ function render(a: number, t: number): void {
   }
   if (pendingShot) { pendingShot = false; capture(); }
   if (playing) { drawDoorHints(a); drawActionHint(a, actNow); }
+  for (const c of crews) drawCrewTag(c);
   room.drawFront?.(a);
+  if (outdoors) drawWeather(room, R.cam, a, 1 - dayness());
   PX.gmul = 1;
   R.present(room.w, room.h, room.fillTop, room.fillLow);
   layoutBubbles(t, heads, R.cssW);
   animatePlate(t);
+}
+
+// ---------- group dances (game/dance.ts) and the weather (world/weather.ts) ----------
+function crewStep(dt: number, t: number): void {
+  const dancers = [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)].filter((av) => av.pose === POSE_DANCE && !av.moving && av.use < 0);
+  crews = findCrews(dancers);
+  if (!(playing && me.crew && me.pose === POSE_DANCE && !me.moving)) { crewT = 0; crewCounted = false; return; }
+  if (crewT === 0 && t - crewToastAt > 30) { crewToastAt = t; SFX.joy(); toast('GROUP DANCE! ' + me.crew.n + ' of you, in step. Keep it going!', 3000); }
+  crewT += dt;
+  if (crewT > 5 && !crewCounted) { crewCounted = true; quests.bump('crew'); quests.stat('crews'); }
+}
+function weatherStep(t: number): void {
+  if (!playing) return;
+  const w = weather(), out = OUTDOORS.includes(room.id);
+  // news when it changes while you're outside (or the first time you step out into it)
+  if (out && w.k > 0.3 && w.kind !== wxSeen) { if (w.kind !== 'clear' || (wxSeen && wxSeen !== 'clear')) toast(WEATHER_NEWS[w.kind], 4500); wxSeen = w.kind; }
+  // thunder follows the lightning (everyone sees the same strikes)
+  if (out && w.kind === 'storm' && w.k > 0.3) { const L = stormBolt(); if (L.id >= 0 && L.id !== thunderId && L.since > 0.6) { thunderId = L.id; SFX.thunder(); } }
+  // rain waters the Rooftop gardens: one call per rainy slot from each player, spread out (the server only waters dry plants)
+  if (raining(w) && w.slot !== rainSlot) {
+    if (!rainAt) rainAt = t + 5 + Math.random() * 60;
+    else if (t >= rainAt) {
+      rainSlot = w.slot; rainAt = 0;
+      net.rainWater().then((n) => { if (!n) return; GARDEN.dirty = true; if (room.id === 'roof') toast('The rain watered ' + n + (n === 1 ? ' plant' : ' plants') + ' in the garden', 3500); }).catch((e) => console.warn('[rain]', e));
+    }
+  }
 }
 
 // ---------- loop ----------
@@ -1292,7 +1336,7 @@ function frame(nowMs: number): void {
       onGamePhase(g);
     }
     const bg: BotGame | null = g && g.kind !== 'off' ? { kind: g.kind, phase: g.phase, players: new Set((g.kind === 'chairs' ? g.alive : g.ids.map((_, i) => i)).map((i) => g.ids[i])), seats: g.seats, itId: g.it >= 0 ? g.ids[g.it] : null, pos: posOf } : null;
-    bots?.update(room, dt, new Set(room.inUse.keys()), bg);
+    bots?.update(room, dt, new Set(room.inUse.keys()), bg, [...(playing && me.pose === POSE_DANCE && !me.moving ? [me] : []), ...npcs.inRoom(room.id).map((n) => n.av).filter((av) => av.pose === POSE_DANCE && !av.moving)]);
     // slop invasion bookkeeping (the event is on the Square; everyone else just hears about it)
     const sw = slopWave();
     if (sw && sw.w !== slopW) { slopW = sw.w; slopHits.clear(); slopGone.clear(); }
@@ -1310,6 +1354,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
+    crewStep(dt, t); weatherStep(t);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
@@ -1336,7 +1381,8 @@ function frame(nowMs: number): void {
     const fw = room.id === 'roof' ? showStart() : null;
     if (fw && fw.t0 !== fwHeard && Date.now() / 1000 - fw.t0 < 3) { fwHeard = fw.t0; for (let k = 0; k < 8; k++) setTimeout(() => { SFX.boom(); SFX.pop(); }, (0.9 + k * 0.72) * 1000); }
     // the Den: rain on the window, thunder after lightning, pomodoro chimes
-    rain.set(room.id === 'den' && playing ? 0.05 : 0);
+    const wx = weather(), wet = OUTDOORS.includes(room.id) && (wx.kind === 'rain' || wx.kind === 'storm');
+    rain.set(!playing ? 0 : room.id === 'den' ? 0.05 : wet ? (wx.kind === 'storm' ? 0.08 : 0.05) * wx.k : 0);
     if (room.id === 'den' && playing) {
       const fl = lightning(); if (fl > 0.9 && t - lastFlash > 5) { lastFlash = t; setTimeout(() => SFX.thunder(), 700); }
       const focus = pomodoro().focus;
@@ -1450,6 +1496,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
     spots: () => room.spots.map((sp) => ({ kind: sp.kind, n: sp.n })), candleOrder: () => candleOrder(),
     doorsOpen: () => room.doors.map((d) => !!doorDest(d)),
+    weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };
 }

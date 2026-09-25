@@ -129,6 +129,7 @@ export class SupabaseTransport implements Transport {
   private async rpcJson(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>> { const { data, error } = await this.sb.rpc(fn, args); if (error) throw new Error(error.message); return (data ?? {}) as Record<string, unknown>; }
   async plant(bed: number, seed: number): Promise<number> { const { data, error } = await this.sb.rpc('plant', { bed, seed }); if (error) throw new Error(error.message); return Number(data) || 0; }
   async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: Number(o.tokens) || 0, thanked: o.thanked === true }; }
+  async rainWater(): Promise<number> { const { data, error } = await this.sb.rpc('rain_water'); if (error) throw new Error(error.message); return Number(data) || 0; }
   async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: Number(o.tokens) || 0, seed: Number(o.seed) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null }; }
   async digUp(bed: number): Promise<void> { const { error } = await this.sb.rpc('dig_up', { bed }); if (error) throw new Error(error.message); }
   // ---- the fishing contest (0010_fishing.sql) ----

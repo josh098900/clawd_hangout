@@ -8,7 +8,8 @@ import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
 const OUTLINE = K.OUTLINE;
 import { alpha, oval, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX } from '../engine/pixel';
 import { bump, eOB, h1, seg, lerp } from '../engine/math';
-import { wind } from '../world/weather';
+import { drawUmbrella, wind } from '../world/weather';
+import { crewPose } from '../game/dance';
 
 export type EmoteKind = 'wave' | 'hop' | 'joy' | 'huh' | 'idea' | 'sip' | 'eat' | 'feed' | 'laugh' | 'cry' | 'love' | 'angry' | 'sleep' | 'cool' | 'clap' | 'wow';
 /** Every emote that can go over the network. Ones with a `key` also get a button in the emote bar. */
@@ -72,6 +73,8 @@ export interface Avatar {
   noteT: number;
   /** The pet's own position (it trails behind), and when it was last moved. */
   pet: { x: number; y: number; z: number; t: number; dir: 1 | -1 };
+  /** In a group dance (game/dance.ts): place in the line and crew size, set every frame. */
+  crew?: { rank: number; n: number } | null;
 }
 
 export function makeAvatar(id: string, name: string, look: Look, x: number, y: number, self: boolean, now: number): Avatar {
@@ -133,7 +136,9 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     if (u >= 0 && u < 0.45) { P.sy += -0.09 * Math.exp(-u * 9) * Math.cos(u * 22); P.ant += av.dir * Math.sin(u * 20) * Math.exp(-u * 6) * 2.4; }
   }
   const us = now - av.useT0, ps = now - av.poseT0;
-  if (av.pose === POSE_DANCE && !av.moving) {
+  if (av.pose === POSE_DANCE && !av.moving && av.crew) {
+    hopY += crewPose(P, av.crew.rank); // in a group dance: the crew's routine, on the wall clock
+  } else if (av.pose === POSE_DANCE && !av.moving) {
     // 120 bpm: bounce on every beat, lean side to side, arms pump, antenna whips
     const beat = a * 2, k = Math.floor(beat), f = beat - k;
     hopY += Math.sin(f * Math.PI) * 3;
@@ -357,7 +362,8 @@ function drawSheet(x: number, y: number, a: number, seed: number): void {
   r(X - 6, Y - 26, 3, 4, [30, 24, 40]); r(X + 3, Y - 26, 3, 4, [30, 24, 40]); r(X - 2, Y - 19, 4, 3, [30, 24, 40]);
 }
 
-export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0): { headX: number; headY: number } {
+/** `brolly`: out in the rain, so hold an umbrella (world/weather.ts). */
+export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0, brolly = false): { headX: number; headY: number } {
   if (av.look.pet) drawPet(av, a, now, av.look.pet);
   const { P, hopY } = poseFor(av, a, now, using);
   // contact shadow shrinks while airborne (none when seated: the seat is the ground)
@@ -408,6 +414,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     if (em.kind === 'wave' && u < 0.3) { const [wx, wy] = TX(16, -30); lit(() => star4(Math.round(wx), Math.round(wy), 1, [255, 255, 255])); }
     wheelFx(em.kind, u, av, TX, hx, hy, a);
   }
+  if (brolly) { PX.dim = dim; drawUmbrella(hx, hy, av.seed, a); }
   // name tag (3x5 pixel font, outlined)
   const label = av.hideName ? '?' : av.name.toUpperCase().slice(0, 16);
   const nx = Math.round(hx - tw(label) / 2), ny = Math.round(hy - 9);
