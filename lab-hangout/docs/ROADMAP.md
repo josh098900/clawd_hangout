@@ -78,7 +78,7 @@ Guiding rules (from what already works):
 - [x] 8. The Diner (co-op cooking)
 - [x] 9. The Kart Track and the tank duel
 - [x] 10. Your own apartment (THE LOFTS)
-- [ ] 11. The Space Station
+- [x] 11. The Space Station
 - [ ] 12. Karaoke on the Stage
 - [ ] 13. The photo wall (moderated)
 - [ ] 14. Winter (December)
