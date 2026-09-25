@@ -12,7 +12,7 @@
 --     Each pays 1 token once a day; find all 12 in a day for a winter prize you haven't got.
 --   * The ADVENT CALENDAR in the Lab: doors 1 to 24, each opens once from its date in December
 --     (any you missed stay openable until the season ends). Tokens, and a prize on the 6th, 12th,
---     18th and 24th.
+--     18th and 24th. (Switched on early to test, only door 1 opens, and it doesn't count for December.)
 --   * The Square's TREE: ornaments hung by players (5 each a day), per server, for the season.
 --   * SANTA'S SLEIGH (at :15 and :45) drops 8 presents on the Square; catch up to 3 a pass (+1 each).
 --   * SECRET SANTA: wrap a present of 3, 5 or 10 of your tokens for another player, with a message
@@ -28,10 +28,10 @@ language sql stable security definer set search_path = '' as $$
          when to_char(now() at time zone 'utc', 'MM') = '12' or to_char(now() at time zone 'utc', 'MMDD') <= '0106' then 'winter' end);
 $$;
 revoke execute on function private.season() from public, anon, authenticated;
-/** Which winter it is: the year its December falls in. */
+/** Which winter it is: the year its December falls in (0 when it's switched on early to test, so the real one starts fresh). */
 create or replace function private.winter_year() returns integer
 language sql stable set search_path = '' as $$
-  select case when extract(month from now() at time zone 'utc') = 1 then extract(year from now() at time zone 'utc')::int - 1 else extract(year from now() at time zone 'utc')::int end;
+  select case extract(month from now() at time zone 'utc') when 1 then extract(year from now() at time zone 'utc')::int - 1 when 12 then extract(year from now() at time zone 'utc')::int else 0 end;
 $$;
 revoke execute on function private.winter_year() from public, anon, authenticated;
 
