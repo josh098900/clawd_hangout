@@ -8,7 +8,7 @@
 // per room ('wall0'..'wall5', 'floor0'..'floor4'; the first two of each are free).
 
 import { CONFETTI, K, type RGB } from '../engine/palette';
-import { r, line, disc, oval, txt, tw, lit, alpha, Gd, G, M, shade } from '../engine/pixel';
+import { PX, r, line, disc, oval, txt, tw, lit, alpha, Gd, G, M, shade } from '../engine/pixel';
 import { h1 } from '../engine/math';
 
 /** The flats' geometry: back wall bottom, the three floor rows' feet lines, where wall pieces hang. */
@@ -17,7 +17,7 @@ export type Layer = 'floor' | 'rug' | 'wall';
 /** What a piece lets you do (becomes a Spot in world/flat.ts). */
 export type FurnUse = 'sit' | 'nap' | 'juke' | 'arcade' | 'keys' | 'look' | 'party' | 'soda';
 /** Everything drawing needs to know about the flat it's in. */
-export interface FurnCtx { a: number; night: number; party: boolean; fish: string[]; badges: string[]; owner: string }
+export interface FurnCtx { a: number; night: number; party: boolean; fish: string[]; badges: string[]; owner: string; /** the owner's photo from the Lab's photo wall (32x30), for the PHOTO FRAME */ photo: HTMLCanvasElement | null }
 export interface Furn {
   id: string; name: string; price: number; w: number; h: number; layer: Layer;
   /** Seats as [dx from centre, lift]. */
@@ -125,6 +125,10 @@ export const FURNITURE: Furn[] = [
   { id: 'clock', name: 'WALL CLOCK', price: 6, w: 18, h: 18, layer: 'wall', draw(x, y) {
     const cy = y - 20; disc(x, cy, 8, [60, 60, 70]); disc(x, cy, 7, [240, 240, 236]); const d = new Date(), hh = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * Math.PI * 2, mm = d.getMinutes() / 60 * Math.PI * 2;
     line(x, cy, Math.round(x + Math.sin(hh) * 4), Math.round(cy - Math.cos(hh) * 4), [30, 30, 40]); line(x, cy, Math.round(x + Math.sin(mm) * 6), Math.round(cy - Math.cos(mm) * 6), [30, 30, 40]); r(x, cy, 1, 1, K.RED); } },
+  { id: 'pframe', name: 'PHOTO FRAME', price: 10, w: 40, h: 40, layer: 'wall', draw(x, y, _f, c) {
+    r(x - 20, y - 40, 40, 38, [120, 84, 54]); r(x - 19, y - 39, 38, 36, [184, 136, 90]); r(x - 18, y - 38, 36, 34, [250, 248, 240]);
+    if (c.photo) PX.ctx.drawImage(c.photo, x - 16, y - 36); else { r(x - 16, y - 36, 32, 30, [200, 204, 214]); txt('PHOTO', x - tw('PHOTO') / 2, y - 26, [120, 126, 140]); txt('WALL', x - tw('WALL') / 2, y - 19, [120, 126, 140]); }
+    r(x - 1, y - 43, 2, 3, [90, 90, 100]); } },
   { id: 'painting', name: 'PAINTING', price: 12, w: 42, h: 30, layer: 'wall', draw(x, y) { r(x - 21, y - 32, 42, 30, [200, 160, 60]); r(x - 18, y - 29, 36, 24, [120, 180, 230]); r(x - 18, y - 14, 36, 9, [80, 150, 90]); disc(x + 8, y - 24, 3, [255, 230, 120]); for (let k = 0; k < 4; k++) r(x - 16 + k * 9, y - 17 - (k % 2) * 3, 6, 3 + (k % 2) * 3, [60, 120, 70]); } },
   { id: 'neon', name: 'NEON SIGN', price: 18, w: 60, h: 20, layer: 'wall', draw(x, y, _f, c) { const on = (c.a * 1.7) % 9 > 0.2; lit(() => txt('HOME', x - tw('HOME', 2) / 2, y - 24, on ? [255, 90, 170] : [120, 40, 90], 2)); if (on) G(x - 30, y - 28, 60, 18, [255, 90, 170], 0.22); } },
   { id: 'lights', name: 'STRING LIGHTS', price: 10, w: 100, h: 16, layer: 'wall', draw(x, y, _f, c) {

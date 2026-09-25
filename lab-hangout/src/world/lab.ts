@@ -18,7 +18,13 @@ const MUGS: { x: number; c: RGB }[] = [{ x: 140, c: [232, 106, 146] }, { x: 194,
 const LAMPS = [180, 330, 510, 700, 860];
 const JUKE = { x: 330 };
 /** Live values main.ts keeps up to date from room state: jukebox track (-1 off) and the arcade high score. */
-export const LAB_INFO = { juke: -1, jukeT0: 0, hi: null as { name: string; score: number } | null };
+export const LAB_INFO = {
+  juke: -1, jukeT0: 0, hi: null as { name: string; score: number } | null,
+  /** The PHOTO WALL: the newest approved strips as polaroids (the photo of the week first), fetched by main.ts. */
+  photos: [] as { id: number; name: string; thumb: HTMLCanvasElement; week: boolean }[],
+};
+/** The corkboard, above the step, low enough to see from the floor: 4 x 2 polaroids. */
+export const PHOTO_BOARD = { x0: 372, y0: 254, x1: 540, y1: 344 };
 const STAIRS = { x: 822, y: 326, w: 40, h: 104 };
 
 function build(this: Room): void {
@@ -50,6 +56,10 @@ function build(this: Room): void {
     for (let k = 0; k < 3; k++) line(170, 300 + k * 14, 230, 306 + k * 12, [170, 176, 180]);
     disc(210, 336, 7, C.MK); disc(210, 336, 6, C.WB); r(207, 334, 1, 1, C.MK); r(212, 334, 1, 1, C.MK); r(207, 339, 6, 1, C.MK); r(206, 340, 1, 1, C.MK); r(213, 340, 1, 1, C.MK);
 
+    // the PHOTO WALL corkboard (the polaroids are drawn live)
+    const PB = PHOTO_BOARD; r(PB.x0, PB.y0, PB.x1 - PB.x0, PB.y1 - PB.y0, [110, 76, 50]); r(PB.x0 + 2, PB.y0 + 2, PB.x1 - PB.x0 - 4, PB.y1 - PB.y0 - 4, [196, 150, 100]);
+    for (let i = 0; i < 90; i++) r(PB.x0 + 3 + Math.floor(h1(i + 400) * (PB.x1 - PB.x0 - 6)), PB.y0 + 3 + Math.floor(h1(i + 401) * (PB.y1 - PB.y0 - 6)), 1, 1, [176, 132, 86]);
+    const cx = (PB.x0 + PB.x1) / 2; r(cx - 26, PB.y0 - 12, 52, 11, [40, 46, 50]); txt('PHOTO WALL', cx - tw('PHOTO WALL') / 2, PB.y0 - 9, [255, 214, 90]);
     // safety poster, clock face, danger sign
     r(256, 240, 46, 58, [40, 46, 50]); r(258, 242, 42, 54, [248, 248, 244]); r(258, 242, 42, 12, [46, 120, 84]); txt('DAYS', 264, 245, [255, 255, 255]); txt('WITHOUT', 265, 257, [40, 46, 50]); txt('SLOP', 271, 264, [40, 46, 50]);
     r(267, 272, 24, 20, [40, 46, 50]); r(268, 273, 22, 18, [26, 28, 32]); r(268, 281, 22, 1, [60, 64, 70]); txt('0', 274, 275, [255, 90, 70], 3); r(284, 249, 1, 1, [255, 255, 255]);
@@ -126,6 +136,7 @@ function drawBack(a: number): void {
   for (const lx of LAMPS) lamp(lx, a);
   // everyone's drawings on the whiteboard
   PX.ctx.drawImage(BOARD.cv, BOARD_POS.x, BOARD_POS.y);
+  photoWall(a);
   // jukebox: neon arch + bubble tubes cycle while it plays, and the record spins
   const on = LAB_INFO.juke >= 0, jx = JUKE.x;
   lit(() => {
@@ -181,6 +192,22 @@ function drawBack(a: number): void {
   G(ax + 2, 356, 32, 28, [120, 140, 255], 0.3); G(ax + 4, 334, 28, 12, [255, 200, 90], 0.25);
 }
 
+/** The polaroids on the corkboard: a white card, the photo, a red pin; the week's favourite in gold with a star. */
+function photoWall(a: number): void {
+  const PB = PHOTO_BOARD, ps = LAB_INFO.photos;
+  for (let i = 0; i < 8; i++) {
+    const x = PB.x0 + 3 + (i % 4) * 41, y = PB.y0 + 3 + Math.floor(i / 4) * 44 + ((i * 7) % 3) - 1, p = ps[i];
+    if (!p) { if (i < 2 && !ps.length) continue; r(x, y, 36, 40, [186, 140, 92]); continue; }
+    r(x + 1, y + 1, 36, 40, [120, 84, 54]); r(x, y, 36, 40, p.week ? [255, 214, 90] : [250, 248, 240]);
+    PX.ctx.drawImage(p.thumb, x + 2, y + 2);
+    const n = p.name.slice(0, 8); txt(n, x + 18 - tw(n) / 2, y + 33, p.week ? [120, 80, 10] : [90, 84, 100]);
+    r(x + 17, y - 1, 2, 2, K.RED);
+    if (p.week) lit(() => { const tw2 = (a * 2) % 1 < 0.5; r(x + 31, y - 3, 3, 3, K.GOLD); r(x + 32, y - 5, 1, 7, tw2 ? K.WHITE : K.GOLD); r(x + 30, y - 2, 5, 1, tw2 ? K.WHITE : K.GOLD); });
+  }
+  const cx = (PB.x0 + PB.x1) / 2;
+  if (!ps.length) { txt('PIN YOURS!', cx - tw('PIN YOURS!') / 2, PB.y0 + 30, [110, 76, 50]); txt('(PHOTO BOOTH', cx - tw('(PHOTO BOOTH') / 2, PB.y0 + 44, [140, 100, 66]); txt('IN THE CINEMA)', cx - tw('IN THE CINEMA)') / 2, PB.y0 + 52, [140, 100, 66]); }
+}
+
 // ---- things you can use (index = network id: append only) ----
 const SOFA_AREA = { x0: 538, y0: 484, x1: 662, y1: 524 };
 const seat = (x: number, y: number, lift: number, area: Spot['area'], sy: number): Spot => ({ kind: 'sit', x, y, sx: x, sy, lift, label: 'SIT', area });
@@ -190,6 +217,7 @@ export const LAB_SPOTS: Spot[] = [
   { kind: 'arcade', x: 908, y: 446, sx: 908, sy: 446, lift: 0, label: 'PLAY', area: { x0: 886, y0: 328, x1: 928, y1: 430 } },
   { kind: 'board', x: 150, y: 446, sx: 150, sy: 446, lift: 0, label: 'DRAW', area: { x0: 52, y0: 280, x1: 248, y1: 358 } },
   { kind: 'juke', x: 349, y: 446, sx: 349, sy: 446, lift: 0, label: 'MUSIC', area: { x0: 328, y0: 346, x1: 370, y1: 430 } },
+  { kind: 'photos', x: 456, y: 446, sx: 456, sy: 446, lift: 0, label: 'PHOTOS', area: { x0: 372, y0: 242, x1: 540, y1: 344 } }, // 7
 ];
 export const LAB_COFFEE = 3, LAB_ARCADE = 4, LAB_JUKE_X = 349;
 let labRoom: Room | null = null;

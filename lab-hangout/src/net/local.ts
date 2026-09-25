@@ -6,7 +6,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { TRAY_SPEED } from '../world/station';
@@ -191,6 +191,43 @@ export class LocalTransport implements Transport {
     const paid = Math.max(0, Math.min(4, Math.floor(pts / 8), 12 - today));
     this.lastWalk = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
     this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+  }
+  // ---- the photo wall, kept in this browser (every tab shares it); ?admin makes you the owner. Same rules as 0017_photos.sql ----
+  private photoRows(v?: (Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]) {
+    if (v) { try { localStorage.setItem('labhangout.localPhotos', JSON.stringify(v)); } catch { /* full */ } return v; }
+    try { return JSON.parse(localStorage.getItem('labhangout.localPhotos') || '[]') as (Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]; } catch { return []; }
+  }
+  private pub(p: Photo & { hearters: string[] }): Photo { return { id: p.id, owner: p.owner, ownerName: p.ownerName, png: p.png, at: p.at, hearts: p.hearters.length, mine: p.hearters.includes(this.selfId) }; }
+  async isAdmin(): Promise<boolean> { return /[?&]admin\b/.test(location.search); }
+  private pinsToday: number[] = [];
+  async pinPhoto(png: string): Promise<number> {
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(png) || png.length > 90000) throw new Error('that is not a photo strip');
+    const all = this.photoRows(), day = 86400000; this.pinsToday = this.pinsToday.filter((t) => Date.now() - t < day);
+    if (this.pinsToday.length >= 3) throw new Error('you can pin 3 photos a day. more tomorrow!');
+    if (all.filter((p) => p.owner === this.selfId && p.status === 'pending').length >= 3) throw new Error('you have 3 photos waiting to be checked already');
+    const id = Math.max(0, ...all.map((p) => p.id)) + 1; this.pinsToday.push(Date.now());
+    this.photoRows([...all, { id, owner: this.selfId, ownerName: (await this.loadProfile())?.name ?? 'YOU', png, at: Date.now() / 1000, hearts: 0, mine: false, status: 'pending', featured: false, created: Date.now(), hearters: [] }]);
+    return id;
+  }
+  async wallPhotos(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }> {
+    const ok = this.photoRows().filter((p) => p.status === 'approved').sort((a, b) => b.id - a.id), wk = ok.filter((p) => p.hearters.length && Date.now() / 1000 - p.at < 7 * 86400).sort((a, b) => b.hearters.length - a.hearters.length || b.id - a.id)[0];
+    return { week: wk ? wk.id : null, photos: ok.filter((p) => before === null || p.id < before).slice(0, Math.min(30, n)).map((p) => this.pub(p)) };
+  }
+  async photoById(id: number): Promise<Photo | null> { const p = this.photoRows().find((q) => q.id === id && q.status === 'approved'); return p ? this.pub(p) : null; }
+  async heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }> {
+    const all = this.photoRows(), p = all.find((q) => q.id === id && q.status === 'approved'); if (!p) throw new Error('no such photo');
+    const mine = !p.hearters.includes(this.selfId); p.hearters = mine ? [...p.hearters, this.selfId] : p.hearters.filter((x) => x !== this.selfId); this.photoRows(all);
+    return { hearts: p.hearters.length, mine };
+  }
+  async myPhotos(): Promise<MyPhoto[]> { return this.photoRows().filter((p) => p.owner === this.selfId).sort((a, b) => b.id - a.id).slice(0, 20).map((p) => ({ id: p.id, status: p.status, featured: p.featured, at: p.at })); }
+  async featurePhoto(id: number): Promise<void> { const all = this.photoRows(); if (!all.some((p) => p.id === id && p.owner === this.selfId && p.status === 'approved')) throw new Error('only your own photos on the wall'); for (const p of all) if (p.owner === this.selfId) p.featured = p.id === id; this.photoRows(all); }
+  async deletePhoto(id: number): Promise<void> { const all = this.photoRows(), admin = await this.isAdmin(); if (!all.some((p) => p.id === id && (p.owner === this.selfId || admin))) throw new Error('that is not your photo'); this.photoRows(all.filter((p) => p.id !== id)); }
+  async flatPhoto(owner: string): Promise<string | null> { const p = this.photoRows().filter((q) => q.owner === owner && q.status === 'approved').sort((a, b) => Number(b.featured) - Number(a.featured) || b.id - a.id)[0]; return p ? p.png : null; }
+  async pendingPhotos(): Promise<Photo[]> { if (!(await this.isAdmin())) throw new Error('only the owner can do that'); return this.photoRows().filter((p) => p.status === 'pending').sort((a, b) => a.id - b.id).map((p) => ({ ...this.pub(p), at: p.created / 1000 })); }
+  async reviewPhoto(id: number, ok: boolean): Promise<void> {
+    if (!(await this.isAdmin())) throw new Error('only the owner can do that');
+    const all = this.photoRows(), p = all.find((q) => q.id === id); if (!p) throw new Error('no such photo');
+    p.status = ok ? 'approved' : 'rejected'; p.at = Date.now() / 1000; if (!ok) p.featured = false; this.photoRows(all);
   }
   /** Same rules as karaoke_tip() in 0016_karaoke.sql: nothing under 40, 1 + score/30 (max 4), 12 a day, one per 30 s. */
   private lastSong = 0;

@@ -186,6 +186,10 @@ export interface Plot { bed: number; owner: string; ownerName: string; seed: num
  * `i` (0 keys, 1 drums, 2 bass, 3 mic): score so far 0..100, current combo, `f` = 1 when it's final.
  */
 export interface KScore { r: number; i: number; s: number; c: number; f: 0 | 1 }
+/** A photo-booth strip on the Lab's photo wall (0017_photos.sql). `png` is a data URL; `at` = epoch s. */
+export interface Photo { id: number; owner: string; ownerName: string; png: string; at: number; hearts: number; mine: boolean }
+/** Your own pinned photos and how they're getting on. */
+export interface MyPhoto { id: number; status: 'pending' | 'approved' | 'rejected'; featured: boolean; at: number }
 /** A hydroponic tray on the Space Station with a STAR MELON in it (0015_space.sql). `plantedAt` = ms since 1970. */
 export interface Tray { tray: number; owner: string; ownerName: string; plantedAt: number }
 /** The Pier's contest scoreboard (see 0010_fishing.sql). */
@@ -242,6 +246,22 @@ export interface Transport {
   spaceDigUp(tray: number): Promise<void>;
   /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
   spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
+  /** THE PHOTO WALL. Is this player an owner (can moderate)? */
+  isAdmin(): Promise<boolean>;
+  /** Pin a strip (a PNG data URL) for review; resolves with its id. */
+  pinPhoto(png: string): Promise<number>;
+  /** Approved photos, newest first (older than `before`), and which is the photo of the week. */
+  wallPhotos(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }>;
+  photoById(id: number): Promise<Photo | null>;
+  heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }>;
+  myPhotos(): Promise<MyPhoto[]>;
+  featurePhoto(id: number): Promise<void>;
+  deletePhoto(id: number): Promise<void>;
+  /** The photo in someone's flat PHOTO FRAME (a data URL), or null. */
+  flatPhoto(owner: string): Promise<string | null>;
+  /** Owner only: the queue, and approving / rejecting (also takes approved ones down). */
+  pendingPhotos(): Promise<Photo[]>;
+  reviewPhoto(id: number, ok: boolean): Promise<void>;
   /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
   karaokeTip(score: number): Promise<{ tokens: number; paid: number }>;
   /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */

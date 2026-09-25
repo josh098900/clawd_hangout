@@ -113,6 +113,9 @@ body.decorating #lyrics { display: none !important; }
 #count { cursor: pointer; }
 #quests { font-family: 'VT323', ui-monospace, monospace; font-size: 19px; font-weight: 400; padding: 6px 12px; color: #FFD65A; }
 #quests.allDone { color: #7CF29C; }
+#mod { font-family: 'VT323', ui-monospace, monospace; font-size: 19px; font-weight: 400; padding: 6px 12px; color: #9FEFFF; }
+#mod.hot { color: #FF5FD2; animation: modpulse 1s steps(2) infinite; }
+@keyframes modpulse { 50% { color: #FFD65A; } }
 .pill.quiet { cursor: default; font-family: 'VT323', ui-monospace, monospace; font-size: 19px; font-weight: 400; padding: 6px 12px; }
 .pill[aria-pressed="true"] { background: rgba(217, 119, 87, .9); }
 .pill:disabled { opacity: .55; cursor: progress; }

@@ -69,7 +69,8 @@ src/
     input.ts           keys + click/tap-to-walk
   world/
     room.ts            Room/Door/Prop/Spot types, walkable(); doors with `route` open only sometimes (doorDest())
-    lab.ts             THE LAB set (960x680), props, animated bits
+    lab.ts             THE LAB set (960x680), props, animated bits; the PHOTO WALL corkboard (LAB_INFO.photos: 8 polaroids,
+                       the photo of the week in gold; spot 7 opens the album)
     plaza.ts           THE SQUARE set (1400x780; THE LOFTS apartment block at the right end), voxel installations, lamps, benches, cinema front, day/night (wall clock)
     cinema.ts          THE CINEMA set (1100x720): lobby, concession stand, photo booth, screen + the 80 s film, seats
     den.ts             THE DEV DEN (1000x680): desks, build status screen, kanban, rack, DEPLOY, duck; pomodoro + lightning (wall clock)
@@ -179,6 +180,8 @@ src/
   ui/kanban.ts         the Dev Den kanban board
   ui/stars.ts          the rooftop telescope's constellation game
   ui/karaoke.ts        the song menu, the lyrics strip (only when the Stage's big screen is out of view) and your note lane
+  ui/photos.ts         THE PHOTO WALL: decorate a booth strip (frame colour + 2x stickers) and PIN IT, the album (hearts,
+                       HANG IN MY FLAT / TAKE DOWN), the owner's MODERATE queue; strips are 1x PNG data URLs (~10 KB)
   ui/mission.ts        MISSION CONTROL: steer the station's telescope over the sky (world/sky.ts), hold on something to log it
   net/filter.ts        client-side word filter + per-sender token-bucket rate limits
 supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
@@ -197,7 +200,11 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0015 space (space_trays + space_plant/space_harvest/space_dig_up: STAR MELONS, 3 tokens, ripe in 30 min,
                        pay 5 + a COMET BLOOM seed; plant() takes any found seed; spacewalk_pay: 1 per 8 points, 4 a walk,
                        one a minute, 12 a day; the launch / spacewalk / comet quests + ASTRONAUT badge) ·
-                       0016 karaoke (karaoke_tip: nothing under 40, 1 + score/30, max 4 a song, one per 30 s, 12 a day)
+                       0016 karaoke (karaoke_tip: nothing under 40, 1 + score/30, max 4 a song, one per 30 s, 12 a day) ·
+                       0017 photos (private.admins + is_admin() + make_admin(email) for the SQL editor; photos table (PNG data
+                       URLs, checked; pending/approved/rejected, members see approved + their own), pin_photo (3 a day, 3 waiting),
+                       review_photo, delete_photo, heart_photo, wall_photos, photo_by_id, pending_photos, my_photos,
+                       feature_photo, flat_photo; the 'pframe' furniture)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -245,6 +252,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | kart race | room state `race` (host: t0 = GO, seed, ids/names/cols in grid order; others ask to join with a `kart` msg `j: 1`, the host adds them) + broadcast `kart` (your kart, 12 Hz racing, 6-8 with 3-4 racers, 2 Hz on the grid) + `kartbest` (fastest lap per circuit); CPU karts from `cpuAt` | `{ r, x, y, a, v, lap, g, c, fin, best, b, d, j? }` |
 | tank duel | broadcast `tank` ~15/s per side during a match (shells in flight, score, hits landed, P1's phase; vs CPU also the CPU tank) | `{ s, x, y, a, sh, sc, hit, inv, ph?, o?, osc? }` |
 | flats | RPCs `my_flat` (made with a starter kit), `get_flat(owner)` (refused if you may not go in), `flat_doors(ids)`, `buy_furniture(what)`, `save_flat(layout)` (only furniture you own), `set_door`, `flat_party(on)`, `let_in(who)`; channels `hangout:<server>:<room>.<owner>` (joinRoom's `inst`); room state `flat` { n: layout revision, party }; lobby broadcast `flat` { k: knock / in / no / party, to, nm, until } | layout `{ rooms: { liv, bed, kit: { w, f, items: [[id, x, row, flip]] } }, show }` |
+| photo wall | RPCs `pin_photo(png)`, `wall_photos(n, before)` (+ the photo of the week), `photo_by_id`, `heart_photo`, `my_photos` (so the pinner hears when it's approved), `feature_photo` / `flat_photo(owner)` (the flat's PHOTO FRAME), `delete_photo`; owners (`is_admin()`): `pending_photos`, `review_photo(id, ok)`. Nothing realtime: the Lab refetches every 60 s | `{ id, owner, owner_name, png, at, hearts, mine }` |
 | karaoke | room state `karaoke` `{ song, t0 (wall ms of the first step, after a 4 s count-in), by }`; performers play their notes as usual (`note`) and broadcast `kscore` `{ r: the song's t0, i: instrument, s: score so far, c: combo, f: final }` about once a second; the HYPE bar is worked out in each browser from the emotes and dancers it sees; RPC `karaoke_tip(score)` at the end | see game/karaoke.ts |
 | space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |

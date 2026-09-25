@@ -32,9 +32,12 @@ weather + group dances, the Diner + COOKIE's tour, the Kart Track + tank duel, T
 migrations 0007-0014). **Step 11, the Space Station, is done and confirmed** (migration 0015). What was decided: launches every 20 min (:00/:20/:40) from a SPACEPORT added past the roof
 garden (the roof is now 1860 wide), drift-and-push-off zero g, all four extras (spacewalk, star melon
 hydroponics, mission control's telescope, the SPACE HELMET), free to fly. The station's NPC is COSMO,
-the critter from the Cinema's own film A CRITTER IN SPACE. **Step 12, karaoke, is built** (migration 0016;
-waiting for Josh): a rhythm game at the mic plus band lanes on keys/drums/bass, 5 original songs, capped tips,
-the ROCK STAR jacket for a 90+, and a crowd HYPE bar (no quest or badge, by choice). **Next: step 13, the photo wall.**
+the critter from the Cinema's own film A CRITTER IN SPACE. **Step 12, karaoke, is done and confirmed** (migration 0016): a rhythm game at the mic plus band lanes on keys/drums/bass, 5 original songs, capped tips,
+the ROCK STAR jacket for a 90+, and a crowd HYPE bar (no quest or badge, by choice). **Step 13, the photo wall, is built** (migration 0017;
+waiting for Josh): in-game MODERATE panel for owners (private.admins, `make_admin(email)`), a corkboard of polaroids
+in the Lab (the photo of the week in gold), hearts, stickers + frame colours before pinning, the PHOTO FRAME
+furniture, 3 pins a day. Strips live in the database (small PNG data URLs) instead of Storage: no bucket to set up,
+and the SQL tests cover it all. **Next: step 14, Winter.**
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

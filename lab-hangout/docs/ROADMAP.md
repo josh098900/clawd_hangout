@@ -79,7 +79,7 @@ Guiding rules (from what already works):
 - [x] 9. The Kart Track and the tank duel
 - [x] 10. Your own apartment (THE LOFTS)
 - [x] 11. The Space Station
-- [ ] 12. Karaoke on the Stage
+- [x] 12. Karaoke on the Stage
 - [ ] 13. The photo wall (moderated)
 - [ ] 14. Winter (December)
 

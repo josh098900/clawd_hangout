@@ -12,6 +12,7 @@ import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, withCtx, alpha, puff } 
 import { K, SK } from './engine/palette';
 import { clamp, seg } from './engine/math';
 import { makeLab, LAB_INFO } from './world/lab';
+import { openAlbum, openModerate, openPinEditor, thumbOf, type AlbumHooks } from './ui/photos';
 import { makeDen, DEN_INFO, lightning, pomodoro } from './world/den';
 import { makeRoof, rocketTop, showStart } from './world/roof';
 import { makeRocket } from './world/rocket';
@@ -70,7 +71,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Photo, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -384,6 +385,7 @@ async function switchServer(): Promise<void> {
 async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
   if (room.id === 'diner' && id !== 'diner') { endTour(false); leaveKitchen(); } // (while the others are still here to hand over to)
   if (decorating() && !isFlat(id)) closeDecorate(true); // walked out while decorating: keep it
+  if (isFlat(id) && FLAT.owner !== FLAT.photoOf) loadFlatPhoto(FLAT.owner);
   if (isFlat(id) && FLAT.owner !== flatSeen) { flatSeen = FLAT.owner; for (const f of FLAT_ROOMS) { roomState[f].clear(); FLAT.juke[f] = { n: -1, t0: 0 }; } } // a different flat
   switching = true;
   tapTarget = null;
@@ -396,6 +398,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   room = ROOMS[id];
   zv.x = zv.y = 0;
   if (id === 'station') STATION.dirty = true;
+  if (id === 'lab') photosAt = 0;
   if (id === 'diner') dinerSince = now();
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
@@ -583,6 +586,7 @@ function useSpot(i: number): void {
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'tray') { tendTray(s.n ?? 0); return; }
   if (s.kind === 'karaoke') { openKaraoke(); return; }
+  if (s.kind === 'photos') { SFX.blip(); openAlbum(albumHooks(), () => input.clear()); return; }
   if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
   if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { quests.bump('kite'); me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
   if (s.kind === 'sand') { SFX.blip(); openSandbox(() => PARK_INFO.sand, (v) => setState({ k: 'sand', v }), () => input.clear()); return; }
@@ -682,6 +686,58 @@ function tendBed(n: number): void {
   }
   if (plantState(p).wet) { toast(plantLine(p, false), 3500); return; }
   waterBed(n);
+}
+
+// ---------- THE PHOTO WALL (ui/photos.ts, the Lab's corkboard, 0017_photos.sql) ----------
+let photosAt = 0, isAdmin = false;
+const thumbCache = new Map<number, HTMLCanvasElement>();
+/** A strip's corkboard polaroid (made once per photo). */
+function thumb(p: Photo): Promise<HTMLCanvasElement> {
+  const hit = thumbCache.get(p.id); if (hit) return Promise.resolve(hit);
+  return new Promise((res, rej) => { const im = new Image(); im.onload = () => { const t = thumbOf(im); thumbCache.set(p.id, t); res(t); }; im.onerror = rej; im.src = p.png; });
+}
+/** The newest approved strips for the Lab's corkboard, with the photo of the week in the first spot. */
+function refreshPhotos(): void {
+  photosAt = Date.now();
+  net.wallPhotos(10, null).then(async (w) => {
+    let list = w.photos;
+    if (w.week !== null && !list.some((p) => p.id === w.week)) { const wk = await net.photoById(w.week).catch(() => null); if (wk) list = [wk, ...list.slice(0, 9)]; }
+    else if (w.week !== null) list = [...list.filter((p) => p.id === w.week), ...list.filter((p) => p.id !== w.week)];
+    const out: typeof LAB_INFO.photos = [];
+    for (const p of list) { try { out.push({ id: p.id, name: p.ownerName, thumb: await thumb(p), week: p.id === w.week }); } catch { /* a broken image: skip it */ } }
+    LAB_INFO.photos = out;
+  }).catch((e) => console.warn('[photos]', e));
+}
+function albumHooks(): AlbumHooks {
+  return {
+    page: (before) => net.wallPhotos(12, before), heart: (p) => net.heartPhoto(p.id).then((r) => { photosAt = 0; return r; }),
+    feature: (p) => net.featurePhoto(p.id).then(() => { FLAT.photoOf = ''; }), remove: (p) => (p.owner === net.selfId ? net.deletePhoto(p.id) : net.reviewPhoto(p.id, false)).then(() => { photosAt = 0; thumbCache.delete(p.id); }),
+    me: net.selfId, admin: isAdmin, toast: (t) => toast(t, 4000),
+  };
+}
+/** The owner's MODERATE button (only shown to owners), with how many photos are waiting. */
+const modBtn = document.createElement('button'); modBtn.type = 'button'; modBtn.id = 'mod'; modBtn.className = 'pill'; modBtn.style.display = 'none';
+$('#hud').insertBefore(modBtn, $('#quests').nextSibling);
+modBtn.addEventListener('click', () => { if (modalOpen()) return; openModerate({ list: () => net.pendingPhotos(), review: (p, ok) => net.reviewPhoto(p.id, ok).then(() => { photosAt = 0; }), toast: (t) => toast(t, 3000) }, () => { input.clear(); void checkQueue(); }); });
+async function checkQueue(): Promise<void> {
+  if (!isAdmin) return;
+  try { const n = (await net.pendingPhotos()).length; modBtn.style.display = ''; modBtn.textContent = (narrow() ? 'MOD' : 'MODERATE') + (n ? ' · ' + n : ''); modBtn.classList.toggle('hot', n > 0); } catch { /* try again later */ }
+}
+/** Tell the pinner when their photo's been approved or not (remembered per browser, so each news comes once). */
+async function checkMyPhotos(): Promise<void> {
+  let mine; try { mine = await net.myPhotos(); } catch { return; }
+  const key = 'labhangout.photoSeen.' + net.selfId; let seen: Record<string, string> = {}; try { seen = JSON.parse(localStorage.getItem(key) || '{}'); } catch { /* none */ }
+  for (const p of mine) {
+    const was = seen[p.id]; seen[p.id] = p.status;
+    if (was === 'pending' && p.status === 'approved') { toast('Your photo is up on the PHOTO WALL in the Lab!', 6000); SFX.score(); photosAt = 0; }
+    else if (was === 'pending' && p.status === 'rejected') toast('Your photo wasn\'t approved for the wall this time', 5000);
+  }
+  try { localStorage.setItem(key, JSON.stringify(seen)); } catch { /* full */ }
+}
+/** The flat owner's photo for their PHOTO FRAME. */
+function loadFlatPhoto(owner: string): void {
+  FLAT.photoOf = owner; FLAT.photo = null;
+  net.flatPhoto(owner).then((png) => { if (!png || FLAT.photoOf !== owner) return; const im = new Image(); im.onload = () => { if (FLAT.photoOf === owner) FLAT.photo = thumbOf(im); }; im.src = png; }).catch(() => {});
 }
 
 // ---------- KARAOKE on the Stage (game/karaoke.ts, world/stage.ts, ui/karaoke.ts) ----------
@@ -1522,7 +1578,8 @@ function showStrip(frames: HTMLCanvasElement[]): void {
   const url = strip.toDataURL('image/png'), m = openModal('PHOTO STRIP', () => input.clear());
   const img = document.createElement('img'); img.src = url; img.alt = 'Your photo strip';
   const save = document.createElement('a'); save.className = 'mbtn'; save.href = url; save.download = 'lab-hangout-photo.png'; save.textContent = 'SAVE';
-  m.body.append(img, row(save, button('CLOSE', m.close, true)));
+  const pin = button('DECORATE & PIN IT', () => { m.close(); openPinEditor(frames, (png) => net.pinPhoto(png).then(() => { SFX.chime(); toast('Pinned! Once it\'s checked it goes up on the PHOTO WALL in the Lab', 5000); void checkMyPhotos(); }), () => input.clear()); });
+  m.body.append(img, row(pin, save, button('CLOSE', m.close, true)));
 }
 
 // ---------- render ----------
@@ -2026,6 +2083,7 @@ function frame(nowMs: number): void {
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
     crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); karaokeStep(dt);
+    if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
@@ -2166,6 +2224,8 @@ async function boot(): Promise<void> {
   playing = true;
   await enterRoom('lab', null);
   net.tokens().then(setTokens).catch(() => {});
+  net.isAdmin().then((a) => { isAdmin = a; void checkQueue(); }).catch(() => {});
+  void checkMyPhotos(); setInterval(() => { void checkMyPhotos(); void checkQueue(); }, 90000);
   net.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
   logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
 }

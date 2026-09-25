@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -164,6 +164,22 @@ export class SupabaseTransport implements Transport {
   async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> { const o = await this.rpcJson('space_harvest', { tray }); return { tokens: Number(o.tokens) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null, rotten: o.rotten === true }; }
   async spaceDigUp(tray: number): Promise<void> { const { error } = await this.sb.rpc('space_dig_up', { tray }); if (error) throw new Error(error.message); }
   async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('spacewalk_pay', { pts: Math.max(0, Math.round(pts)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
+  // ---- the photo wall ----
+  private photoOf(o: Record<string, unknown>): Photo { return { id: Number(o.id), owner: String(o.owner ?? ''), ownerName: cleanName(o.owner_name) || 'SOMEONE', png: typeof o.png === 'string' && o.png.startsWith('data:image/png;base64,') ? o.png : '', at: Number(o.at) || 0, hearts: Number(o.hearts) || 0, mine: o.mine === true }; }
+  async isAdmin(): Promise<boolean> { const { data, error } = await this.sb.rpc('is_admin'); if (error) return false; return data === true; }
+  async pinPhoto(png: string): Promise<number> { const { data, error } = await this.sb.rpc('pin_photo', { png }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async wallPhotos(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }> {
+    const o = await this.rpcJson('wall_photos', { n, before }); const ps = Array.isArray(o.photos) ? o.photos as Record<string, unknown>[] : [];
+    return { week: o.week == null ? null : Number(o.week), photos: ps.map((p) => this.photoOf(p)).filter((p) => p.png) };
+  }
+  async photoById(id: number): Promise<Photo | null> { const { data, error } = await this.sb.rpc('photo_by_id', { photo: id }); if (error) throw new Error(error.message); return data ? this.photoOf(data as Record<string, unknown>) : null; }
+  async heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }> { const o = await this.rpcJson('heart_photo', { photo: id }); return { hearts: Number(o.hearts) || 0, mine: o.mine === true }; }
+  async myPhotos(): Promise<MyPhoto[]> { const { data, error } = await this.sb.rpc('my_photos'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((p) => ({ id: Number(p.id), status: (['pending', 'approved', 'rejected'].includes(String(p.status)) ? p.status : 'pending') as MyPhoto['status'], featured: p.featured === true, at: Number(p.at) || 0 })); }
+  async featurePhoto(id: number): Promise<void> { const { error } = await this.sb.rpc('feature_photo', { photo: id }); if (error) throw new Error(error.message); }
+  async deletePhoto(id: number): Promise<void> { const { error } = await this.sb.rpc('delete_photo', { photo: id }); if (error) throw new Error(error.message); }
+  async flatPhoto(owner: string): Promise<string | null> { const { data, error } = await this.sb.rpc('flat_photo', { owner }); if (error) throw new Error(error.message); return typeof data === 'string' && data.startsWith('data:image/png;base64,') ? data : null; }
+  async pendingPhotos(): Promise<Photo[]> { const { data, error } = await this.sb.rpc('pending_photos'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((p) => this.photoOf(p)).filter((p) => p.png); }
+  async reviewPhoto(id: number, ok: boolean): Promise<void> { const { error } = await this.sb.rpc('review_photo', { photo: id, ok }); if (error) throw new Error(error.message); }
   async karaokeTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async contestBoard(): Promise<ContestBoard> {

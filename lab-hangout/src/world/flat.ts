@@ -37,6 +37,8 @@ export const emptyLayout = (): FlatLayout => ({ rooms: {}, show: { fish: [], bad
 /** The flat you're in (or were last in), and yours. */
 export const FLAT = {
   owner: '', name: '', layout: emptyLayout(), door: 'locked' as DoorMode, party: null as number | null, mine: false,
+  /** The owner's photo from the Lab wall for the PHOTO FRAME (main.ts fetches it), and whose it is. */
+  photo: null as HTMLCanvasElement | null, photoOf: '',
   /** Your furniture (owner only). */
   owned: {} as Record<string, number>,
   /** Music per room (room state 'juke'). */
@@ -85,7 +87,7 @@ function build(this: Room, id: FlatRoomId): void {
 }
 
 /** Everything a piece of furniture needs to know to draw itself. */
-export function furnCtx(a: number): FurnCtx { return { a, night: 1 - dayness(), party: partyOn(), fish: FLAT.layout.show.fish, badges: FLAT.layout.show.badges, owner: FLAT.owner }; }
+export function furnCtx(a: number): FurnCtx { return { a, night: 1 - dayness(), party: partyOn(), fish: FLAT.layout.show.fish, badges: FLAT.layout.show.badges, owner: FLAT.owner, photo: FLAT.photo }; }
 
 function drawBack(id: FlatRoomId, a: number): void {
   const g = GEO[id], L = roomLayout(id), c = furnCtx(a);
