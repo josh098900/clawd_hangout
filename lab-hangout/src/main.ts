@@ -22,6 +22,9 @@ import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
+import { makeDiner, DINER } from './world/diner';
+import { ST, cookAct, live as shiftLive, newShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
+import { syncTickets } from './ui/tickets';
 import { OUTDOORS, WEATHER_NEWS, drawWeather, forceWeather, lightning as stormBolt, raining, weather } from './world/weather';
 import { drawCrewFloor, drawCrewTag, findCrews, type Crew } from './game/dance';
 import { openQuests, badgeChips } from './ui/quests';
@@ -46,7 +49,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, HOLD_KITE, HOLD_HOTDOG, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -81,7 +84,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1) };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -130,7 +133,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -155,7 +158,8 @@ function applyState(s: StateMsg): boolean {
   if (room.id === 'den' && fresh && s.k === 'deploy' && Date.now() / 1000 - s.v.t0 < 2 && s.v.by !== me.name) { if (s.v.ok) { SFX.score(); toast(s.v.by + ' shipped it!'); } else { SFX.siren(); SFX.boom(); toast('INCIDENT! ' + s.v.by + ' broke production'); } }
   return true;
 }
-function setState(v: StateVal): void { const s = { ...v, ts: Date.now() } as StateMsg; applyState(s); net.sendState(s); }
+/** Share a room value. Its ts is always newer than the last one (two changes in the same millisecond must not tie). */
+function setState(v: StateVal): void { const s = { ...v, ts: Math.max(Date.now(), (roomState[room.id].get(v.k)?.ts ?? 0) + 1) } as StateMsg; applyState(s); net.sendState(s); }
 /** The "host" (lowest real id in the room) catches newcomers up. */
 function catchUp(newcomer: string): void {
   if (newcomer.startsWith('bot-') || switching) return;
@@ -217,6 +221,13 @@ function onNet(e: NetEvent): void {
       // only from whoever is actually standing at that side of the table
       const av = others.get(e.id); if (!av || room.id !== 'arcade' || av.use !== PONG_SPOTS[e.p.s] || !allow(e.id, 'pong', 20, 30)) break;
       pongSeen(e.p); pong?.recv(e.id, e.p);
+      break;
+    }
+    case 'cook': {
+      const av = others.get(e.id), g = DINER.g;
+      if (!av || room.id !== 'diner' || !g || g.host !== net.selfId || !shiftLive(g) || !settled() || !allow(e.id, 'cook', 6, 10)) break;
+      const res = cookAct(g, e.id, av.name, e.st);
+      if ('g' in res) { setState({ k: 'diner', v: res.g }); if (res.ticket) SFX.bell(); }
       break;
     }
     case 'status': toast(e.text); break;
@@ -329,6 +340,7 @@ async function switchServer(): Promise<void> {
 
 // ---------- rooms ----------
 async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
+  if (room.id === 'diner' && id !== 'diner') leaveKitchen(); // (while the others are still here to hand over to)
   switching = true;
   tapTarget = null;
   await fade(true);
@@ -336,6 +348,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   others.clear();
   if (room.id === 'train' && id !== 'train') { quests.stat('rides'); if (id === 'parkstn') quests.bump('ride'); }
   room = ROOMS[id];
+  if (id === 'diner') dinerSince = now();
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
@@ -356,6 +369,7 @@ async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promi
   forceSend = true;
   await fade(false);
   switching = false;
+  if (id === 'diner' && !shiftLive(DINER.g)) toast('Want to cook? CLOCK IN at the time clock by the kitchen', 4000);
 }
 function goThrough(d: Door): void {
   const dest = doorDest(d);
@@ -500,6 +514,8 @@ function useSpot(i: number): void {
     return;
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
+  if (s.kind === 'shift') { clockIn(); return; }
+  if (s.kind === 'cook') { cook(s.n ?? 0); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
   if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { quests.bump('kite'); me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
@@ -691,6 +707,7 @@ function endArcade(score: number): void {
 }
 /** Sip / eat whatever's in your hand. */
 function useItem(): void {
+  if (isKitchen(me.hold)) { cook(ST.BIN); return; }
   if (me.hold === HOLD_KITE) { me.hold = 0; forceSend = true; toast('Kite back on the stand'); return; }
   if (!me.hold || me.emote) return;
   if (emote(useEmote(me.hold))) me.sips++;
@@ -913,7 +930,7 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
-  if (i >= 0) { const s = room.spots[i]; return { label: s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
+  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
@@ -931,7 +948,7 @@ function syncActionBar(): void {
     actShown = label; actBtn.style.display = label ? '' : 'none';
     const k = document.createElement('kbd'); k.textContent = 'E'; actBtn.replaceChildren(k, ' ' + label);
   }
-  const s = me.hold && playing ? (me.hold === HOLD_KITE ? 'PUT AWAY' : useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
+  const s = me.hold && playing ? (me.hold === HOLD_KITE ? 'PUT AWAY' : isKitchen(me.hold) ? 'DROP' : useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
   if (s !== sipShown) {
     sipShown = s; sipBtn.style.display = s ? '' : 'none';
     const k = document.createElement('kbd'); k.textContent = 'Q'; sipBtn.replaceChildren(k, ' ' + s);
@@ -1307,6 +1324,87 @@ function weatherStep(t: number): void {
   }
 }
 
+// ---------- the Diner (game/diner.ts, world/diner.ts) ----------
+/** When you walked into the Diner: wait for the others to catch you up before acting as the shift's host. */
+let dinerSince = 0;
+const settled = (): boolean => now() - dinerSince > 1.5;
+/** predictUntil: don't copy your hand from the shift state until the host has had time to answer. */
+let predictUntil = 0, hostGone = 0, shiftSeen = '', lastDone = 0, lastMissed = 0, lastOpen = 0;
+const tipped = new Set<number>();
+/** Walking out mid-shift: put down what you're carrying, and hand the kitchen to a cook who's still here. */
+function leaveKitchen(): void {
+  const g = DINER.g;
+  if (isKitchen(me.hold)) { cook(ST.BIN, true); me.hold = 0; }
+  if (g && shiftLive(DINER.g) && DINER.g!.host === net.selfId) { const next = DINER.g!.ids.find((id) => id !== net.selfId && others.has(id)); if (next) setState({ k: 'diner', v: { ...DINER.g!, host: next } }); }
+}
+function clockIn(): void {
+  if (!settled()) return;
+  if (shiftLive(DINER.g)) { toast('A shift is already on: grab a station and help out!'); return; }
+  const cooks = 1 + [...others.keys()].filter((id) => !id.startsWith('bot-')).length;
+  setState({ k: 'diner', v: newShift(net.selfId, me.name, cooks) });
+  SFX.dingdong(); toast('SHIFT STARTED! Orders coming in. Patties are in the FRIDGE', 4000);
+}
+/** Press E at kitchen station `st`: the host applies it, everyone else asks the host. */
+function cook(st: number, quiet = false): void {
+  const g = DINER.g;
+  if (!shiftLive(g)) { if (!quiet) toast('Clock in first: the time clock is by the kitchen door'); return; }
+  if (!settled()) return;
+  const res = cookAct(g, net.selfId, me.name, st);
+  if ('err' in res) { if (!quiet) { toast(res.err, 1800); SFX.blip(); } return; }
+  if (!quiet) toast(res.msg, 1800);
+  const k = res.g.ids.indexOf(net.selfId);
+  me.hold = res.g.hands[k] ?? 0; forceSend = true; predictUntil = now() + 0.8;
+  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
+  else if (st === ST.PASS) { if (res.ticket) SFX.bell(); else SFX.chime(); }
+  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
+  if (g.host === net.selfId) setState({ k: 'diner', v: res.g }); else net.sendCook(st);
+}
+function dinerStep(dt: number, t: number): void {
+  const g = DINER.g, inDiner = room.id === 'diner' && playing, on = inDiner && shiftLive(g);
+  npcs.away.clear(); if (on) npcs.away.add('npc-cookie');
+  syncTickets(on ? g : null);
+  if (!inDiner || !g) { if (isKitchen(me.hold) && room.id !== 'diner') { me.hold = 0; forceSend = true; } return; }
+  if (!settled()) return;
+  // the host walked out: the first cook still here (by id) takes over
+  if (on && g.host !== net.selfId && !others.has(g.host)) {
+    hostGone += dt;
+    const here = g.ids.filter((id) => id === net.selfId || others.has(id)).sort();
+    if (hostGone > 3 && here[0] === net.selfId) { hostGone = 0; setState({ k: 'diner', v: { ...g, host: net.selfId } }); toast('The shift boss left: you are running the kitchen now!', 3000); }
+  } else hostGone = 0;
+  // your hands are whatever the shift says (after a moment for the host to answer)
+  const k = g.ids.indexOf(net.selfId), want = on && k >= 0 ? g.hands[k] : 0;
+  if (t > predictUntil && me.hold !== want && (isKitchen(me.hold) || isKitchen(want))) { me.hold = want; forceSend = true; }
+  // sounds for everyone in the kitchen: a new ticket, an order up, a missed one
+  const key = g.t0 + ':' + (on ? 'on' : 'over'), miss = missed(g);
+  if (key !== shiftSeen) { const first = shiftSeen === ''; shiftSeen = key; lastDone = g.done; lastMissed = miss; lastOpen = 0; if (!on && !first && Date.now() >= shiftEnd(g)) shiftOver(g); }
+  if (on) {
+    const open = openTickets(g).length;
+    if (open > lastOpen) SFX.dingdong();
+    lastOpen = open;
+    if (g.done > lastDone && g.host !== net.selfId) SFX.bell();
+    if (miss > lastMissed) { SFX.hurt(); toast('A customer gave up waiting! -5', 2000); }
+    lastDone = g.done; lastMissed = miss;
+  }
+}
+/** The shift ended: tips, the best-shift board, quests, the chef's hat. */
+function shiftOver(g: DinerState): void {
+  if (!g.ids.includes(net.selfId) || tipped.has(g.t0) || Date.now() - shiftEnd(g) > 60000) return;
+  tipped.add(g.t0);
+  const sc = score(g);
+  SFX.score(); toast('SHIFT OVER! ' + sc + ' points, ' + g.done + ' orders served. ' + verdict(sc), 5000);
+  quests.bump('diner');
+  if (sc > (save.data.stats.dinerBest ?? 0)) { save.update((d) => { d.stats.dinerBest = sc; }); quests.checkBadges(); }
+  if (sc >= 120 && save.unlock('hat:13')) setTimeout(() => { toast('You earned the CHEF HAT! Wear it from Look', 5000); SFX.score(); }, 2500);
+  if (g.host === net.selfId && sc > (DINER.best?.score ?? 0)) setState({ k: 'dinerbest', v: { name: g.names.slice(0, 2).join(' & ').slice(0, 16), score: sc } });
+  if (sc > 0) net.dinerTip(sc).then((r) => { if (r.paid) { setTokens(r.tokens); setTimeout(() => toast('Tips: +' + r.paid + (r.paid === 1 ? ' token' : ' tokens'), 3000), 5200); } }).catch((e: unknown) => console.warn('[tips]', e));
+}
+/** The top banner in the Diner during a shift. */
+function dinerLine(): string {
+  const g = DINER.g; if (room.id !== 'diner' || !shiftLive(g)) return '';
+  const left = Math.max(0, Math.ceil((g.t0 + SHIFT_S * 1000 - Date.now()) / 1000));
+  return 'KITCHEN SHIFT · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
+}
+
 // ---------- loop ----------
 // Capped at 60 fps: 120 Hz displays would otherwise draw every frame twice for no visible gain.
 const FRAME_MIN_MS = 1000 / 60 - 1.5;
@@ -1354,14 +1452,14 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t);
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
-    if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn') subwaySounds();
+    if (room.id === 'subway' || room.id === 'train' || room.id === 'parkstn' || room.id === 'dinerstn') subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine);
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = g && partyMusic(g);
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -1496,6 +1594,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
     spots: () => room.spots.map((sp) => ({ kind: sp.kind, n: sp.n })), candleOrder: () => candleOrder(),
     doorsOpen: () => room.doors.map((d) => !!doorDest(d)),
+    diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };

@@ -10,7 +10,9 @@ Room map (doors):
                                                                                   ├── red doors → CINEMA
                                                                                   ├── tower door → STAGE
                                                                                   ├── grate → CRYPT
-                                                                                  └── right edge → PIER
+                                                                                  ├── right edge → PIER
+                                                                                  └── stairs → SUBWAY (Square station) ── train ── PARK station → CITY PARK
+                                                                                                                    └── DINER station → THE GREASY BYTE
 ```
 
 **The plan lives in `docs/ROADMAP.md`** (phases, what's done, what must happen before a
@@ -79,6 +81,8 @@ src/
                        music, hot dogs, picnic blankets, the shared sandbox (room state 'sand'), OAK
     weather.ts         the wall-clock sky: the wind (kites) and the WEATHER over the outdoor rooms (15-min slots: clear,
                        rain, storm + lightning, fog; snow in winter; roll() must match 0011_weather.sql), umbrellas
+    diner.ts           THE GREASY BYTE (1400x700, the Subway's DINER stop): booths, counter + stools, soda fountain, jukebox,
+                       and the KITCHEN (stations along the back wall, drawn live from DINER.g), ticket rail, time clock, COOKIE
     contest.ts         the hourly fishing contest (:30-:40 UTC): contestClock(), the Pier scoreboard prop
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
@@ -98,6 +102,8 @@ src/
                        quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
   game/dance.ts        group dances: 3+ dancers close together form a crew, dance one routine on the wall-clock
                        beat (crewPose), and the floor lights up; worked out in every browser, nothing is sent
+  game/diner.ts        the Diner's co-op kitchen game: tickets (from t0 + seed), cookAct() (pure: host applies, others predict),
+                       missed tickets / shift end / score all derived from the clock
   game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
@@ -114,6 +120,7 @@ src/
     prizes.ts          the prize counter: your collection
     garden.ts          the seed picker and your-plant card (water / harvest / dig up)
     sandbox.ts         the Park sandbox editor (pile / dig / tower)
+    tickets.ts         the Diner's order tickets as a HUD strip during a shift
     quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
@@ -136,7 +143,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0008 gardens (plots, plant/water/harvest/dig_up, growth on the server's clock) ·
                        0009 quests (todays_quests, complete_quest, claim_badge, badges table, harvest log) ·
                        0010 fishing (catch_fish rolls every catch, contest_board settles + pays contests) ·
-                       0011 weather (private.weather(), rain_water(), the crew quest + DANCE CREW / STORM CHASER badges)
+                       0011 weather (private.weather(), rain_water(), the crew quest + DANCE CREW / STORM CHASER badges) ·
+                       0012 diner (diner_tip: 1 + score/40, max 5 a shift, 15 a day; the diner quest + HEAD CHEF badge)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -180,6 +188,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | quests | RPCs `todays_quests()` (3 a day, same for all), `complete_quest(q)` (5, +10 for the third; coins/claw/water/harvest checked on the server) | `{ day, quests, done }` |
 | badges | table `badges` (members read); RPC `claim_badge(b)` (green/helper/quester/tycoon checked on the server) | badge ids |
 | servers | RPCs `list_servers(friends)`, `claim_seat`, `seat_ping`, `leave_seat`, `my_server` | `{ id, name, players, cap, here }` |
+| diner | room state `diner` (the shift: host, t0, seed, hands, grill, fry, shake, served bitmasks, pts; only its host writes it) + broadcast `cook` `{ id, st }` ("E at station st", the host applies it with `cookAct`); `dinerbest`; RPC `diner_tip(score)` at the end | see game/diner.ts |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
@@ -196,7 +205,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
-8 hot dog); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
+8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
 4 rowing a boat (moves only where `room.water()` is true). Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the

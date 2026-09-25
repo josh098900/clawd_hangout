@@ -51,6 +51,19 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.park .sub { color: #D8F5C0; } .plate.park .big { color: #FAFFF0; text-shadow: 0 3px 0 #10301A, 0 0 14px rgba(180, 240, 140, .6); }
 .plate.parkstn { background: linear-gradient(90deg, rgba(20, 60, 46, .95), rgba(40, 110, 84, .9)); border-left: 5px solid #E6BE28; }
 .plate.parkstn .sub { color: #B8F0D8; } .plate.parkstn .big { color: #F4FFF8; text-shadow: 0 3px 0 #0A2A20, 0 0 14px rgba(124, 242, 156, .6); }
+.plate.dinerstn { background: linear-gradient(90deg, rgba(90, 24, 30, .95), rgba(160, 50, 60, .9)); border-left: 5px solid #E6BE28; }
+.plate.dinerstn .sub { color: #FFD8DC; } .plate.dinerstn .big { color: #FFF6F4; text-shadow: 0 3px 0 #3A0A10, 0 0 14px rgba(255, 120, 140, .6); }
+.plate.diner { background: linear-gradient(90deg, rgba(20, 90, 96, .95), rgba(40, 150, 150, .9)); border-left: 5px solid #FF5AAA; }
+.plate.diner .sub { color: #D0FFF8; } .plate.diner .big { color: #FFF4F8; text-shadow: 0 3px 0 #0A3034, 0 0 14px rgba(255, 90, 170, .7); }
+#tickets { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 96px); transform: translateX(-50%); display: none; gap: 6px; z-index: 3; pointer-events: none; }
+#tickets.on { display: flex; }
+#tickets .ticket { background: #FCFAEC; color: #3C3C46; border-top: 3px solid #8C96A4; padding: 5px 6px 7px; min-width: 64px; font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 8px; line-height: 1.6; display: flex; flex-direction: column; position: relative; box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+#tickets .ticket b { color: #B4283A; }
+#tickets .ticket .done { text-decoration: line-through; color: #50A064; }
+#tickets .ticket i { position: absolute; left: 0; bottom: 0; height: 3px; }
+#tickets .ticket.late { animation: tk .5s steps(2) infinite; }
+@keyframes tk { 50% { background: #FFE2D2; } }
+@media (max-width: 560px) { #tickets { top: calc(env(safe-area-inset-top, 0px) + 136px); gap: 3px; } #tickets .ticket { min-width: 0; font-size: 7px; padding: 4px; } }
 .plate.pier { background: linear-gradient(90deg, rgba(10, 26, 58, .95), rgba(28, 58, 114, .9)); border-left: 5px solid #FFE08A; }
 .plate.pier .sub { color: #CFE6FF; } .plate.pier .big { color: #FFF6E0; text-shadow: 0 3px 0 #0B1A3A, 0 0 14px rgba(255, 224, 138, .6); }
 .plate.plaza .sub { color: #FFE59A; } .plate.plaza .big { color: #FFD65A; text-shadow: 0 3px 0 #9A5B12, 0 0 14px rgba(255, 200, 90, .6); }

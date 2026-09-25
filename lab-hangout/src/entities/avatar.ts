@@ -32,6 +32,9 @@ export const emoteDur = (k: EmoteKind): number => ALL_EMOTES.find((e) => e.kind 
 export const isEmote = (k: unknown): k is EmoteKind => typeof k === 'string' && ALL_EMOTES.some((e) => e.kind === k);
 /** Held items (MoveMsg.hold). How many sips/bites each lasts, and the emote that uses it. */
 export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_MARSH = 4, HOLD_TOAST = 5, HOLD_BURNT = 6, HOLD_KITE = 7, HOLD_HOTDOG = 8;
+/** The Diner's kitchen (game/diner.ts): what a cook carries between stations. */
+export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12, HOLD_FROZEN = 13, HOLD_FRIES = 14, HOLD_SHAKE = 15;
+export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4 };
 export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
@@ -322,6 +325,27 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
 }
 
 /** A hot dog: bun, sausage, a squiggle of mustard. */
+/** Kitchen things, held up on a little plate or in hand (the Diner). */
+function drawKitchen(x: number, y: number, hold: number, a: number): void {
+  const X = Math.round(x), Y = Math.round(y);
+  const plate = () => { r(X - 6, Y + 1, 13, 2, [236, 240, 244]); r(X - 5, Y + 3, 11, 1, [180, 186, 196]); };
+  if (hold === HOLD_PATTY || hold === HOLD_COOKED || hold === HOLD_CHAR) {
+    const c: RGB = hold === HOLD_PATTY ? [226, 120, 120] : hold === HOLD_COOKED ? [120, 70, 44] : [40, 32, 28];
+    plate(); r(X - 4, Y - 2, 9, 3, c); r(X - 3, Y - 2, 7, 1, M(c, [255, 255, 255], 0.25));
+    if (hold === HOLD_CHAR) { const ph = (a * 1.4) % 1; alpha(0.5 * (1 - ph), () => r(X, Y - 5 - Math.round(ph * 8), 1, 2, [90, 90, 100])); }
+  } else if (hold === HOLD_BURGER) {
+    plate(); r(X - 5, Y - 1, 11, 2, [224, 170, 90]); r(X - 5, Y - 2, 11, 1, [90, 170, 70]); r(X - 5, Y - 3, 11, 1, [255, 200, 60]); r(X - 5, Y - 5, 11, 2, [120, 70, 44]);
+    r(X - 5, Y - 9, 11, 4, [224, 160, 80]); r(X - 4, Y - 10, 9, 1, [224, 160, 80]); r(X - 3, Y - 9, 7, 1, [246, 196, 120]); r(X - 2, Y - 8, 1, 1, [255, 246, 220]); r(X + 2, Y - 8, 1, 1, [255, 246, 220]);
+  } else if (hold === HOLD_FROZEN || hold === HOLD_FRIES) {
+    const c: RGB = hold === HOLD_FRIES ? [255, 210, 80] : [236, 230, 200];
+    for (let k = 0; k < 5; k++) r(X - 3 + k * 1.5, Y - 7 + (k % 2), 1, 4, c);
+    r(X - 4, Y - 4, 9, 7, hold === HOLD_FRIES ? [220, 50, 50] : [150, 190, 230]); r(X - 4, Y - 4, 9, 1, M(hold === HOLD_FRIES ? [220, 50, 50] : [150, 190, 230], [255, 255, 255], 0.3));
+    if (hold === HOLD_FRIES) r(X - 1, Y - 2, 3, 3, [255, 255, 255]); else r(X - 3, Y - 2, 7, 1, [255, 255, 255]);
+  } else if (hold === HOLD_SHAKE) {
+    r(X - 3, Y - 6, 7, 9, [236, 240, 244]); r(X - 2, Y - 5, 5, 7, [250, 170, 200]); r(X - 2, Y - 5, 5, 1, [255, 220, 236]);
+    r(X - 3, Y - 8, 7, 2, [255, 250, 250]); r(X - 1, Y - 10, 3, 2, [255, 250, 250]); r(X, Y - 12, 2, 2, [220, 30, 50]); r(X + 2, Y - 13, 1, 6, [255, 90, 120]);
+  }
+}
 function drawHotdog(x: number, y: number, d: number): void {
   const X = Math.round(x) - (d > 0 ? 1 : 8), Y = Math.round(y) - 3;
   r(X, Y + 1, 10, 4, [226, 170, 100]); r(X, Y + 1, 10, 1, [246, 200, 130]); r(X - 1, Y, 12, 2, [196, 90, 70]); r(X - 1, Y, 12, 1, [226, 120, 90]);
@@ -385,6 +409,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_SODA) drawSoda(mx, my);
     else if (av.hold === HOLD_HOTDOG) drawHotdog(mx, my, P.dir > 0 ? 1 : -1);
     else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
+    else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);
     if (em?.kind === 'eat') { const u = now - em.t0; for (let k = 0; k < 3; k++) { const q = u - 0.45 - k * 0.12; if (q > 0 && q < 0.5) r(Math.round(mx + (k - 1) * 3 + q * 8 * (k - 1)), Math.round(my - 2 + q * 30 * q * 4), 1, 1, K.POPCORN_HI); } }
   }

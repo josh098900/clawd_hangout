@@ -9,14 +9,16 @@ import { sanitizeLook, type Look } from '../entities/critter';
 import { isEmote, type EmoteKind } from '../entities/avatar';
 import { ROOM_IDS, type RoomId } from '../world/room';
 import { scrub } from './filter';
+import { COOKS_MAX, type DinerState } from '../game/diner';
 
 export interface PeerState { id: string; name: string; look: Look; x: number; y: number; dir: 1 | -1; moving: boolean }
 /**
  * `use` = index into room.spots you're using (-1 = none). `hold` = what's in your hand
- * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt). `pose` = 0 normal, 1 dancing, 2 sitting on the floor.
+ * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite, 8 hot dog, 9-15 the Diner's kitchen:
+ * patty raw/cooked/burnt, burger, frozen fries, fries, shake). `pose` = 0 normal, 1 dancing, 2 sitting on the floor.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 8, POSE_MAX = 4;
+export const SPOTS_MAX = 40, HOLD_MAX = 15, POSE_MAX = 4;
 
 /**
  * Room state: small shared values that someone arriving later must also get. Each has a
@@ -49,7 +51,8 @@ export type StateVal =
   | { k: 'game'; v: GameState } | { k: 'slop'; v: { w: number; dead: number[] } } | { k: 'fw'; v: { t0: number; seed: number } }
   | { k: 'crypt'; v: { b: number[]; open: number } }
   | { k: 'claw'; v: { name: string; item: string } } | { k: 'champ'; v: { name: string; wins: number } }
-  | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string };
+  | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string }
+  | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } };
 export type StateMsg = StateVal & { ts: number };
 /** One whiteboard stroke chunk: colour index (0 = erase) and a polyline as flat [x0,y0,x1,y1,…], or a wipe. */
 export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
@@ -67,6 +70,7 @@ export type NetEvent =
   | { type: 'draw'; id: string; d: DrawMsg }
   | { type: 'note'; id: string; i: number; n: number }
   | { type: 'pong'; id: string; p: PongMsg }
+  | { type: 'cook'; id: string; st: number }
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'status'; text: string };
 
@@ -141,6 +145,8 @@ export interface Transport {
   /** Reel one in: the server picks the fish and its size (and enters it in a live contest). */
   catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }>;
   contestBoard(): Promise<ContestBoard>;
+  /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
+  dinerTip(score: number): Promise<{ tokens: number; paid: number }>;
   /** Today's 3 quests (the same for everyone) and which you've handed in. */
   todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }>;
   /** Hand in a quest (5 tokens; +10 with the third). */
@@ -184,6 +190,8 @@ export interface Transport {
   /** One note on a Stage instrument (i = instrument 0..3, n = pad 0..7). */
   sendNote(i: number, n: number): void;
   sendPong(p: PongMsg): void;
+  /** The Diner: "I pressed E at kitchen station st" (to the shift's host, see game/diner.ts). */
+  sendCook(st: number): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -298,6 +306,11 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     const name = cleanName(v.name), wins = v.wins;
     return name && typeof wins === 'number' && Number.isInteger(wins) && wins >= 1 && wins <= 9999 ? { id: o.id, s: { k: 'champ', v: { name, wins }, ts } } : null;
   }
+  if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
+  if (o.k === 'dinerbest' && v && typeof v === 'object') {
+    const name = cleanName(v.name), score = v.score;
+    return name && typeof score === 'number' && Number.isInteger(score) && score >= 0 && score <= 99999 ? { id: o.id, s: { k: 'dinerbest', v: { name, score }, ts } } : null;
+  }
   if (o.k === 'board' && typeof o.v === 'string' && o.v.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(o.v)) return { id: o.id, s: { k: 'board', v: o.v, ts } };
   return null;
 }
@@ -322,6 +335,21 @@ function parseGame(v: Record<string, unknown>): GameState | null {
   const times = Array.isArray(v.times) && v.times.length <= n && v.times.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x < 1e4) ? (v.times as number[]) : null;
   if (t0 === null || dur === null || since === null || round === null || !alive || !seats || !out || it === null || last === null || !times) return null;
   return { kind: v.kind as GameState['kind'], host: v.host as string, phase: v.phase as GameState['phase'], t0, dur, round, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), alive, seats, out, it, last, since, times };
+}
+function parseDiner(v: Record<string, unknown>): DinerState | null {
+  if (!isId(v.host)) return null;
+  const ids = v.ids, names = v.names, hands = v.hands, n = Array.isArray(ids) ? ids.length : -1;
+  if (!Array.isArray(ids) || n < 1 || n > COOKS_MAX || !ids.every(isId) || !Array.isArray(names) || names.length !== n || !Array.isArray(hands) || hands.length !== n || !hands.every((h) => Number.isInteger(h) && h >= 0 && h <= HOLD_MAX)) return null;
+  const times = (x: unknown, len: number) => (Array.isArray(x) && x.length === len && x.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t < 1e13) ? (x as number[]) : null);
+  const int = (x: unknown, lo: number, hi: number) => (typeof x === 'number' && Number.isInteger(x) && x >= lo && x <= hi ? x : null);
+  const t0 = num(v.t0, 0, 1e13), shake = num(v.shake, 0, 1e13), seed = int(v.seed, 0, 1e6), lvl = int(v.lvl, 1, 4), pts = int(v.pts, 0, 99999), done = int(v.done, 0, 99);
+  const grill = times(v.grill, 2), fry = times(v.fry, 2), served = Array.isArray(v.served) && v.served.length <= 32 && v.served.every((x) => Number.isInteger(x) && x >= 0 && x <= 7) ? (v.served as number[]) : null;
+  if (t0 === null || shake === null || seed === null || lvl === null || pts === null || done === null || !grill || !fry || !served) return null;
+  return { host: v.host as string, t0, seed, lvl, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), hands: hands as number[], grill, fry, shake, served, pts, done };
+}
+export function parseCook(p: unknown): { id: string; st: number } | null {
+  const o = p as Record<string, unknown> | null;
+  return o && isId(o.id) && typeof o.st === 'number' && Number.isInteger(o.st) && o.st >= 0 && o.st <= 7 ? { id: o.id, st: o.st } : null;
 }
 export function parseNote(p: unknown): { id: string; i: number; n: number } | null {
   const o = p as Record<string, unknown> | null;

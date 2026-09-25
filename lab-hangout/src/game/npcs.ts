@@ -150,6 +150,19 @@ const DEFS: NpcDef[] = [
     chat: ['welcome to the stage!', 'step up to an instrument and hit 1-8', 'everything is in the same key, you cannot play a wrong note', 'the DJ booth changes the beat', 'form a band!', 'the mic is for singing (sort of)'],
   },
   {
+    id: 'npc-cookie', name: 'COOKIE', room: 'diner', speed: 34,
+    look: { c: 1, hat: 13, face: 4, fit: 1, sp: 0 },
+    stops: [
+      { x: 1020, y: 500, wait: 16, say: ['sizzle sizzle', 'flip... and flip', 'six seconds a side. well. six seconds'] },
+      { x: 1296, y: 500, wait: 5, say: ['patties, patties...', 'who keeps leaving the fridge open'] },
+      { x: 1130, y: 500, wait: 10, say: ['fries are the easy bit', 'shake the basket!'] },
+      { x: 822, y: 500, wait: 8, say: ['ORDER UP!', 'table three, your burger!', 'ding ding!'] },
+      { x: 420, y: 560, wait: 14, say: ['everything ok here?', 'try the pie. i insist', 'refill?'] },
+      { x: 640, y: 500, wait: 6, say: ['i love this song', 'play something with a sax'] },
+    ],
+    chat: ['welcome to the Greasy Byte!', 'want to cook? CLOCK IN at the time clock by the kitchen', 'fridge for patties, grill them, then BUNS, then the PASS', 'fries: FREEZER, then FRYER. shakes make themselves (almost)', 'burnt stuff goes in the BIN', 'tickets pay tips, and a great shift gets you a hat like mine', 'more cooks means more orders. teamwork!'],
+  },
+  {
     id: 'npc-fern', name: 'FERN', room: 'roof', speed: 30,
     look: { c: 6, hat: 4, face: 0, fit: 2, sp: 0 },
     stops: [
@@ -210,7 +223,9 @@ export class Npcs {
     }
   }
 
-  inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season())); }
+  /** NPCs who've stepped out for now (COOKIE takes a break while players run a kitchen shift). */
+  readonly away = new Set<string>();
+  inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season()) && !this.away.has(n.def.id)); }
 
   /**
    * Put every NPC where the clock says. `taken(i)` = a player is using spot i in the NPC's room

@@ -69,6 +69,10 @@ export const SFX = {
   zap: () => tone('square', 1400, 500, 0.08, 0.03),
   boom: () => noise(500, 0.8, 0.25, 0.14, 0, 90),
   /** the Subway's door chime */
+  /** the Diner: the service bell on the pass */
+  bell: () => { tone('sine', 2093, 2093, 0.6, 0.05); tone('sine', 4186, 4186, 0.25, 0.015); },
+  /** a patty hitting the grill / fries going in the oil */
+  sizzle: () => { noise(5000, 0.7, 0.9, 0.05, 0, 3000); noise(2500, 1.2, 0.5, 0.03, 0.05); },
   dingdong: () => { tone('sine', 988, 988, 0.35, 0.06); tone('sine', 784, 784, 0.5, 0.06, 0.32); },
   /** wheels on the rails */
   clack: () => { noise(900, 2, 0.04, 0.025); noise(700, 2, 0.04, 0.02, 0.09); },

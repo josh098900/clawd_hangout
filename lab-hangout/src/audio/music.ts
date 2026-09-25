@@ -78,6 +78,28 @@ export const PARK_TRACKS: Track[] = [
   },
 ];
 /** The Dev Den radio: slow, soft lo-fi loops. */
+/** The Diner's jukebox: doo-wop-ish tunes written for the game. */
+export const DINER_TRACKS: Track[] = [
+  {
+    name: 'BLUE PLATE SPECIAL', bpm: 140, wave: 'square',
+    lead: 'E5 . G5 . C6 - B5 A5 A5 . E5 . C5 - E5 . F5 . A5 . C6 - A5 F5 G5 . B5 . D6 - . .',
+    bass: 'C3 . G2 . C3 . G2 . A2 . E2 . A2 . E2 . F2 . C3 . F2 . C3 . G2 . D3 . G2 . B2 .',
+    drums: 'k . s . k k s . k . s . k k s . k . s . k k s . k . s . k s s s',
+  },
+  {
+    name: 'MIDNIGHT MALT', bpm: 96, wave: 'triangle',
+    lead: 'A4 - C5 E5 - D5 C5 - B4 - D5 F5 - E5 D5 - C5 - E5 G5 - F5 E5 - D5 - - . E5 - - .',
+    bass: 'A2 . E3 . A2 . E3 . D3 . A2 . D3 . A2 . C3 . G2 . C3 . G2 . E2 . B2 . E2 . G#2 .',
+    drums: 'k . h s . h k . k . h s . h k h k . h s . h k . k . h s . s s .',
+  },
+  {
+    name: 'TABLE FOR TWO', bpm: 118, wave: 'square',
+    lead: 'G4 . C5 . E5 . D5 C5 A4 . C5 . F5 . E5 D5 D5 . G4 . B4 . D5 C5 B4 . C5 - - . . .',
+    bass: 'C3 . E3 . G3 . E3 . F2 . A2 . C3 . A2 . G2 . B2 . D3 . B2 . C3 . G2 . C3 . . .',
+    drums: 'k . s h k . s h k . s h k . s h k . s h k . s h k . s h k k s .',
+  },
+];
+
 export const LOFI: Track[] = [
   {
     name: 'RAINY COMMITS', bpm: 72, wave: 'sine',

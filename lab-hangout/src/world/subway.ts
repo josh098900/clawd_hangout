@@ -4,7 +4,7 @@
 // it together), with the tunnel and then the city rushing past the windows, and an EXIT that
 // opens at each station.
 //
-// The line: SQUARE -> PARK -> (back). Stations without a room yet are OPENING SOON: the train
+// The line is a loop: SQUARE -> PARK -> DINER -> (back to the SQUARE). Stations without a room yet are OPENING SOON: the train
 // stops but keeps its doors shut. Each station takes STOP_S seconds (4 s pulling in, doors open,
 // 4 s pulling out) and the ride to the next one takes RIDE_S.
 
@@ -18,6 +18,7 @@ import type { Door, Prop, Room, RoomId, Spot } from './room';
 export const STATIONS: { name: string; room: RoomId | null; arrive: { x: number; y: number }; exit: { to: RoomId; arrive: { x: number; y: number } }; tile: RGB; tileLn: RGB }[] = [
   { name: 'SQUARE', room: 'subway', arrive: { x: 0, y: 500 }, exit: { to: 'plaza', arrive: { x: 760, y: 664 } }, tile: [226, 222, 204], tileLn: [196, 190, 170] },
   { name: 'PARK', room: 'parkstn', arrive: { x: 0, y: 500 }, exit: { to: 'park', arrive: { x: 170, y: 668 } }, tile: [206, 226, 200], tileLn: [172, 196, 166] },
+  { name: 'DINER', room: 'dinerstn', arrive: { x: 0, y: 500 }, exit: { to: 'diner', arrive: { x: 70, y: 650 } }, tile: [236, 206, 200], tileLn: [206, 170, 164] },
 ];
 const IN_S = 4, OPEN_S = 16, OUT_S = 4, STOP_S = IN_S + OPEN_S + OUT_S, RIDE_S = 36, LEG = STOP_S + RIDE_S;
 export type TrainPhase = 'in' | 'open' | 'out' | 'ride';
@@ -58,7 +59,7 @@ function buildStation(this: Room, n: number): void {
     // the line map poster
     r(360, 330, 200, 50, [30, 34, 40]); r(362, 332, 196, 46, [245, 242, 230]); txt('LAB HANGOUT LINE', 460 - tw('LAB HANGOUT LINE') / 2, 336, [30, 34, 40]);
     line(390, 356, 530, 356, BAND); line(390, 357, 530, 357, BAND);
-    STATIONS.forEach((s, i) => { const x = 390 + i * 140; r(x - 3, 353, 7, 7, s.room ? BAND : [150, 150, 150]); r(x - 1, 355, 3, 3, K.WHITE); txt(s.name, x - tw(s.name) / 2, 364, s.room ? [30, 34, 40] : [150, 150, 150]); });
+    STATIONS.forEach((s, i) => { const x = 390 + i * 140 / (STATIONS.length - 1); r(x - 3, 353, 7, 7, s.room ? BAND : [150, 150, 150]); r(x - 1, 355, 3, 3, K.WHITE); txt(s.name, x - tw(s.name) / 2, 364, s.room ? [30, 34, 40] : [150, 150, 150]); });
     // the track pit behind the platform edge: dark tunnel wall with cables
     r(0, TRAIN_TOP, SW, PLAT - TRAIN_TOP, [34, 36, 42]); for (let x = 0; x < SW; x += 40) r(x, TRAIN_TOP, 2, PLAT - TRAIN_TOP, [28, 30, 36]);
     for (const y of [TRAIN_TOP + 8, TRAIN_TOP + 14, TRAIN_TOP + 20]) r(0, y, SW, 1, [50, 46, 40]);
@@ -254,8 +255,10 @@ function carBack(a: number): void {
   lit(() => txt(msg.slice(0, 48), 500 - tw(msg.slice(0, 48)) / 2, 331, [255, 180, 60]));
   // the line map over the left windows, with a light where the train is
   const mx0 = 90, mx1 = 210; r(mx0 - 20, 326, mx1 - mx0 + 40, 18, [245, 242, 230]); line(mx0, 332, mx1, 332, BAND);
-  STATIONS.forEach((s, i) => { const x = mx0 + i * (mx1 - mx0); r(x - 2, 330, 5, 5, s.room ? BAND : [150, 150, 150]); txt(s.name, x - tw(s.name) / 2, 337, s.room ? [60, 64, 72] : [150, 150, 150]); });
-  const pos = tr.phase === 'ride' ? (tr.at + tr.u) : tr.at, px = mx0 + (pos % 2 <= 1 ? pos % 2 : 2 - (pos % 2)) * (mx1 - mx0);
+  const nS = STATIONS.length;
+  STATIONS.forEach((s, i) => { const x = mx0 + i * (mx1 - mx0) / (nS - 1); r(x - 2, 330, 5, 5, s.room ? BAND : [150, 150, 150]); txt(s.name, x - tw(s.name) / 2, 337, s.room ? [60, 64, 72] : [150, 150, 150]); });
+  // along the line, and back along it for the loop home
+  const pos = tr.phase === 'ride' ? (tr.next === 0 ? (nS - 1) * (1 - tr.u) : tr.at + tr.u) : tr.at, px = mx0 + pos * (mx1 - mx0) / (nS - 1);
   lit(() => { r(Math.round(px) - 2, 329, 5, 7, (a % 0.8) < 0.5 ? [255, 214, 90] : [255, 140, 40]); });
   // hanging handles: they swing with the ride
   const sway = tr.phase === 'ride' ? Math.sin(a * 2.2) * 3 : tr.phase === 'in' ? 5 * (1 - tr.u) : tr.phase === 'out' ? -5 * tr.u : Math.sin(a * 1.5) * 0.6;

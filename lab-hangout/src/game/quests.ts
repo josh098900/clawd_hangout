@@ -32,6 +32,7 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   commit: { text: 'Make 3 commits in the Dev Den', goal: 3 },
   stars: { text: 'Find a constellation from the roof', goal: 1 },
   crew: { text: 'Join a group dance (3 or more dancing together)', goal: 1 },
+  diner: { text: 'Work a kitchen shift at the Diner', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -48,6 +49,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'spooked', name: 'SPOOKED', hint: 'Get tricked on Halloween', earned: () => stat('tricks') >= 1 },
   { id: 'trophy', name: 'TROPHY ANGLER', hint: 'Win a fishing contest at the Pier', earned: () => false }, // the server awards this one
   { id: 'crew', name: 'DANCE CREW', hint: 'Join 10 group dances', earned: () => stat('crews') >= 10 },
+  { id: 'chef', name: 'HEAD CHEF', hint: 'Score 120 points in one Diner shift', earned: () => stat('dinerBest') >= 120 },
   { id: 'storm', name: 'STORM CHASER', hint: 'Catch a fish in a thunderstorm', earned: () => stat('stormFish') >= 1 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;

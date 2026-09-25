@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parseCook, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -137,6 +137,7 @@ export class SupabaseTransport implements Transport {
     const o = await this.rpcJson('catch_fish', {});
     return { fish: String(o.fish ?? ''), rarity: String(o.rarity ?? 'COMMON'), cm: Number(o.cm) || 0, contest: o.contest === true, rank: typeof o.rank === 'number' ? o.rank : null };
   }
+  async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async contestBoard(): Promise<ContestBoard> {
     const o = await this.rpcJson('contest_board', {});
     const top = Array.isArray(o.top) ? (o.top as Record<string, unknown>[]).map((e) => ({ name: cleanName(e.name) || 'SOMEONE', fish: String(e.fish ?? '').slice(0, 16), cm: Number(e.cm) || 0 })) : [];
@@ -239,6 +240,7 @@ export class SupabaseTransport implements Transport {
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => { const v = parseEmote(payload); if (v && v.id !== this.selfId) this.on({ type: 'emote', id: v.id, kind: v.kind }); });
     ch.on('broadcast', { event: 'state' }, ({ payload }) => { const v = parseState(payload); if (v && v.id !== this.selfId) this.on({ type: 'state', id: v.id, s: v.s }); });
     ch.on('broadcast', { event: 'note' }, ({ payload }) => { const v = parseNote(payload); if (v && v.id !== this.selfId) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); });
+    ch.on('broadcast', { event: 'cook' }, ({ payload }) => { const v = parseCook(payload); if (v && v.id !== this.selfId) this.on({ type: 'cook', id: v.id, st: v.st }); });
     ch.on('broadcast', { event: 'pong' }, ({ payload }) => { const v = parsePong(payload); if (v && v.id !== this.selfId) this.on({ type: 'pong', id: v.id, p: v.p }); });
     ch.on('broadcast', { event: 'draw' }, ({ payload }) => { const v = parseDraw(payload); if (v && v.id !== this.selfId) this.on({ type: 'draw', id: v.id, d: v.d }); });
 
@@ -283,6 +285,7 @@ export class SupabaseTransport implements Transport {
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
   sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
+  sendCook(st: number): void { void this.ch?.send({ type: 'broadcast', event: 'cook', payload: { id: this.selfId, st } }); }
   sendPong(p: PongMsg): void { void this.ch?.send({ type: 'broadcast', event: 'pong', payload: { id: this.selfId, ...p } }); }
 
   async leaveRoom(): Promise<void> {
