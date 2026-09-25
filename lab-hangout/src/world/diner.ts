@@ -46,7 +46,7 @@ function build(this: Room): void {
     for (const [x0, x1] of [[96, 424], [476, 604]]) {
       r(x0 - 5, 296, x1 - x0 + 10, 108, CHROME_DK); r(x0 - 3, 298, x1 - x0 + 6, 104, CHROME);
       for (let y = 300; y < 400; y += 4) r(x0, y, x1 - x0, 4, M([18, 20, 48], [52, 40, 80], (y - 300) / 100));
-      for (let x = x0; x < x1; x += 22) { const hh = 20 + Math.floor(h1(x * 0.37) * 40); r(x, 372 - hh, 20, hh, [26, 26, 56]); for (let wy = 372 - hh + 4; wy < 368; wy += 7) if (h1(x + wy) > 0.6) r(x + 4 + (wy % 2) * 8, wy, 2, 3, [255, 206, 120]); }
+      for (let x = x0; x < x1; x += 22) { const hh = 20 + Math.floor(h1(x * 0.37) * 40); r(x, 372 - hh, Math.min(20, x1 - x), hh, [26, 26, 56]); for (let wy = 372 - hh + 4; wy < 368; wy += 7) { const lx = x + 4 + (wy % 2) * 8; if (h1(x + wy) > 0.6 && lx + 2 <= x1) r(lx, wy, 2, 3, [255, 206, 120]); } }
       r(x0, 372, x1 - x0, 28, [36, 36, 46]); r(x0, 384, x1 - x0, 1, [200, 180, 80]); // the street
       for (let x = x0 + 60; x < x1; x += 160) r(x, 340, 3, 32, [60, 60, 70]);
     }

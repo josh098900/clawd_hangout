@@ -93,7 +93,7 @@ function drawBack(id: FlatRoomId, a: number): void {
   if (g.win) {
     const [x0, x1] = g.win, day = dayness(), sky0: RGB = M([20, 22, 56], [120, 180, 230], day), sky1: RGB = M([60, 40, 90], [190, 220, 240], day);
     for (let y = 300; y < 404; y += 4) r(x0, y, x1 - x0, 4, M(sky0, sky1, (y - 300) / 104));
-    for (let x = x0, i = 0; x < x1; x += 22, i++) { const hh = 30 + Math.floor(h1(i * 3.1 + x0) * 50), bc: RGB = M([30, 30, 64], [150, 170, 200], day); r(x, 404 - hh, 20, hh, bc); if (day < 0.5) lit(() => { for (let wy = 408 - hh; wy < 400; wy += 7) if (h1(x + wy) > 0.55) r(x + 4 + (wy % 2) * 8, wy, 2, 3, [255, 214, 140]); }); }
+    for (let x = x0, i = 0; x < x1; x += 22, i++) { const hh = 30 + Math.floor(h1(i * 3.1 + x0) * 50), bc: RGB = M([30, 30, 64], [150, 170, 200], day), bw = Math.min(20, x1 - x); r(x, 404 - hh, bw, hh, bc); if (day < 0.5) lit(() => { for (let wy = 408 - hh; wy < 400; wy += 7) { const lx = x + 4 + (wy % 2) * 8; if (h1(x + wy) > 0.55 && lx + 2 <= x1) r(lx, wy, 2, 3, [255, 214, 140]); } }); } // (the last building stops at the frame)
     r(x0 + (x1 - x0) / 2 - 1, 300, 3, 104, [236, 232, 220]); r(x0, 350, x1 - x0, 3, [236, 232, 220]);
   }
   // rugs under everything, wall pieces on the wall
