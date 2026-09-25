@@ -67,10 +67,78 @@ const res = await p.evaluate(async () => {
   for (const k of Object.keys(out)) out[k] = String(out[k]).replace(/#\d+/g, (m) => done[m]);
   return out;
 });
+// ---- characters and sound, on a page that doesn't start the game (so nothing live can mix in) ----
+const p2 = await b.newPage(); p2.on('pageerror', (e) => errs.push(e.message));
+await p2.evaluateOnNewDocument(() => {
+  const FIXED = 1790000123456; const RD = Date;
+  class FD extends RD { constructor(...a) { if (a.length) super(...a); else super(FIXED); } static now() { return FIXED; } }
+  globalThis.Date = FD; performance.now = () => 1234567.89;
+  let s = 42; Math.random = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  // sound renders offline (silently, into a buffer we can fingerprint)
+  globalThis.AudioContext = class extends OfflineAudioContext { constructor() { super(1, 44100 * 5, 44100); } resume() { return Promise.resolve(); } };
+});
+await p2.goto('http://localhost:5197/src/engine/math.ts', { waitUntil: 'load' });
+Object.assign(res, await p2.evaluate(async () => {
+  const sha = async (buf) => [...new Uint8Array(await crypto.subtle.digest('SHA-1', buf))].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('');
+  const px = await import('/src/engine/pixel.ts'), av = await import('/src/entities/avatar.ts'), cr = await import('/src/entities/critter.ts');
+  const out = {}, NOW = 1234.5, A = 12.345;
+  const grid = async (name, list) => { // list of [look, setup(avatar), using?]
+    const cols = 12, rows = Math.ceil(list.length / cols), c = px.mk(cols * 50, rows * 90), g = px.mk(cols * 25, rows * 45), gx = g.getContext('2d'); gx.setTransform(0.5, 0, 0, 0.5, 0, 0);
+    for (const dim of [0, 0.4]) {
+      c.getContext('2d').clearRect(0, 0, c.width, c.height);
+      const pg = px.PX.glow; px.PX.glow = gx;
+      px.withCtx(c.getContext('2d'), () => {
+        list.forEach(([look, setup, using], i) => {
+          const a = av.makeAvatar('av' + i, 'NAME' + i, { ...cr.DEFAULT_LOOK, ...look }, 25 + (i % cols) * 50, 80 + Math.floor(i / cols) * 90, i === 0, NOW - 5);
+          a.stopT = NOW - 5; a.useT0 = NOW - 2; a.poseT0 = NOW - 1; a.pet.t = NOW;
+          setup?.(a); px.PX.dim = dim; px.PX.emit = false; px.PX.fl = 0;
+          av.drawAvatar(a, A, NOW, dim, using ?? null, 0, false);
+        });
+      });
+      px.PX.glow = pg;
+      out[name + ':' + dim] = (await sha(c.getContext('2d').getImageData(0, 0, c.width, c.height).data)) + '/' + (await sha(gx.getImageData(0, 0, g.width, g.height).data));
+    }
+  };
+  const L = (n) => Array.from({ length: n }, (_, i) => i);
+  await grid('holds', L(18).map((h) => [{}, (a) => { a.hold = h; }]));
+  await grid('poses', L(6).map((pz) => [{}, (a) => { a.pose = pz; }]).concat(['sit', 'desk', 'instrument', 'hammock', 'scope', 'rack', 'board', 'coffee', 'arcade', 'kart', 'mission'].map((u) => [{}, (a) => { a.use = 0; }, u])));
+  await grid('moving', L(12).map((i) => [{ c: i % 9 }, (a) => { a.moving = true; a.walkDist = i * 7; a.dir = i % 2 ? 1 : -1; }]));
+  for (const sp of [0, 1]) {
+    await grid('hats' + sp, L(cr.HATS.length).map((h) => [{ sp, hat: h }]));
+    await grid('faces' + sp, L(cr.FACES.length).map((f) => [{ sp, face: f }]));
+    await grid('fits' + sp, L(cr.FITS.length).map((f) => [{ sp, fit: f }]));
+    await grid('pets' + sp, L(cr.PETS.length).map((pt) => [{ sp, pet: pt }]));
+  }
+  await grid('emotes', av.ALL_EMOTES.map((e) => [{}, (a) => { a.emote = { kind: e.kind, t0: NOW - 0.3 }; }]));
+  av.ENV.zeroG = true; await grid('zerog', L(6).map((i) => [{}, (a) => { a.moving = i % 2 === 1; a.pose = i < 2 ? 5 : 0; }])); av.ENV.free = true; await grid('free', L(4).map(() => [{}])); av.ENV.zeroG = false; av.ENV.free = false;
+  av.ENV.ice = () => true; await grid('ice', L(4).map((i) => [{}, (a) => { a.moving = true; a.walkDist = i * 13; }])); av.ENV.ice = null;
+  av.ENV.g = 0.6; await grid('gforce', L(3).map(() => [{}])); av.ENV.g = 0;
+  // sound: every effect, every instrument pad and a bar of music, rendered offline together
+  const sfx = await import('/src/audio/sfx.ts'), mu = await import('/src/audio/music.ts');
+  sfx.setSound(true);
+  for (const k of Object.keys(sfx.SFX)) sfx.SFX[k]();
+  for (let i = 0; i < 4; i++) for (let n = 0; n < 8; n++) mu.playPad(i, n, 0.5);
+  const mp = new mu.MusicPlayer(); mp.set(mu.TRACKS[0], Date.now() / 1000); mp.volume(0.8); mp.tick();
+  new mu.Rain().set(0.5); new mu.Rumble().set(0.5); new mu.Engine().set(0.7, true);
+  const buf = await sfx.audio().AC.startRendering();
+  // (overlapping sounds are summed in an order Chrome doesn't fix, so the last bits of a sample vary run to run:
+  // keep each 50 ms slice's loudness instead, compared with a small tolerance)
+  const d = buf.getChannelData(0), win = 2205; out.audio = [];
+  out.pitch = []; // and how often it crosses zero in each slice (that follows the pitch, which loudness doesn't)
+  for (let i = 0; i < d.length; i += win) {
+    let e = 0, z = 0; for (let j = i; j < Math.min(d.length, i + win); j++) { e += d[j] * d[j]; if (j > i && (d[j] >= 0) !== (d[j - 1] >= 0)) z++; }
+    out.audio.push(Math.round(Math.sqrt(e / win) * 1e6) / 1e6); out.pitch.push(z);
+  }
+  return out;
+}));
 await b.close(); await server.close();
 if (errs.length) { console.error('errors while drawing:', errs); process.exit(1); }
 if (update || !fs.existsSync(BASE)) { fs.writeFileSync(BASE, JSON.stringify(res, null, 1) + '\n'); console.log('saved', Object.keys(res).length, 'fingerprints as the new baseline'); process.exit(0); }
-const base = JSON.parse(fs.readFileSync(BASE, 'utf8')), changed = [...new Set([...Object.keys(base), ...Object.keys(res)])].filter((k) => base[k] !== res[k]);
+const base = JSON.parse(fs.readFileSync(BASE, 'utf8'));
+/** Sound (an array of loudness per slice) may wobble in its last digits; everything else must match exactly. */
+const TOL = { audio: 1e-4, pitch: 4 }; // (zero crossings: a sample right at zero can flip either way)
+const same = (a, b, k) => (Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) <= (TOL[k] ?? 0)) : a === b);
+const changed = [...new Set([...Object.keys(base), ...Object.keys(res)])].filter((k) => !same(base[k], res[k], k));
 for (const k of changed) console.log('CHANGED  ' + k);
 console.log(changed.length ? changed.length + ' of ' + Object.keys(base).length + ' fingerprints changed' : 'all ' + Object.keys(base).length + ' fingerprints match the baseline');
 process.exit(changed.length ? 1 : 0);
