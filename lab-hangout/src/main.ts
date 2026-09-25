@@ -8,7 +8,7 @@
 import './styles.css';
 import { Renderer } from './engine/renderer';
 import { Input, isTyping } from './engine/input';
-import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, alpha, puff, bake } from './engine/pixel';
+import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, alpha, puff, bake, arrowDown } from './engine/pixel';
 import { K, SK } from './engine/palette';
 import { clamp, seg } from './engine/math';
 import { makeLab, LAB_INFO } from './world/lab';
@@ -29,7 +29,7 @@ import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, ARCADE_INFO, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
 import { openTanks, type TankHandle } from './ui/tanks';
 import { makeStation, makeTrain, STATIONS, train } from './world/subway';
-import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
+import { makePark, PARK_INFO, DOCK, pondEdge, pondFeedPoint } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
 import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
@@ -244,7 +244,7 @@ function onNet(e: NetEvent): void {
       if (usingOf(av) !== 'instrument') crowdEmote(e.kind);
       if (e.kind === 'wave') highFive(av);
       if (e.kind === 'feed' && room.id === 'plaza') ambient.feed(av.x + av.dir * 30, av.y, t);
-      if (e.kind === 'feed' && room.id === 'park') { const ex = av.x + av.dir * 40, k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((av.y - POND.y) / POND.ry) ** 2)); PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (av.y - POND.y) * k, t }; }
+      if (e.kind === 'feed' && room.id === 'park') PARK_INFO.feed = { ...pondFeedPoint(av.x + av.dir * 40, av.y), t };
       break;
     }
     case 'state': if (allow(e.id, 'state', 6, 12)) applyState(e.s); break;
@@ -675,17 +675,23 @@ function useSpot(i: number): void {
     toast(first ? 'You found the CROWN! It is yours now (Look menu)' : 'The crown suits you', 4000);
   }
 }
+// ---------- asking the server to do something to a shared thing (a garden bed, a station tray) ----------
+const serverBusy = new Set<string>();
+/**
+ * Run `act` (one at a time per `what`), then `ok` with its answer and `refresh(true)` so everyone here looks again;
+ * on an error, say why and just refresh.
+ */
+function serverDo<T>(what: string, act: () => Promise<T>, ok: (r: T) => void, refresh: (bump?: boolean) => void): void {
+  if (serverBusy.has(what)) return; serverBusy.add(what);
+  act().then((r) => { ok(r); refresh(true); }).catch((e: unknown) => { toast(cap(errText(e)), 3500); SFX.hurt(); refresh(); }).finally(() => { serverBusy.delete(what); });
+}
 // ---------- the Rooftop garden (world/garden.ts) ----------
-let gardenBusy = false;
 function refreshGarden(bump = false): void {
   GARDEN.dirty = false; GARDEN.fetchedAt = Date.now();
   net.plots().then((ps) => { GARDEN.plots = ps; }).catch((e) => console.warn('[garden]', e));
   if (bump) setState({ k: 'garden', v: { n: Date.now() } }); // tell everyone else on the roof to look again
 }
-function gardenDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
-  if (gardenBusy) return; gardenBusy = true;
-  act().then((r) => { ok(r); refreshGarden(true); }).catch((e: unknown) => { const m = errText(e); toast(cap(m), 3500); SFX.hurt(); refreshGarden(); }).finally(() => { gardenBusy = false; });
-}
+const gardenDo = <T,>(act: () => Promise<T>, ok: (r: T) => void): void => serverDo('garden', act, ok, refreshGarden);
 function waterBed(n: number): void {
   const other = GARDEN.plots.find((q) => q.bed === n)?.owner !== net.selfId;
   gardenDo(() => net.water(n), (r) => { if (other) quests.bump('water'); if (r.thanked) quests.stat('helped'); setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floatText('+1'); });
@@ -856,8 +862,7 @@ function openPresent(n: number): void {
   net.findPresent(n).then((r) => {
     WINTER.presents.add(n); setTokens(r.tokens); SFX.chime(); floatText('+1', PRESENTS[n].x, PRESENTS[n].y - 30);
     toast('A PRESENT! +1 token (' + r.found + '/12 found today)', 3000);
-    if (r.prize === 'tokens:5') toast('ALL 12 PRESENTS! You have every winter prize already, so +5 tokens', 5000);
-    else if (r.prize) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('ALL 12 PRESENTS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+    seasonPrize(r.prize, 'ALL 12 PRESENTS!', 'winter prize');
   }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(cap(m), 3000); });
 }
 function adventMenu(): void {
@@ -1095,16 +1100,12 @@ function spaceArrive(from: RoomId, id: RoomId): void {
   if (from === 'station' && id === 'park') { SFX.splash(); toast('SPLASHDOWN! The escape pod dropped you in the Park pond', 4500); }
 }
 // the hydroponic trays
-let trayBusy = false;
 function refreshTrays(bump = false): void {
   STATION.dirty = false; STATION.fetchedAt = Date.now();
   net.trays().then((ts) => { STATION.trays = ts; }).catch((e) => console.warn('[trays]', e));
   if (bump) setState({ k: 'trays', v: { n: Date.now() } }); // tell everyone else here to look again
 }
-function trayDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
-  if (trayBusy) return; trayBusy = true;
-  act().then((r) => { ok(r); refreshTrays(true); }).catch((e: unknown) => { const m = errText(e); toast(cap(m), 3500); SFX.hurt(); refreshTrays(); }).finally(() => { trayBusy = false; });
-}
+const trayDo = <T,>(act: () => Promise<T>, ok: (r: T) => void): void => serverDo('trays', act, ok, refreshTrays);
 function tendTray(n: number): void {
   const t = STATION.trays.find((q) => q.tray === n), mine = STATION.trays.find((q) => q.owner === net.selfId);
   if (t && t.owner === net.selfId) {
@@ -1167,6 +1168,11 @@ async function refreshSeason(): Promise<void> {
   npcs.dressFor(season());
   if (isWinter()) { installWinter(ROOMS, [...LAB_TRACKS, ...WINTER_TRACKS]); FILL.coffee = { hold: HOLD_COCOA, secs: 1.8, msg: 'Hot cocoa with marshmallows!' }; void refreshWinter(); }
 }
+/** A season's collect-them-all prize: a new item (celebrate!), or 5 tokens if you already have them all. */
+function seasonPrize(prize: string | null, all: string, what: string): void {
+  if (prize === 'tokens:5') toast(all + ' You have every ' + what + ' already, so +5 tokens', 5000);
+  else if (prize) { save.addPrize(prize); SFX.score(); celebrate(); toast(all + ' You got the ' + itemName(prize) + '! (Look menu)', 6000); }
+}
 /** Trick or treat at door n: the server pays (or tricks you into a ghost for a minute). */
 function knock(n: number): void {
   if (knocking) return; knocking = true;
@@ -1175,8 +1181,7 @@ function knock(n: number): void {
     markKnocked(n); setTokens(r.tokens);
     if (r.trick) { quests.stat('tricks'); me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
     else { SFX.chime(); floatText('+1'); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
-    if (r.prize === 'tokens:5') toast('ALL 8 DOORS! You have every costume already, so +5 tokens', 5000);
-    else if (r.prize) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('ALL 8 DOORS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+    seasonPrize(r.prize, 'ALL 8 DOORS!', 'costume');
   }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) markKnocked(n); toast(cap(m), 3000); })
     .finally(() => { knocking = false; });
 }
@@ -1206,12 +1211,14 @@ function openClawMachine(i: number): void {
     onClose: closeSpot(i),
   });
 }
+/** Whoever is standing at spot `spot` (the other side of a Pong table or a tank cabinet). */
+const seatedAt = (spot: number): { id: string; name: string } | null => { for (const o of others.values()) if (o.use === spot) return { id: o.id, name: o.name }; return null; };
 let pong: PongHandle | null = null;
 function startPong(i: number): void {
   const side = (PONG_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = PONG_SPOTS[1 - side];
   pong = openPong({
     side, myName: me.name,
-    opponent: () => { for (const o of others.values()) if (o.use === other) return { id: o.id, name: o.name }; return null; },
+    opponent: () => seatedAt(other),
     send: (p) => { net.sendPong(p); pongSeen(p); },
     over: (winner) => {
       const ch = ARCADE_INFO.champ;
@@ -1227,7 +1234,7 @@ function startTank(i: number): void {
   const side = (TANK_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = TANK_SPOTS[1 - side];
   tank = openTanks({
     side, myName: me.name,
-    opponent: () => { for (const o of others.values()) if (o.use === other) return { id: o.id, name: o.name }; return null; },
+    opponent: () => seatedAt(other),
     send: (m) => { net.sendTank(m); tankSeen(m); },
     won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); celebrate(); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
     onClose: () => { tank = null; input.clear(); if (me.use === i) leaveSpot(); },
@@ -1371,7 +1378,7 @@ function syncPad(): void {
   if (i === padShown) return;
   padShown = i; pad.style.display = i < 0 ? 'none' : ''; document.body.classList.toggle('jamming', i >= 0);
   if (i < 0) return;
-  pad.replaceChildren(...PAD_LABELS[i].map((lab, n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; const k = document.createElement('kbd'); k.textContent = String(n + 1); b.append(k, ' ' + lab); b.style.boxShadow = '0 0 0 2px ' + ['#5FE7FF', '#FFD65A', '#FF5FD2', '#7CF29C'][i]; b.addEventListener('pointerdown', (e) => { e.preventDefault(); playNote(n); }); return b; }));
+  pad.replaceChildren(...PAD_LABELS[i].map((lab, n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; keyLabel(b, String(n + 1), lab); b.style.boxShadow = '0 0 0 2px ' + ['#5FE7FF', '#FFD65A', '#FF5FD2', '#7CF29C'][i]; b.addEventListener('pointerdown', (e) => { e.preventDefault(); playNote(n); }); return b; }));
   const t = document.createElement('span'); t.className = 'pill quiet'; t.textContent = INSTRUMENTS[i]; pad.prepend(t);
 }
 /** Fish bite about twice as fast in the rain. */
@@ -1426,9 +1433,7 @@ function land(): void {
 function feedDucks(): void {
   if (!emote('feed')) return;
   quests.bump('feed');
-  const ex = me.x + me.dir * 40, ey = me.y;
-  const k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((ey - POND.y) / POND.ry) ** 2));
-  PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (ey - POND.y) * k, t: now() };
+  PARK_INFO.feed = { ...pondFeedPoint(me.x + me.dir * 40, me.y), t: now() };
 }
 function feed(): void {
   if (!emote('feed')) return;
@@ -1488,6 +1493,12 @@ function currentAction(): Action | null {
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
 }
+/** Fill a pill button with its key and what it does: <kbd>E</kbd> LABEL. */
+function keyLabel(b: HTMLElement, key: string, label: string): void { const k = document.createElement('kbd'); k.textContent = key; b.replaceChildren(k, ' ' + label); }
+/** A pill button showing its key, that runs onClick. */
+function pillButton(cls: string, key: string, label: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button'); b.type = 'button'; b.className = cls; keyLabel(b, key, label); b.addEventListener('click', onClick); return b;
+}
 let actNow: Action | null = null;
 const actBtn = document.createElement('button'), sipBtn = document.createElement('button');
 actBtn.type = sipBtn.type = 'button'; actBtn.className = sipBtn.className = 'pill act';
@@ -1499,29 +1510,22 @@ function syncActionBar(): void {
   const label = actNow?.label ?? '';
   if (label !== actShown) {
     actShown = label; actBtn.style.display = label ? '' : 'none';
-    const k = document.createElement('kbd'); k.textContent = 'E'; actBtn.replaceChildren(k, ' ' + label);
+    keyLabel(actBtn, 'E', label);
   }
   const s = me.hold && playing ? (me.hold === HOLD_KITE ? 'PUT AWAY' : isKitchen(me.hold) ? 'DROP' : useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
   if (s !== sipShown) {
     sipShown = s; sipBtn.style.display = s ? '' : 'none';
-    const k = document.createElement('kbd'); k.textContent = 'Q'; sipBtn.replaceChildren(k, ' ' + s);
+    keyLabel(sipBtn, 'Q', s);
   }
   for (const [p, b] of poseBtns) b.setAttribute('aria-pressed', String(me.pose === p));
   const fl = playing && room.zeroG?.() ? (room.freeFloat ? 'JETPACK' : 'FLOAT') : '';
-  if (fl !== floatShown) { floatShown = fl; floatBtn.style.display = fl ? '' : 'none'; const k = document.createElement('kbd'); k.textContent = 'SPACE'; floatBtn.replaceChildren(k, ' ' + fl); }
+  if (fl !== floatShown) { floatShown = fl; floatBtn.style.display = fl ? '' : 'none'; keyLabel(floatBtn, 'SPACE', fl); }
 }
 const emoteBar = $('#emotes');
 emoteBar.append(actBtn, sipBtn);
 $('#bar').prepend(pad); pad.style.display = 'none';
 const khud = new KaraokeHud($('#bar'));
-for (const em of EMOTES) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'pill emo';
-  const k = document.createElement('kbd'); k.textContent = em.key;
-  b.append(k, ' ' + em.label);
-  b.addEventListener('click', () => emote(em.kind));
-  emoteBar.appendChild(b);
-}
+for (const em of EMOTES) emoteBar.appendChild(pillButton('pill emo', em.key, em.label, () => emote(em.kind)));
 // the emote wheel: R (or MORE) opens 8 more emotes in a ring
 const wheel = document.createElement('div'); wheel.id = 'wheel';
 function openWheel(): void {
@@ -1548,9 +1552,7 @@ wheel.addEventListener('click', closeWheel);
 $('#stage').appendChild(wheel);
 // toggles that last until you move: 6 dance, 7 sit on the floor
 const poseBtns: [number, HTMLButtonElement][] = ([[POSE_DANCE, '6', 'DANCE'], [POSE_FLOOR, '7', 'SIT']] as [number, string, string][]).map(([p, key, label]) => {
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'pill emo';
-  const k = document.createElement('kbd'); k.textContent = key; b.append(k, ' ' + label);
-  b.addEventListener('click', () => setPose(p)); emoteBar.appendChild(b);
+  const b = pillButton('pill emo', key, label, () => setPose(p)); emoteBar.appendChild(b);
   return [p, b];
 });
 const floatBtn = document.createElement('button'); floatBtn.type = 'button'; floatBtn.className = 'pill float'; floatBtn.style.display = 'none';
@@ -1781,7 +1783,7 @@ function drawActionHint(a: number, act: Action | null): void {
   if (!act?.at) return;
   const cx = Math.round(act.at[0]), y = Math.round(act.at[1]) - Math.round(Math.abs(Math.sin(a * 5)) * 2);
   const label = isTouch ? act.label : 'E ' + act.label;
-  lit(() => { r(cx - 1, y - 3, 3, 3, [255, 214, 90]); for (let j = 0; j < 4; j++) r(cx - 3 + j, y + j, 7 - j * 2, 1, [255, 214, 90]); });
+  arrowDown(cx, y, [255, 214, 90]);
   txtOutlined(label, Math.round(cx - tw(label) / 2), y - 11, [255, 236, 170]);
   Gd(cx, y, 6, [255, 214, 90], 0.35);
 }
@@ -1852,7 +1854,7 @@ function render(a: number, t: number): void {
   const g = gameNow();
   if (g?.kind === 'chairs' && g.phase === 'grab') for (const si of g.seats) {
     const s = room.spots[si], y = Math.round(s.y - s.lift - 46 - Math.abs(Math.sin(a * 6)) * 3), taken = room.inUse.has(si);
-    lit(() => { const c: [number, number, number] = taken ? [124, 242, 156] : [255, 214, 90]; r(s.x - 1, y - 3, 3, 3, c); for (let j = 0; j < 4; j++) r(s.x - 3 + j, y + j, 7 - j * 2, 1, c); });
+    arrowDown(s.x, y, taken ? [124, 242, 156] : [255, 214, 90]);
     Gd(s.x, y, 8, taken ? [124, 242, 156] : [255, 214, 90], 0.4);
   }
   if (g?.kind === 'tag' && g.phase === 'play') {
@@ -1919,6 +1921,12 @@ function clockIn(): void {
   setState({ k: 'diner', v: newShift(net.selfId, me.name, cooks) });
   SFX.dingdong(); toast('SHIFT STARTED! Orders coming in. Patties are in the FRIDGE', 4000);
 }
+/** The kitchen's sound for pressing E at station st (your hands already updated); `cheer` = the tour's extra fanfare for an order up. */
+function cookSound(st: number, ticket: boolean, cheer = false): void {
+  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
+  else if (st === ST.PASS) { if (ticket) { SFX.bell(); if (cheer) SFX.score(); } else SFX.chime(); }
+  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
+}
 /** Press E at kitchen station `st`: the host applies it, everyone else asks the host. */
 function cook(st: number, quiet = false): void {
   if (tour) { tourCook(st); return; }
@@ -1930,9 +1938,7 @@ function cook(st: number, quiet = false): void {
   if (!quiet) toast(res.msg, 1800);
   const k = res.g.ids.indexOf(net.selfId);
   me.hold = res.g.hands[k] ?? 0; forceSend = true; predictUntil = now() + 0.8;
-  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
-  else if (st === ST.PASS) { if (res.ticket) SFX.bell(); else SFX.chime(); }
-  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
+  cookSound(st, !!res.ticket);
   if (g.host === net.selfId) setState({ k: 'diner', v: res.g }); else net.sendCook(st);
 }
 function dinerStep(dt: number, t: number): void {
@@ -2204,16 +2210,14 @@ function tourCook(st: number): void {
   if ('err' in res) { toast(res.err, 1800); SFX.blip(); return; }
   tour.g = res.g; DINER.tour = res.g;
   me.hold = res.g.hands[res.g.ids.indexOf(net.selfId)] ?? 0; forceSend = true;
-  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
-  else if (st === ST.PASS) { if (res.ticket) { SFX.bell(); SFX.score(); } else SFX.chime(); }
-  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
+  cookSound(st, !!res.ticket, true);
 }
 /** A big bouncing arrow over where the tour wants you. */
 function drawTourArrow(a: number): void {
   if (!tour) return;
   const st = tourStepNow(); if (st.at === 'you') return;
   const sp = tourSpot(st.at), x = Math.round(sp.x), y = Math.round(sp.top - 14 - Math.abs(Math.sin(a * 4)) * 5), c: [number, number, number] = [124, 242, 156];
-  lit(() => { r(x - 2, y - 8, 5, 8, c); for (let j = 0; j < 6; j++) r(x - 6 + j, y + j, 13 - j * 2, 1, c); });
+  arrowDown(x, y, c, 6, 6, 2, 8);
   Gd(x, y, 12, c, 0.45);
 }
 

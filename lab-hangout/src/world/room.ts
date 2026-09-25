@@ -131,6 +131,12 @@ export interface Room {
   extras?(a: number): Prop[];
 }
 
+/** Bake a set that has a night backdrop (bg) and a day one (bgAlt, cross-faded in by the clock) with the same painter. */
+export function bakeDayNight(room: Room, paint: (ctx: CanvasRenderingContext2D, day: boolean) => void): void {
+  paint(room.bg.getContext('2d')!, false);
+  if (room.bgAlt) paint(room.bgAlt.getContext('2d')!, true);
+}
+
 export const inside = (r: Rect, x: number, y: number): boolean => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
 /** Feet are a small box; returns true if (x,y) is free to stand on. */

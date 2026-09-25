@@ -11,11 +11,10 @@ import { mk, r, line, disc, txt, tw, alpha, lit, G, Gd, Gsoft, M, shade, puff, b
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { StateMsg } from '../net/transport';
-import type { Room, Prop, Spot } from './room';
+import { bakeDayNight, type Door, type Room, type Prop, type Spot } from './room';
 import { GARDEN, GARDEN_BLOCKERS, GARDEN_PROPS, GARDEN_SPOTS, gardenBack } from './garden';
 import { SK } from '../engine/palette';
 import { DEPART, LAND, PAD_BASE, PAD_X, drawRocket, flight, type Flight } from './space';
-import type { Door } from './room';
 
 const W = 1860, H = 700, SKYLINE = 400, LEDGE = 440; // the community garden is the far right end (world/garden.ts)
 const HUT = { x: 12, y: 332, w: 84, h: LEDGE + 10 - 332 };
@@ -72,7 +71,6 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     for (let x = 140; x < 1040; x += 110) { r(x, LEDGE + 16, 60, 14, RK.PLANTER); r(x, LEDGE + 16, 60, 2, RK.PLANTER_HI); for (let k = 0; k < 9; k++) { const fx = x + 3 + k * 6 + Math.floor(h1(x + k) * 3); r(fx, LEDGE + 8 + Math.floor(h1(x * k + 1) * 4), 2, 9, RK.HEDGE); r(fx - 1, LEDGE + 6 + Math.floor(h1(x * k + 1) * 4), 4, 3, CONFETTI[Math.floor(h1(x * 3 + k) * CONFETTI.length)]); } }
   });
 }
-function build(this: Room): void { paint(this.bg.getContext('2d')!, false); if (this.bgAlt) paint(this.bgAlt.getContext('2d')!, true); }
 
 // ---------- animated set pieces ----------
 function drawBack(a: number): void {
@@ -239,7 +237,7 @@ export function makeRoof(): Room {
     glowMul: () => 1 - 0.6 * dayness(),
     fillTop: 'rgb(6,10,28)', fillLow: 'rgb(90,94,106)',
     bg: mk(W, H), bgAlt: mk(W, H),
-    build: () => build.call(room),
+    build: () => bakeDayNight(room, paint),
     drawBack,
     props: [...POLES.map(pole), topiary(210, 506, 'BUN', BUNNY), topiary(820, 486, 'SWAN', SWAN), topiary(1010, 576, 'DRAGON', DRAGON), hammock(360, 440, 520), hammock(620, 700, 600), telescope, crate, bench, ...GARDEN_PROPS, launchPad, padBench],
   };

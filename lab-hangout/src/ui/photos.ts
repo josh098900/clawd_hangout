@@ -5,10 +5,9 @@
 
 import { K, type RGB } from '../engine/palette';
 import { mk, r, txt, tw, spr, bake } from '../engine/pixel';
-import { button, openModal, row, type Modal } from './modal';
+import { button, openModal, row, type Modal, font } from './modal';
 import type { Photo } from '../net/transport';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 export const FW = 96, FH = 90, BORDER = 4, CAPTION = 12;
 export const STRIP_W = FW + BORDER * 2;
 export const stripH = (n: number): number => BORDER + n * (FH + BORDER) + CAPTION;

@@ -3,9 +3,8 @@
 
 import { SEEDS, duration, plantLine, plantState } from '../world/garden';
 import type { Plot } from '../net/transport';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 
 /** Pick a seed for bed `bed`. `tokens` = your balance, `has(i)` = you're holding a found seed of kind i (moonflower, comet bloom). */
 export function openSeeds(bed: number, tokens: number, has: (seed: number) => boolean, pick: (seed: number) => void, onClose: () => void): void {

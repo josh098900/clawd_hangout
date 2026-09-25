@@ -6,10 +6,13 @@ import { EMOTES, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, POSE_DANCE, useEmote, type E
 import { h1 } from '../engine/math';
 import { routeTo, walkable, type Room } from '../world/room';
 import type { NetEvent } from '../net/transport';
-import { botLine } from '../ui/overlay';
 
 interface Bot { id: string; x: number; y: number; tx: number; ty: number; wait: number; dir: 1 | -1; k: number; use: number; goal: number; hold: number; sips: number; sipIn: number; react: number; path: [number, number][]; sent: number; /** dancing (POSE_DANCE) until its wait runs out */ pose: number }
 /** What bots need to know about a running party game. */
+
+/** Friendly canned lines for local demo bots. */
+const BOT_LINES = ['anyone seen my antenna?', 'this sofa is elite', 'who ate my lunch', 'coffee machine is ON', 'brb, checking the dragon', 'the whiteboard still says ???', 'hi!!', 'nice hat', 'is it night outside?', 'zero days without slop...'];
+export const botLine = (k: number) => BOT_LINES[Math.floor(h1(k) * BOT_LINES.length)];
 export interface BotGame {
   kind: 'chairs' | 'tag'; phase: string; players: Set<string>; seats: number[]; itId: string | null;
   pos(id: string): { x: number; y: number } | null;

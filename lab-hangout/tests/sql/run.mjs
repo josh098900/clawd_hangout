@@ -9,7 +9,7 @@
 // (PGTEST_DIR / PGTEST_PORT to change them) and is stopped again at the end.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS = join(HERE, '../../supabase/migrations');
 const DIR = process.env.PGTEST_DIR ?? join(tmpdir(), 'lab-hangout-pgtest');
 const PORT = process.env.PGTEST_PORT ?? '5499';
-const filter = process.argv[2] ?? '';
+const args = process.argv.slice(2), listsAt = args.indexOf('--lists');
+/** `--lists <file>`: also write the tables the game keeps its own copy of (see tests/lists.mjs) to <file> as JSON. */
+const listsFile = listsAt >= 0 ? args[listsAt + 1] : null;
+const filter = args.filter((a, i) => !a.startsWith('--') && i !== listsAt + 1)[0] ?? '';
 
 // find the Postgres tools: PG_BIN, Homebrew's postgresql@14+, or whatever is on the PATH
 const candidates = [process.env.PG_BIN, ...['17', '16', '15', '14'].flatMap((v) => [`/opt/homebrew/opt/postgresql@${v}/bin`, `/usr/local/opt/postgresql@${v}/bin`])].filter(Boolean);
@@ -47,6 +50,12 @@ must('lh_template', ['-f', join(HERE, 'stubs.sql')], 'stubs.sql');
 const migrations = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
 for (const pass of [1, 2]) for (const m of migrations) must('lh_template', ['-f', join(MIGRATIONS, m)], `${m} (pass ${pass})`);
 console.log(`migrations ${migrations[0]} .. ${migrations.at(-1)} ran twice OK`);
+if (listsFile) {
+  const q = "select json_build_object('claw', (select json_agg(json_build_array(item, weight, season) order by item) from private.claw_prizes), 'fish', (select json_agg(json_build_array(name, rarity, cm_min, cm_max) order by name) from private.fish), 'odds', (select json_object_agg(rarity, odds) from private.rarity_odds), 'seeds', (select json_agg(json_build_array(id, name, cost, grow_s, pays) order by id) from private.seeds), 'furn', (select json_agg(json_build_array(id, price, starter) order by id) from private.furniture), 'quests', (select json_agg(id order by id) from private.quest_pool), 'roll', (select json_agg(private.weather_roll(s) order by s) from generate_series(0, 2999) s))";
+  const r = psql('lh_template', ['-t', '-A', '-c', q]);
+  if (r.status !== 0) { console.error(r.stderr); stop(); process.exit(1); }
+  writeFileSync(listsFile, r.stdout.trim());
+}
 
 // each suite on a fresh copy
 let pass = 0, fail = 0;

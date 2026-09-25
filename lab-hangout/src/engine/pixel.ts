@@ -150,6 +150,13 @@ export function alpha(a: number, fn: () => void): void {
     PX.ctx.globalAlpha = p;
   }
 }
+/**
+ * A self-lit arrow pointing down at (x, y+rows): a stem of half-width `sw` and height `sh` above, then a
+ * triangle `rows` tall, `hw` either side at the top. The defaults are the small one over whatever E would use.
+ */
+export function arrowDown(x: number, y: number, c: RGB, hw = 3, rows = 4, sw = 1, sh = 3): void {
+  lit(() => { r(x - sw, y - sh, sw * 2 + 1, sh, c); for (let j = 0; j < rows; j++) r(x - hw + j, y + j, hw * 2 + 1 - j * 2, 1, c); });
+}
 export function twinkle(x: number, y: number, col: RGB, big = 0): void {
   r(x, y - 1 - big, 1, 3 + 2 * big, col);
   r(x - 1 - big, y, 3 + 2 * big, 1, col);

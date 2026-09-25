@@ -6,9 +6,8 @@ import { mmss } from '../engine/format';
 import { K } from '../engine/palette';
 import { r, txt, tw, lit, bake } from '../engine/pixel';
 import { SONGS, songLen, stepS, lane, lineWords, kTime, kWhere, grade, type KaraokeState, type Performance } from '../game/karaoke';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 
 /** Pick a song (or stop the one that's on). */
 export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | null; season: string | null }, onClose: () => void): void {

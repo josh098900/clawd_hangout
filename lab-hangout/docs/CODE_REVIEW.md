@@ -58,8 +58,12 @@ a push, then Josh's live check.
 - **Batch 1 (bugs + Halloween): done.**
   - Fixed: W1 (plus the start of W2: shared `world/dressing.ts`), M1, M2, E1, E2, E8, G1, G2, U1, N8, N10, X1, D1, D2.
   - Kept on purpose: `HOLD_NONE` and `POSE_NONE`, which name the "nothing" value.
-- Batch 2 (small duplication): next.
-- Batches 3 (performance) and 4 (restructures): to do.
+- **Batch 2 (small duplication): done.**
+  - Fixed: E4, E5, W3, W4, W5, W6, M4, M5, M6, M7, U4 (font, RARE_COL), U6, S1, N7.
+  - New tests: `test:golden` (drawing fingerprints) and `test:lists`.
+  - Each change was checked to draw and behave exactly as before, with two intended exceptions: karaoke's "1:60",
+    and the one-frame undimmed flicker the first time a room's snow is drawn.
+- Batch 3 (performance): next. Batch 4 (restructures): to do.
 
 ## Findings
 **Summary (Phase 1 done, 25 September 2026).** 78 findings across the 8 areas.

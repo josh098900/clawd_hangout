@@ -3,10 +3,9 @@
 // find each other instead of spreading thin. Joining takes a seat (the server enforces the cap).
 
 import type { ServerInfo, Transport } from '../net/transport';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 import { SFX } from '../audio/sfx';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 
 /** The busiest server with room left (ties: the first). */
 export function suggest(list: ServerInfo[], current: string | null): ServerInfo | undefined {

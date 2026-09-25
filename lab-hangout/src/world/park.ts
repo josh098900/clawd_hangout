@@ -11,7 +11,7 @@ import { h1 } from '../engine/math';
 import { PARK_TRACKS } from '../audio/music';
 import { dayness } from './plaza';
 import type { StateMsg } from '../net/transport';
-import type { Room, Prop, Spot } from './room';
+import { bakeDayNight, type Room, type Prop, type Spot } from './room';
 
 const W = 1600, H = 760, HORIZON = 440;
 /** The pond: an ellipse, with the fountain in the middle. */
@@ -29,6 +29,11 @@ export function onWater(x: number, y: number): boolean {
   return e < 0.9 && Math.hypot(x - POND.x, (y - POND.y) * 2.2) > 30;
 }
 /** How far (roughly, px) (x, y) is from the pond's edge; negative = in the water. */
+/** Where seeds thrown towards (x, y) land: that spot, or pulled in onto the water if it's past the edge. */
+export function pondFeedPoint(x: number, y: number): { x: number; y: number } {
+  const k = 0.82 / Math.max(0.82, Math.sqrt(((x - POND.x) / POND.rx) ** 2 + ((y - POND.y) / POND.ry) ** 2));
+  return { x: POND.x + (x - POND.x) * k, y: POND.y + (y - POND.y) * k };
+}
 export function pondEdge(x: number, y: number): number {
   const e = Math.sqrt(((x - POND.x) / POND.rx) ** 2 + ((y - POND.y) / POND.ry) ** 2);
   return (e - 1) * Math.min(POND.rx, POND.ry * 2);
@@ -72,7 +77,6 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     r(S.x0, S.y0, sw, sh, day ? [232, 206, 150] : [110, 96, 74]);
   });
 }
-function build(this: Room): void { paint(this.bg.getContext('2d')!, false); if (this.bgAlt) paint(this.bgAlt.getContext('2d')!, true); }
 
 // ---------- ducks: they paddle round the pond, and come for crumbs ----------
 const DUCKS = Array.from({ length: 6 }, (_, i) => ({ x: POND.x + Math.cos(i) * 120, y: POND.y + Math.sin(i) * 30, dir: 1 as 1 | -1, k: i }));
@@ -242,7 +246,7 @@ export function makePark(): Room {
     glowMul: () => 1 - 0.6 * dayness(),
     fillTop: 'rgb(10,14,40)', fillLow: 'rgb(40,80,58)',
     bg: mk(W, H), bgAlt: mk(W, H),
-    build: () => build.call(room),
+    build: () => bakeDayNight(room, paint),
     drawBack,
     props: [tree(60, 452, 1), tree(230, 456, 0), tree(520, 454, 1), tree(800, 456, 0), tree(1240, 452, 1), tree(1470, 456, 0), tree(1570, 460, 1), lamp(270, 546), lamp(900, 704), lamp(1180, 530), lamp(1540, 600), benchP(230, 620), benchP(1240, 700), blanket(470, 650, [220, 60, 70]), blanket(640, 702, [70, 110, 200]), bandstand, cart, kiteStand],
   };

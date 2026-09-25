@@ -2,9 +2,8 @@
 // change, and your badges. Plus the badge chips shown on someone's player card.
 
 import { BADGES, QUESTS, quests } from '../game/quests';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 const hm = (sec: number) => { const m = Math.ceil(sec / 60); return Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
 
 export function openQuests(onClose: () => void): void {

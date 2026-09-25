@@ -24,6 +24,11 @@ export function openModal(title: string, onClose: () => void): Modal {
   return { body, close };
 }
 
+/** The VT323 look for a panel's lines of text: Object.assign(el.style, font(19, '#9FEFFF')). */
+export const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
+/** Prize rarity colours (the claw machine, the prize counter). */
+export const RARE_COL: Record<string, string> = { COMMON: '#E8D8C0', UNCOMMON: '#7CF29C', RARE: '#5FE7FF', LEGENDARY: '#FFD65A', SPECIAL: '#FF9AD8' };
+
 export function button(label: string, onClick: () => void, ghost = false): HTMLButtonElement {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'mbtn' + (ghost ? ' ghost' : ''); b.textContent = label;
   b.addEventListener('click', onClick); return b;

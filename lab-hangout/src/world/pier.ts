@@ -7,7 +7,7 @@ import { K, DK, PK } from '../engine/palette';
 import { mk, r, line, disc, oval, txt, tw, alpha, lit, G, Gd, Gline, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
-import type { Room, Prop, Spot } from './room';
+import { bakeDayNight, type Room, type Prop, type Spot } from './room';
 import { scoreboard } from './contest';
 
 const W = 1300, H = 720, HORIZON = 380, SHORE = 548;
@@ -41,7 +41,6 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     txt('<- SQUARE', 20, SHORE + 12, PK.SAND_DK);
   });
 }
-function build(this: Room): void { paint(this.bg.getContext('2d')!, false); if (this.bgAlt) paint(this.bgAlt.getContext('2d')!, true); }
 
 // ---------- animated set pieces ----------
 function drawBack(a: number): void {
@@ -113,7 +112,7 @@ export function makePier(): Room {
     glowMul: () => 1 - 0.6 * dayness(),
     fillTop: 'rgb(6,10,28)', fillLow: 'rgb(200,168,120)',
     bg: mk(W, H), bgAlt: mk(W, H),
-    build: () => build.call(room),
+    build: () => bakeDayNight(room, paint),
     drawBack,
     props: [bonfire, log(340, 608), log(420, 608), log(340, 660), log(420, 660), palm(124, 580), palm(1024, 620), cooler, scoreboard],
   };

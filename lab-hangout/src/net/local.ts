@@ -23,6 +23,11 @@ const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { i
 
 interface LocalFlat { name: string; layout: unknown; door: string; party: number | null; inv?: Record<string, number> }
 const PROFILE_KEY = 'hangout.localProfile';
+/** LOCAL's pretend database: JSON in localStorage (every tab shares it), quietly ignoring a full or blocked storage. */
+const db = {
+  get<T>(key: string, fallback: T): T { try { const v = localStorage.getItem(key); return v === null ? fallback : ((JSON.parse(v) as T) ?? fallback); } catch { return fallback; } },
+  set<T>(key: string, v: T): T { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* full, or private mode */ } return v; },
+};
 
 export class LocalTransport implements Transport {
   readonly mode = 'local' as const;
@@ -78,9 +83,23 @@ export class LocalTransport implements Transport {
   async loadSave(): Promise<unknown> { return null; }
   async storeSave(): Promise<void> {}
   private inv(add?: string): string[] {
-    let v: string[] = []; try { v = JSON.parse(localStorage.getItem('labhangout.localInv') || '[]'); } catch { /* ignore */ }
-    if (add && !v.includes(add)) { v.push(add); try { localStorage.setItem('labhangout.localInv', JSON.stringify(v)); } catch { /* ignore */ } }
+    const v = db.get<string[]>('labhangout.localInv', []);
+    if (add && !v.includes(add)) { v.push(add); db.set('labhangout.localInv', v); }
     return v;
+  }
+  /** A season's all-of-them prize: one of its claw prizes you don't have yet (now yours), or 5 tokens if you have them all. */
+  private seasonPrize(season: string): string {
+    const left = CLAW.filter(([k, , s]) => s === season && !this.inv().includes(k)), prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5';
+    if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize);
+    return prize;
+  }
+  /** A payout with the SQL function's caps: at most `want`, `perDay` a day in all, and one every `gapMs` (else `tooSoon`). */
+  private lastPay: Record<string, number> = {};
+  private payCapped(kind: string, want: number, perDay: number, gapMs: number, tooSoon: string): { tokens: number; paid: number } {
+    if (Date.now() - (this.lastPay[kind] ?? 0) < gapMs) throw new Error(tooSoon);
+    const k = 'labhangout.local' + kind + '.' + this.day(), today = Number(db.get(k, 0)) || 0, paid = Math.max(0, Math.min(want, perDay - today));
+    this.lastPay[kind] = Date.now(); db.set(k, today + paid);
+    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
   }
   async inventory(): Promise<string[]> { return this.inv(); }
   /** LOCAL: October (or ?season=halloween) is Halloween. */
@@ -88,19 +107,18 @@ export class LocalTransport implements Transport {
   async trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }> {
     if ((await this.season()) !== 'halloween') throw new Error('trick-or-treating starts on 1 October');
     const day = new Date().toISOString().slice(0, 10), key = 'labhangout.localTreats';
-    let st: { day: string; doors: number[] } = { day, doors: [] }; try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v?.day === day) st = v; } catch { /* ignore */ }
+    const saved = db.get<{ day: string; doors: number[] } | null>(key, null), st = saved?.day === day ? saved : { day, doors: [] as number[] };
     if (st.doors.includes(door)) throw new Error('you already knocked here today');
-    st.doors.push(door); try { localStorage.setItem(key, JSON.stringify(st)); } catch { /* ignore */ }
+    st.doors.push(door); db.set(key, st);
     const trick = Math.random() < 0.2; if (!trick) this.wallet(this.wallet() + 1);
     let prize: string | null = null;
-    if (st.doors.length === 8) { const left = CLAW.filter(([k, , s]) => s === 'halloween' && !this.inv().includes(k)); prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5'; if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize); }
+    if (st.doors.length === 8) prize = this.seasonPrize('halloween');
     return { tokens: this.wallet(), trick, visited: st.doors.length, prize };
   }
   // ---- the Rooftop garden, kept in this browser per server (same rules as 0008_gardens.sql) ----
   private beds(v?: Plot[]): Plot[] {
     const k = 'labhangout.localPlots.' + (this.server ?? 'none');
-    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
-    try { return (JSON.parse(localStorage.getItem(k) || '[]') as Plot[]).filter((p) => !plantState(p).dead); } catch { return []; }
+    return v ? db.set(k, v) : db.get<Plot[]>(k, []).filter((p) => !plantState(p).dead);
   }
   async plots(): Promise<Plot[]> { return this.beds(); }
   async plant(bed: number, seed: number): Promise<number> {
@@ -142,8 +160,7 @@ export class LocalTransport implements Transport {
   async digUp(bed: number): Promise<void> { const all = this.beds(); if (!all.some((p) => p.bed === bed && p.owner === this.selfId)) throw new Error('that is not your plant'); this.beds(all.filter((p) => p.bed !== bed)); }
   // ---- the fishing contest, kept in this browser (other tabs share it) ----
   private contests(v?: Record<string, { id: string; name: string; fish: string; cm: number }[]>): Record<string, { id: string; name: string; fish: string; cm: number }[]> {
-    if (v) { try { localStorage.setItem('labhangout.localContests', JSON.stringify(v)); } catch { /* ignore */ } return v; }
-    try { return JSON.parse(localStorage.getItem('labhangout.localContests') || '{}'); } catch { return {}; }
+    return v ? db.set('labhangout.localContests', v) : db.get('labhangout.localContests', {});
   }
   async catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }> {
     const { fish, cm } = rollFish(), cl = contestClock(), hour = String(Math.floor(Date.now() / 3600000));
@@ -159,8 +176,7 @@ export class LocalTransport implements Transport {
   // ---- the Space Station's trays + spacewalk pay, kept in this browser per server (same rules as 0015_space.sql) ----
   private trayList(v?: Tray[]): Tray[] {
     const k = 'labhangout.localTrays.' + (this.server ?? 'none');
-    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
-    try { return (JSON.parse(localStorage.getItem(k) || '[]') as Tray[]).filter((p) => (Date.now() - p.plantedAt) / 1000 * TRAY_SPEED.k < 88200); } catch { return []; }
+    return v ? db.set(k, v) : db.get<Tray[]>(k, []).filter((p) => (Date.now() - p.plantedAt) / 1000 * TRAY_SPEED.k < 88200);
   }
   async trays(): Promise<Tray[]> { return this.trayList(); }
   async spacePlant(tray: number): Promise<number> {
@@ -183,17 +199,13 @@ export class LocalTransport implements Transport {
     return { tokens: this.wallet(), bonus, rotten: false };
   }
   async spaceDigUp(tray: number): Promise<void> { const all = this.trayList(); if (!all.some((p) => p.tray === tray && p.owner === this.selfId)) throw new Error('that is not your melon'); this.trayList(all.filter((p) => p.tray !== tray)); }
-  private lastWalk = 0;
+  /** Same rules as spacewalk_pay() in 0015_space.sql: 1 per 8 points (max 4), 12 a day, one a minute. */
   async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> {
     if (pts <= 0) return { tokens: this.wallet(), paid: 0 };
-    if (Date.now() - this.lastWalk < 60000) throw new Error('one spacewalk a minute');
-    const k = 'labhangout.localWalks.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
-    const paid = Math.max(0, Math.min(4, Math.floor(pts / 8), 12 - today));
-    this.lastWalk = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
-    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+    return this.payCapped('Walks', Math.min(4, Math.floor(pts / 8)), 12, 60000, 'one spacewalk a minute');
   }
   // ---- winter, kept in this browser (same rules as 0018_winter.sql, minus the ones only a server can keep) ----
-  private wj<T>(k: string, v?: T): T { const key = 'labhangout.local.' + k; if (v !== undefined) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* full */ } return v; } try { return JSON.parse(localStorage.getItem(key) || 'null') as T; } catch { return null as T; } }
+  private wj<T>(k: string, v?: T): T { const key = 'labhangout.local.' + k; return v !== undefined ? db.set(key, v) : db.get(key, null as T); }
   private day(): string { return new Date().toISOString().slice(0, 10); }
   async findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }> {
     if ((await this.season()) !== 'winter') throw new Error('the presents come out on 1 December');
@@ -201,7 +213,7 @@ export class LocalTransport implements Transport {
     const st = this.wj<{ day: string; n: number[]; prized: boolean }>('presents' + this.selfId) ?? { day: '', n: [], prized: false }, cur = st.day === this.day() ? st : { day: this.day(), n: [], prized: false };
     if (cur.n.includes(n)) throw new Error('you already opened this one today');
     cur.n.push(n); this.wallet(this.wallet() + 1); let prize: string | null = null;
-    if (cur.n.length >= 12 && !cur.prized) { cur.prized = true; const left = CLAW.filter(([k, , s]) => s === 'winter' && !this.inv().includes(k)); prize = left.length ? left[Math.floor(Math.random() * left.length)][0] : 'tokens:5'; if (prize === 'tokens:5') this.wallet(this.wallet() + 5); else this.inv(prize); }
+    if (cur.n.length >= 12 && !cur.prized) { cur.prized = true; prize = this.seasonPrize('winter'); }
     this.wj('presents' + this.selfId, cur); return { tokens: this.wallet(), found: cur.n.length, prize };
   }
   async presentsToday(): Promise<number[]> { const st = this.wj<{ day: string; n: number[] }>('presents' + this.selfId); return st && st.day === this.day() ? st.n : []; }
@@ -246,8 +258,7 @@ export class LocalTransport implements Transport {
   }
   // ---- the photo wall, kept in this browser (every tab shares it); ?admin makes you the owner. Same rules as 0017_photos.sql ----
   private photoRows(v?: (Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]) {
-    if (v) { try { localStorage.setItem('labhangout.localPhotos', JSON.stringify(v)); } catch { /* full */ } return v; }
-    try { return JSON.parse(localStorage.getItem('labhangout.localPhotos') || '[]') as (Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]; } catch { return []; }
+    return v ? db.set('labhangout.localPhotos', v) : db.get<(Photo & { status: MyPhoto['status']; featured: boolean; created: number; hearters: string[] })[]>('labhangout.localPhotos', []);
   }
   private pub(p: Photo & { hearters: string[] }): Photo { return { id: p.id, owner: p.owner, ownerName: p.ownerName, png: p.png, at: p.at, hearts: p.hearters.length, mine: p.hearters.includes(this.selfId) }; }
   async isAdmin(): Promise<boolean> { return /[?&]admin\b/.test(location.search); }
@@ -282,24 +293,15 @@ export class LocalTransport implements Transport {
     p.status = ok ? 'approved' : 'rejected'; p.at = Date.now() / 1000; if (!ok) p.featured = false; this.photoRows(all);
   }
   /** Same rules as karaoke_tip() in 0016_karaoke.sql: nothing under 40, 1 + score/30 (max 4), 12 a day, one per 30 s. */
-  private lastSong = 0;
   async karaokeTip(score: number): Promise<{ tokens: number; paid: number }> {
     if (score <= 0) return { tokens: this.wallet(), paid: 0 };
-    if (Date.now() - this.lastSong < 30000) throw new Error('tips come once a song');
-    const k = 'labhangout.localSongs.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
-    const sc = Math.min(100, Math.round(score)), paid = sc < 40 ? 0 : Math.max(0, Math.min(4, 1 + Math.floor(sc / 30), 12 - today));
-    this.lastSong = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
-    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+    const sc = Math.min(100, Math.round(score));
+    return this.payCapped('Songs', sc < 40 ? 0 : Math.min(4, 1 + Math.floor(sc / 30)), 12, 30000, 'tips come once a song');
   }
   /** Same rules as diner_tip() in 0012_diner.sql: 1 + 1 per 40 points (max 5), 15 a day, one per 150 s. */
-  private lastTip = 0;
   async dinerTip(score: number): Promise<{ tokens: number; paid: number }> {
     if (score <= 0) return { tokens: this.wallet(), paid: 0 };
-    if (Date.now() - this.lastTip < 150000) throw new Error('tips come once a shift');
-    const k = 'labhangout.localTips.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
-    const paid = Math.max(0, Math.min(5, 1 + Math.floor(score / 40), 15 - today));
-    this.lastTip = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
-    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+    return this.payCapped('Tips', Math.min(5, 1 + Math.floor(score / 40)), 15, 150000, 'tips come once a shift');
   }
   async contestBoard(): Promise<ContestBoard> {
     const all = this.contests(), cl = contestClock(), hour = Math.floor(Date.now() / 3600000);
@@ -315,19 +317,19 @@ export class LocalTransport implements Transport {
     const day = new Date().toISOString().slice(0, 10), seed = Number(day.replace(/-/g, '')), pool = Object.keys(QUESTS);
     const quests: string[] = []; for (let k = 0; quests.length < 3; k++) { const id = pool[Math.floor(h1(seed * 0.001 + k * 7.3) * pool.length)]; if (!quests.includes(id)) quests.push(id); }
     const forced = new URLSearchParams(location.search).get('quests'); // tests: ?quests=kite,boat,feed
-    let done: string[] = []; try { const v = JSON.parse(localStorage.getItem('labhangout.localQuests') || 'null'); if (v?.day === day) done = v.done; } catch { /* ignore */ }
+    const saved = db.get<{ day: string; done: string[] } | null>('labhangout.localQuests', null), done = saved?.day === day ? saved.done : [];
     return { day, quests: forced ? forced.split(',').filter((q) => QUESTS[q]).slice(0, 3) : quests, done };
   }
   async completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }> {
     const t = await this.todaysQuests();
     if (!t.quests.includes(q)) throw new Error("that is not one of today's quests");
     if (t.done.includes(q)) throw new Error('already done today');
-    const done = [...t.done, q]; try { localStorage.setItem('labhangout.localQuests', JSON.stringify({ day: t.day, done })); } catch { /* ignore */ }
+    const done = [...t.done, q]; db.set('labhangout.localQuests', { day: t.day, done });
     return { tokens: this.wallet(this.wallet() + (done.length >= 3 ? 15 : 5)), bonus: done.length >= 3 };
   }
   private localBadges(add?: string): Record<string, string[]> {
-    let v: Record<string, string[]> = {}; try { v = JSON.parse(localStorage.getItem('labhangout.localBadges') || '{}'); } catch { /* ignore */ }
-    if (add) { const mine = v[this.selfId] ?? []; if (!mine.includes(add)) { v[this.selfId] = [...mine, add]; try { localStorage.setItem('labhangout.localBadges', JSON.stringify(v)); } catch { /* ignore */ } } }
+    const v = db.get<Record<string, string[]>>('labhangout.localBadges', {});
+    if (add) { const mine = v[this.selfId] ?? []; if (!mine.includes(add)) { v[this.selfId] = [...mine, add]; db.set('labhangout.localBadges', v); } }
     return v;
   }
   async claimBadge(b: string): Promise<boolean> { const had = (this.localBadges()[this.selfId] ?? []).includes(b); this.localBadges(b); return !had; }
@@ -443,13 +445,11 @@ export class LocalTransport implements Transport {
   sendFlat(f: FlatMsg): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'flat', p: { id: this.selfId, ...f } } satisfies Wire); }
   // ---- LOCAL flats: a pretend database in localStorage (shared by every tab), with 0014's rules ----
   private flats(v?: Record<string, LocalFlat>): Record<string, LocalFlat> {
-    if (v) { try { localStorage.setItem('labhangout.localFlats', JSON.stringify(v)); } catch { /* ignore */ } return v; }
-    try { return JSON.parse(localStorage.getItem('labhangout.localFlats') || '{}'); } catch { return {}; }
+    return v ? db.set('labhangout.localFlats', v) : db.get('labhangout.localFlats', {});
   }
   private furn(v?: Record<string, number>): Record<string, number> {
     const k = 'labhangout.localFurn.' + this.selfId;
-    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
-    try { return JSON.parse(localStorage.getItem(k) || 'null') ?? {}; } catch { return {}; }
+    return v ? db.set(k, v) : db.get(k, {});
   }
   private canEnter(owner: string): boolean {
     if (owner === this.selfId) return true;

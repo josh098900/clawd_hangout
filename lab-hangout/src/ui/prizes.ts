@@ -3,9 +3,8 @@
 
 import { COLLECTABLES, itemName, RARITY, unlockHint, type Slot } from '../entities/critter';
 import { save } from '../game/save';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, RARE_COL } from './modal';
 
-const RARE_COL: Record<string, string> = { COMMON: '#E8D8C0', UNCOMMON: '#7CF29C', RARE: '#5FE7FF', LEGENDARY: '#FFD65A', SPECIAL: '#FF9AD8' };
 const SLOT_NAME: Record<string, string> = { hat: 'HAT', face: 'FACE', fit: 'OUTFIT', pet: 'PET' };
 
 export function openPrizes(wear: (item: string) => void, onClose: () => void): void {

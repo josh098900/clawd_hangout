@@ -4,9 +4,8 @@
 
 import type { DoorMode, FlatDoor, FlatShow } from '../net/transport';
 import { BADGES } from '../game/quests';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 const doorWord = (d: DoorMode) => (d === 'locked' ? 'LOCKED' : d === 'friends' ? 'FRIENDS ONLY' : 'OPEN');
 
 export interface LiftHooks {

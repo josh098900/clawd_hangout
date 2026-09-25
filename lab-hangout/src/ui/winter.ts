@@ -2,11 +2,10 @@
 // wrapping a Secret Santa present, and opening one.
 
 import { mk, r, txt, tw, bake } from '../engine/pixel';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, font } from './modal';
 import { ORN_NAMES, WINTER, drawTree, ornament, present, treeHW } from '../world/winter';
 import type { Ornament, TreeGift } from '../net/transport';
 
-const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
 const note = (t: string, c = '#9FEFFF') => { const d = document.createElement('div'); d.textContent = t; Object.assign(d.style, font(19, c), { maxWidth: '460px', textAlign: 'center' }); return d; };
 export const NOTES = ['MERRY CHRISTMAS!', 'HAPPY HOLIDAYS!', 'YOU\'RE THE BEST!', 'HAPPY NEW YEAR!', 'THANKS FOR BEING AWESOME', 'HO HO HO!'];
 export const WRAP_NAMES = ['RED', 'GREEN', 'BLUE', 'GOLD', 'PURPLE', 'WHITE'];

@@ -11,7 +11,7 @@ export const FISH: Fish[] = [
   { name: 'SWORDFISH', rarity: 'RARE', cm: [120, 300] }, { name: 'OCTOPUS', rarity: 'RARE', cm: [40, 120] },
   { name: 'MOON FISH', rarity: 'LEGENDARY', cm: [60, 90] }, { name: 'GOLDEN KOI', rarity: 'LEGENDARY', cm: [40, 70] },
 ];
-const ODDS: Record<Fish['rarity'], number> = { JUNK: 0.14, COMMON: 0.44, UNCOMMON: 0.28, RARE: 0.11, LEGENDARY: 0.03 };
+export const ODDS: Record<Fish['rarity'], number> = { JUNK: 0.14, COMMON: 0.44, UNCOMMON: 0.28, RARE: 0.11, LEGENDARY: 0.03 };
 
 /** Roll a catch (LOCAL mode; online the server rolls it, see 0010_fishing.sql, same odds). */
 export function rollFish(): { fish: Fish; cm: number } {

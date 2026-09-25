@@ -7,10 +7,9 @@ import { r, disc, line, txt, tw, M, bake } from '../engine/pixel';
 import { basePose, composeCritter, itemName, RARITY, type Look } from '../entities/critter';
 import type { ClawResult } from '../net/transport';
 import { SFX } from '../audio/sfx';
-import { button, openModal, row } from './modal';
+import { button, openModal, row, RARE_COL } from './modal';
 
 const W = 150, H = 120, CAPS: RGB[] = [[255, 95, 170], [90, 209, 255], [255, 214, 90], [124, 242, 156], [180, 130, 255], [255, 140, 90]];
-const RARE_COL: Record<string, string> = { COMMON: '#E8D8C0', UNCOMMON: '#7CF29C', RARE: '#5FE7FF', LEGENDARY: '#FFD65A', SPECIAL: '#FF9AD8' };
 
 export interface ClawHooks {
   play(): Promise<ClawResult>;

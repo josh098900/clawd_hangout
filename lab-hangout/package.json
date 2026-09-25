@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test:sql": "node tests/sql/run.mjs",
     "test:smoke": "node tests/smoke/smoke.mjs",
-    "test": "npm run typecheck && npm run test:sql && npm run test:smoke",
-    "test:golden": "node tests/golden/golden.mjs"
+    "test": "npm run typecheck && npm run test:sql && npm run test:lists && npm run test:golden && npm run test:smoke",
+    "test:golden": "node tests/golden/golden.mjs",
+    "test:lists": "node tests/lists.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1"

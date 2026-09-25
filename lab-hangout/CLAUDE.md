@@ -37,6 +37,9 @@ npm run typecheck    # tsc --noEmit — run after every change
 npm run build        # typecheck + production build to dist/
 npm run test:sql     # migrations x2 on a local Postgres + the suites in tests/sql (add one per new migration)
 npm run test:smoke   # every room x (normal, winter, halloween) + two players, headless Chrome, LOCAL mode
+npm run test:lists   # game-side copies of server lists (CLAW, FISH, SEEDS, furniture prices, QUESTS, weather roll) == the database
+npm run test:golden  # SHA-1 fingerprints of every room's drawing + pure maths, clocks frozen; refactors must not change them
+                     # (--update only after an intended visual change you've checked by eye)
 ```
 
 Handy URLs while developing:

@@ -1,7 +1,7 @@
 // DOM overlays drawn on top of the canvas: speech bubbles, room plate, chat log, toast.
 // All user text goes in via textContent — never innerHTML.
 
-import { eIn, eOB, seg, clamp, h1 } from '../engine/math';
+import { eIn, eOB, seg, clamp } from '../engine/math';
 
 const $ = <T extends HTMLElement>(q: string) => document.querySelector(q) as T;
 
@@ -71,7 +71,3 @@ export function fade(on: boolean): Promise<void> {
   const f = $('#fade'); f.classList.toggle('on', on);
   return new Promise((res) => setTimeout(res, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 230));
 }
-
-/** Friendly canned lines for local demo bots. */
-export const BOT_LINES = ['anyone seen my antenna?', 'this sofa is elite', 'who ate my lunch', 'coffee machine is ON', 'brb, checking the dragon', 'the whiteboard still says ???', 'hi!!', 'nice hat', 'is it night outside?', 'zero days without slop...'];
-export const botLine = (k: number) => BOT_LINES[Math.floor(h1(k) * BOT_LINES.length)];
