@@ -1,7 +1,7 @@
 // Avatar = one player in the room (you or a remote). Holds network-facing state plus the
 // animation state that turns it into a Pose each frame (walk cycle, settle, emotes).
 
-import { basePose, stampCritter, type Look, type Pose } from './critter';
+import { basePose, stampCritter, PETS, PET_SAY, type Look, type Pose } from './critter';
 import type { SpotKind } from '../world/room';
 import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
 
@@ -33,11 +33,17 @@ export const isEmote = (k: unknown): k is EmoteKind => typeof k === 'string' && 
 /** Held items (MoveMsg.hold). How many sips/bites each lasts, and the emote that uses it. */
 export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_MARSH = 4, HOLD_TOAST = 5, HOLD_BURNT = 6, HOLD_KITE = 7, HOLD_HOTDOG = 8;
 /** The Diner's kitchen (game/diner.ts): what a cook carries between stations. */
+export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12, HOLD_FROZEN = 13, HOLD_FRIES = 14, HOLD_SHAKE = 15;
 /** Winter: a snowball ready to throw, a mug of hot cocoa (the Lab's coffee machine in the season). */
 export const HOLD_SNOWBALL = 16, HOLD_COCOA = 17;
-export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12, HOLD_FROZEN = 13, HOLD_FRIES = 14, HOLD_SHAKE = 15;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4, 17: 5 };
+/** What the log says when it's all gone (every hold in USES has one). */
+export const USED_UP: Record<number, string> = {
+  1: 'Mug empty. Refill it at the coffee machine', 2: 'All the popcorn is gone', 3: 'Slurp! Soda finished',
+  4: 'Raw marshmallow. Bold choice.', 5: 'Perfect golden marshmallow!', 6: 'Crunchy... and a bit sad',
+  8: 'Hot dog gone. Delicious!', 17: 'Cocoa all gone. There\'s more at the coffee machine',
+};
 export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG || hold === HOLD_COCOA ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
 export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4,
@@ -307,7 +313,6 @@ function drawMug(cx: number, cy: number, col: RGB, handle: 1 | -1, a: number, se
  * cat, crab and duck scurry; the ghost just floats. They all catch up through doors and
  * pipe up now and then when you stand still.
  */
-const PET_SAY = ['', 'COO', 'MEOW', 'SNIP', 'QUACK', 'BOO', 'SQUEAK'];
 function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   const p = av.pet, dt = Math.min(0.1, Math.max(0, now - p.t)); p.t = now;
   const tx = av.petGoal ? av.petGoal.x : av.x - av.dir * 20, ty = av.petGoal ? av.petGoal.y : av.y + 3, d = Math.hypot(tx - p.x, ty - p.y);
@@ -359,7 +364,7 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
       R(-2, -8, 1, 2, K.EYE); R(1, -8, 1, 2, K.EYE); R(-1, -5, 2, 1, sh);
     });
   }
-  if (still && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt(PET_SAY[kind] ?? '', x - 5, y - 16 - (ghost ? 6 : 0), [230, 230, 240]));
+  if (still && (a * 0.13 + av.seed) % 1 < 0.04) lit(() => txt(PET_SAY[PETS[kind] ?? 'NONE'], x - 5, y - 16 - (ghost ? 6 : 0), [230, 230, 240]));
 }
 
 /** A hot dog: bun, sausage, a squiggle of mustard. */

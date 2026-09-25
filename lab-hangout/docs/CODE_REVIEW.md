@@ -54,6 +54,13 @@ Josh picks which findings to fix. The batches, safest first:
 After each batch: typecheck, build, `test:sql`, `test:smoke`, screenshots of anything that changed,
 a push, then Josh's live check.
 
+## Progress
+- **Batch 1 (bugs + Halloween): done.**
+  - Fixed: W1 (plus the start of W2: shared `world/dressing.ts`), M1, M2, E1, E2, E8, G1, G2, U1, N8, N10, X1, D1, D2.
+  - Kept on purpose: `HOLD_NONE` and `POSE_NONE`, which name the "nothing" value.
+- Batch 2 (small duplication): next.
+- Batches 3 (performance) and 4 (restructures): to do.
+
 ## Findings
 **Summary (Phase 1 done, 25 September 2026).** 78 findings across the 8 areas.
 - **Bugs:** the most important is **W1**: Halloween starts in 6 days and half the world isn't dressed.

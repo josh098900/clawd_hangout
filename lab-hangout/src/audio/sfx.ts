@@ -38,7 +38,7 @@ function tone(type: OscillatorType, f0: number, f1: number, dur: number, vol: nu
 }
 function noise(f: number, q: number, dur: number, vol: number, delay = 0, f1?: number): void {
   if (!soundOn || !AC || !NB) return;
-  const t0 = AC.currentTime + delay, s = AC.createBufferSource(); s.buffer = NB;
+  const t0 = AC.currentTime + delay, s = AC.createBufferSource(); s.buffer = NB; s.loop = true; // (the buffer is 1.5 s; ignite and thunder run longer)
   const b = AC.createBiquadFilter(); b.type = 'bandpass'; b.frequency.setValueAtTime(f, t0); if (f1) b.frequency.exponentialRampToValueAtTime(f1, t0 + dur); b.Q.value = q;
   s.connect(b); b.connect(genv(t0, 0.005, vol, dur)); s.start(t0, Math.random() * 0.3); s.stop(t0 + dur + 0.05);
 }
@@ -83,11 +83,11 @@ export const SFX = {
   hiss: () => { noise(4000, 0.6, 1.1, 0.07, 0, 1200); tone('sine', 180, 120, 0.4, 0.03, 0.9); },
   splash: () => { noise(1800, 0.7, 0.6, 0.18, 0, 500); for (let i = 0; i < 5; i++) noise(rnd(2500, 4000), 4, 0.05, 0.05, 0.25 + i * 0.07); },
   boom: () => noise(500, 0.8, 0.25, 0.14, 0, 90),
-  /** the Subway's door chime */
   /** the Diner: the service bell on the pass */
   bell: () => { tone('sine', 2093, 2093, 0.6, 0.05); tone('sine', 4186, 4186, 0.25, 0.015); },
   /** a patty hitting the grill / fries going in the oil */
   sizzle: () => { noise(5000, 0.7, 0.9, 0.05, 0, 3000); noise(2500, 1.2, 0.5, 0.03, 0.05); },
+  /** the Subway's door chime */
   dingdong: () => { tone('sine', 988, 988, 0.35, 0.06); tone('sine', 784, 784, 0.5, 0.06, 0.32); },
   /** wheels on the rails */
   clack: () => { noise(900, 2, 0.04, 0.025); noise(700, 2, 0.04, 0.02, 0.09); },

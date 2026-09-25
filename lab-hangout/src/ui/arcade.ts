@@ -27,14 +27,15 @@ export function openArcade(hi: number, onEnd: (score: number) => void): void {
   const spawn = () => { invs = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 6; i++) invs.push({ x: 12 + i * 15, y: 14 + j * 11, row: j, alive: true }); dirX = 1; };
   spawn();
   const finish = () => { if (ended) return; ended = true; onEnd(score); };
-  const m = openModal('SLOP INVADERS', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); finish(); });
+  const m = openModal('SLOP INVADERS', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); finish(); });
 
   const kd = (e: KeyboardEvent) => {
     const k = e.key;
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' ', 'a', 'A', 'd', 'D', 'w', 'W'].includes(k)) { e.preventDefault(); e.stopPropagation(); keys.add(k.length === 1 ? k.toLowerCase() : k); }
   };
   const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true);
+  const unstick = (): void => keys.clear();
+  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
   const hold = (label: string, k: string) => {
     const b = button(label, () => {}); b.classList.add('hold');
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); });

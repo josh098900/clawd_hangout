@@ -11,7 +11,6 @@ export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
 export const seg = (t: number, a: number, b: number): number => clamp((t - a) / (b - a), 0, 1);
 
 export const eOut = (u: number): number => 1 - Math.pow(1 - u, 3);
-export const eOut2 = (u: number): number => 1 - (1 - u) * (1 - u);
 export const eIn = (u: number): number => u * u * u;
 export const eIO = (u: number): number => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
 /** Ease-out with overshoot ("back"). The house style for anything that pops in. */
@@ -22,5 +21,3 @@ export const eOB = (u: number): number => {
 /** A half-sine hump: 0 at t0, 1 in the middle, 0 at t0+d. */
 export const bump = (t: number, t0: number, d: number): number =>
   t < t0 || t > t0 + d ? 0 : Math.sin(((t - t0) / d) * Math.PI);
-/** Damped wobble used for squash-and-settle after an impact. */
-export const decay = (dt: number, k = 6, w = 18): number => (dt < 0 ? 0 : Math.exp(-dt * k) * Math.cos(dt * w));

@@ -13,6 +13,7 @@ import { r, lit, alpha, Gd, line } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { Prop, Room, RoomId, Spot, Talker } from './room';
+import { stringLights, wallDoors, type LightStyle } from './dressing';
 
 /** The 8 doors: which room, the pumpkin (x, base y) and where you stand to knock. */
 export const TREAT_DOORS: { room: RoomId; x: number; y: number; sx: number; sy: number; name: string }[] = [
@@ -31,29 +32,22 @@ const PUMPKINS: Partial<Record<RoomId, [number, number, number][]>> = {
   lab: [[140, 446, 1], [520, 447, 0]], den: [[700, 446, 1]], cinema: [[300, 458, 1], [940, 458, 0]],
   stage: [[180, 480, 1], [930, 480, 1]], pier: [[470, 600, 1], [488, 604, 0], [300, 660, 1]], roof: [[400, 468, 1], [700, 468, 0]],
   arcade: [[1060, 482, 1]],
+  park: [[196, 520, 1], [216, 524, 0], [560, 482, 1], [1300, 502, 0]], karts: [[180, 492, 1], [1180, 492, 0]],
+  diner: [[760, 492, 1]], lofts: [[820, 500, 1]], station: [[1000, 488, 1]],
+  subway: [[300, 520, 1], [1100, 520, 0]], parkstn: [[300, 520, 1], [1100, 520, 0]], dinerstn: [[300, 520, 1], [1100, 520, 0]], kartstn: [[300, 520, 1], [1100, 520, 0]],
 };
-/** Cobwebs in the top corners of doorways: [x, y, which way it hangs]. */
-const WEBS: Partial<Record<RoomId, [number, number, 1 | -1][]>> = {
-  lab: [[52, 306, -1], [816, 306, 1]], den: [[52, 306, -1]], cinema: [[52, 316, -1]],
-  stage: [[52, 342, -1]], arcade: [[70, 350, -1]], crypt: [[56, 322, -1], [898, 318, -1]],
-};
-/** Strings of orange and purple lights: [x0, y0, x1, y1] (they sag between the ends). */
-const LIGHTS: Partial<Record<RoomId, [number, number, number, number][]>> = {
-  plaza: [[161, 492, 521, 492], [701, 492, 1061, 492]],
-  stage: [[140, 126, 540, 126], [540, 126, 940, 126]],
-};
+/** No cobwebs out in space. */
+const NO_WEBS: RoomId[] = ['rocket', 'spacewalk'];
+const HALLOWEEN_LIGHTS: LightStyle = { bulbs: [[150, 90, 255], [255, 140, 40]], sag: 14, offEvery: 5, wire: null, off: () => [60, 50, 60], dy: 0 };
 /** Where bats fly: the band of sky the camera actually shows in each outdoor room. */
-const BATS: Partial<Record<RoomId, [number, number]>> = { plaza: [370, 470], roof: [120, 300], pier: [300, 370] };
-const FOG: RoomId[] = ['plaza', 'pier', 'roof'];
-const WIDTH: Partial<Record<RoomId, number>> = { plaza: 1400, pier: 1300, roof: 1500 };
-const FLOOR_Y: Partial<Record<RoomId, [number, number]>> = { plaza: [560, 712], pier: [424, 690], roof: [462, 650] };
+const BATS: Partial<Record<RoomId, [number, number]>> = { plaza: [370, 470], roof: [120, 300], pier: [300, 370], park: [330, 420] };
+const FOG: RoomId[] = ['plaza', 'pier', 'roof', 'park'];
 
 // ---------- trick-or-treat: which pumpkins you've knocked at today (this browser) ----------
 const KEY = 'labhangout.treats';
 const today = () => new Date().toISOString().slice(0, 10);
 function knocked(): number[] { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); return v?.day === today() && Array.isArray(v.doors) ? v.doors : []; } catch { return []; } }
 export function markKnocked(i: number): void { const d = knocked(); if (!d.includes(i)) d.push(i); try { localStorage.setItem(KEY, JSON.stringify({ day: today(), doors: d })); } catch { /* private mode */ } }
-export const knockedCount = (): number => knocked().length;
 
 // ---------- the haunted Crypt ----------
 export const CANDLES: { x: number; sym: string }[] = [{ x: 160, sym: 'MOON' }, { x: 300, sym: 'BAT' }, { x: 440, sym: 'EYE' }, { x: 660, sym: 'FLAME' }];
@@ -124,17 +118,18 @@ function candle(i: number, x: number, a: number): void {
   lit(() => { g.forEach((row, y) => [...row].forEach((ch, xx) => { if (ch === '#') r(x - 4 + xx * 2, CANDLE_Y - 52 + y * 2, 2, 2, col); })); });
 }
 
+/** A cobweb in the top corner of every door (the corner away from the wall), hanging towards the middle of the room. */
+const webs = (room: Room): [number, number, 1 | -1][] => (NO_WEBS.includes(room.id) ? [] : wallDoors(room).map((d) => ((d.area.x0 + d.area.x1) / 2 < room.w / 2 ? [d.area.x1, d.area.y0, -1] : [d.area.x0, d.area.y0, 1])));
 /** Behind the players: cobwebs, strings of lights, bats in the sky. */
-export function halloweenBack(room: RoomId, a: number): void {
-  for (const [x, y, s] of WEBS[room] ?? []) {
+export function halloweenBack(rm: Room, a: number): void {
+  const room = rm.id;
+  for (const [x, y, s] of webs(rm)) {
     const c: RGB = [200, 204, 214];
     alpha(0.55, () => { for (let k = 0; k < 5; k++) line(x, y, x + s * (4 + k * 5), y + 22 - k * 5, c); for (let rr = 6; rr <= 18; rr += 6) for (let k = 0; k < 4; k++) line(x + s * Math.round(rr * Math.cos(k * 0.39)), y + Math.round(rr * Math.sin(k * 0.39 + 0.2)), x + s * Math.round(rr * Math.cos((k + 1) * 0.39)), y + Math.round(rr * Math.sin((k + 1) * 0.39 + 0.2)), c); });
     r(x + s * 10, y + 10 + Math.round(Math.sin(a * 1.3) * 2), 2, 2, [30, 24, 40]);
   }
-  for (const [x0, y0, x1, y1] of LIGHTS[room] ?? []) {
-    const n = Math.floor((x1 - x0) / 14);
-    for (let k = 0; k <= n; k++) { const u = k / n, x = Math.round(x0 + (x1 - x0) * u), y = Math.round(y0 + (y1 - y0) * u + Math.sin(u * Math.PI) * 14); r(x, y - 1, 1, 1, [40, 40, 50]); const on = (k + Math.floor(a * 2)) % 5 !== 0; const c: RGB = k % 2 ? [255, 140, 40] : [150, 90, 255]; if (on) { lit(() => r(x - 1, y, 3, 3, c)); Gd(x, y + 1, 5, c, 0.3); } else r(x - 1, y, 3, 3, [60, 50, 60]); }
-  }
+  stringLights(room, a, HALLOWEEN_LIGHTS);
+
   if (room === 'crypt') { // the old scroll on the wall (walk up to it and press E to read)
     const x = 560, y = 330, fl = 0.7 + 0.3 * Math.sin(a * 2);
     r(x - 16, y, 32, 3, [150, 110, 60]); r(x - 14, y + 3, 28, 30, [214, 196, 150]); r(x - 16, y + 33, 32, 3, [150, 110, 60]);
@@ -143,7 +138,7 @@ export function halloweenBack(room: RoomId, a: number): void {
   }
   const band = BATS[room];
   if (band && dayness() < 0.6) {
-    const W = WIDTH[room] ?? 1200;
+    const W = rm.w;
     for (let k = 0; k < 7; k++) {
       const sp = 26 + h1(k) * 22, x = ((a * sp + h1(k + 3) * W * 2) % (W + 200)) - 100, y = band[0] + h1(k + 9) * (band[1] - band[0]) + Math.sin(a * 1.7 + k) * 8, up = Math.floor(a * 9 + k) % 2, c: RGB = [4, 2, 8];
       const X = Math.round(x), Y = Math.round(y);
@@ -153,10 +148,10 @@ export function halloweenBack(room: RoomId, a: number): void {
 }
 
 /** Over everything: low fog over the outdoor floors at night. */
-export function halloweenFront(room: RoomId, a: number): void {
-  if (!FOG.includes(room)) return;
+export function halloweenFront(rm: Room, a: number): void {
+  if (!FOG.includes(rm.id)) return;
   const night = 1 - dayness(); if (night < 0.1) return;
-  const W = WIDTH[room] ?? 1200, [f0, f1] = FLOOR_Y[room] ?? [560, 712];
+  const W = rm.w, f0 = rm.floor.y0, f1 = rm.floor.y1;
   for (let k = 0; k < 7; k++) {
     const x = ((a * (6 + k * 1.3) + h1(k) * W) % (W + 400)) - 200, y = f0 + h1(k + 5) * (f1 - f0), w = 150 + h1(k + 2) * 120;
     alpha(0.07 * night, () => { for (let j = -6; j <= 6; j++) { const hw = Math.round(w / 2 * Math.sqrt(1 - (j * j) / 49)); r(Math.round(x - hw), Math.round(y + j * 2), hw * 2, 2, [200, 210, 230]); } });

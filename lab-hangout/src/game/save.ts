@@ -58,9 +58,11 @@ export function merge(a: SaveData, b: SaveData): SaveData {
 const KEY = 'labhangout.save.', MIGRATED = 'labhangout.migrated';
 const ls = { get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
+const json = (v: string | null): unknown => { try { return JSON.parse(v || 'null'); } catch { return null; } };
+
 /** Progress from before saves existed (plain localStorage keys), picked up once per browser. */
 function legacy(): SaveData {
-  const j = (k: string): unknown => { try { return JSON.parse(ls.get(k) || 'null'); } catch { return null; } };
+  const j = (k: string): unknown => json(ls.get(k));
   const unlocks: string[] = [];
   if (ls.get('labhangout.hat.5') === '1') unlocks.push('hat:5');
   if (ls.get('labhangout.pet.1') === '1') unlocks.push('pet:1');
@@ -79,7 +81,7 @@ class Save {
   /** Load this player's save: the browser cache, old-style keys (once), then the server; merge them all. */
   async attach(uid: string, store: SaveStore | null): Promise<void> {
     this.uid = uid; this.store = store;
-    let d = clean(JSON.parse(ls.get(KEY + uid) || '{}'));
+    let d = clean(json(ls.get(KEY + uid))); // (a corrupted cache must never stop the game from starting)
     if (!ls.get(MIGRATED)) { d = merge(d, legacy()); ls.set(MIGRATED, '1'); }
     if (store) {
       try { const remote = await store.loadSave(); if (remote) d = merge(d, clean(remote)); } catch (e) { console.warn('[save] load failed', e); }

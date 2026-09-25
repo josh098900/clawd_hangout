@@ -119,7 +119,11 @@ export function txt(s: string, x: number, y: number, c: RGB, sc = 1): void {
     cx += 4 * sc;
   }
 }
-export const tw = (s: string, sc = 1): number => s.length * 4 * sc - sc;
+/** Width of txt(s): it draws one glyph per character of s.toUpperCase() (so emoji count once, and 'ß' as 'SS'). */
+export function tw(s: string, sc = 1): number {
+  let n = 0; for (const _ of s.toUpperCase()) n++;
+  return n * 4 * sc - sc;
+}
 /** Pixel text with a 1px dark drop outline, the film's style for pop-up words ("RESET!", "?"). */
 export function txtOutlined(s: string, x: number, y: number, c: RGB, sc = 1, ol: RGB = [20, 12, 30]): void {
   txt(s, x + 1, y + 1, ol, sc);

@@ -40,12 +40,13 @@ export function openPong(h: PongHooks): PongHandle {
     else if (['s', 'S', 'ArrowDown'].includes(e.key)) { down = on; e.preventDefault(); }
   };
   const kd = (e: KeyboardEvent) => key(e, true), ku = (e: KeyboardEvent) => key(e, false);
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true);
+  const unstick = (): void => { up = down = false; };
+  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
   const toY = (e: PointerEvent) => { const rc = cv.getBoundingClientRect(); return (e.clientY - rc.top) / rc.height; };
   cv.addEventListener('pointerdown', (e) => { drag = toY(e); cv.setPointerCapture(e.pointerId); });
   cv.addEventListener('pointermove', (e) => { if (drag !== null) drag = toY(e); });
   cv.addEventListener('pointerup', () => { drag = null; });
-  const m = openModal('PONG', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); h.onClose(); });
+  const m = openModal('PONG', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); h.onClose(); });
   const setPh = (p: number) => { ph = p; phT = performance.now() / 1000; if (p === 3 && sc[h.side] >= WIN) h.won(); };
   const serve = (toward: number) => { const an = (Math.random() - 0.5) * 0.9; ball = { x: 0.5, y: 0.3 + Math.random() * 0.4, vx: toward * 0.55 * Math.cos(an), vy: 0.55 * Math.sin(an) }; };
 

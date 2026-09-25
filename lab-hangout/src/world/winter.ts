@@ -15,6 +15,7 @@ import { PX, mk, r, line, disc, txt, tw, lit, alpha, G, Gd, Gsoft, withCtx, M, s
 import { h1 } from '../engine/math';
 import { POND, onWater } from './park';
 import { vnoise } from './space';
+import { stringLights, wallDoors, type LightStyle } from './dressing';
 import type { Ornament, TreeGift } from '../net/transport';
 import type { Prop, Room, RoomId, Spot } from './room';
 
@@ -217,14 +218,6 @@ function snowLayer(room: Room): HTMLCanvasElement {
   });
   snowCache.set(room.id, cv); return cv;
 }
-/** Strings of coloured lights: [x0, y0, x1, y1] (they sag between the ends). */
-const LIGHTS: Partial<Record<RoomId, [number, number, number, number][]>> = {
-  plaza: [[161, 492, 521, 492], [701, 492, 1061, 492]],
-  lab: [[10, 236, 250, 236], [540, 226, 740, 226], [740, 226, 950, 226]], den: [[10, 250, 490, 250], [490, 250, 990, 250]],
-  cinema: [[10, 290, 390, 290]], arcade: [[10, 326, 540, 326], [540, 326, 1090, 326]], diner: [[10, 336, 700, 336], [700, 336, 1390, 336]],
-  lofts: [[10, 330, 450, 330], [450, 330, 890, 330]], station: [[10, 290, 750, 290], [750, 290, 1490, 290]], pier: [[380, 380, 900, 380]],
-  karts: [[10, 340, 650, 340], [650, 340, 1290, 340]], subway: [[10, 330, 650, 330], [650, 330, 1290, 330]], flat: [[20, 300, 940, 300]], flatbed: [[20, 300, 740, 300]], flatkit: [[20, 300, 700, 300]],
-};
 /** Little decorated trees standing indoors (on the same safe spots Halloween's pumpkins use). */
 const XTREES: Partial<Record<RoomId, [number, number][]>> = {
   lab: [[520, 452]], den: [[700, 452]], cinema: [[940, 464]], stage: [[186, 496]], arcade: [[1060, 488]], diner: [[760, 492]], lofts: [[820, 500]], station: [[1000, 488]],
@@ -237,20 +230,10 @@ function smallTree(x: number, y: number, a: number): void {
   present(x - 12, y + 2, (x / 10) % 6 | 0, 0); present(x + 11, y + 1, (x / 7 + 2) % 6 | 0, 1);
 }
 const BULBS: RGB[] = [[255, 70, 70], [124, 242, 156], [255, 214, 90], [90, 180, 255], [255, 255, 255]];
-function lights(room: RoomId, a: number): void {
-  for (const [x0, y0, x1, y1] of LIGHTS[room] ?? []) {
-    const n = Math.max(2, Math.floor((x1 - x0) / 14));
-    for (let k = 0; k <= n; k++) {
-      const u = k / n, x = Math.round(x0 + (x1 - x0) * u), y = Math.round(y0 + (y1 - y0) * u + Math.sin(u * Math.PI) * 12), c = BULBS[k % BULBS.length], on = (k + Math.floor(a * 2)) % 6 !== 0;
-      r(x, y - 1, 1, 1, [40, 60, 40]); if (k < n) r(x, y, Math.round((x1 - x0) / n), 1, [30, 70, 40]);
-      if (on) { lit(() => r(x - 1, y + 1, 3, 3, c)); Gd(x, y + 2, 5, c, 0.3); } else r(x - 1, y + 1, 3, 3, shade(c, 0.35));
-    }
-  }
-}
+const WINTER_LIGHTS: LightStyle = { bulbs: BULBS, sag: 12, offEvery: 6, wire: [30, 70, 40], off: (c) => shade(c, 0.35), dy: 1 };
 /** A wreath over the middle of every door (not the open edges of a set). */
 function wreaths(room: Room): void {
-  for (const d of room.doors) {
-    if (d.edge || d.area.y1 - d.area.y0 < 50 || d.area.y0 >= room.floor.y0) continue; // (not the ones in the ground, like the Crypt's grate)
+  for (const d of wallDoors(room)) {
     const x = Math.round((d.area.x0 + d.area.x1) / 2), y = Math.round(d.area.y0 + 18);
     for (let k = 0; k < 18; k++) { const an = (k / 18) * Math.PI * 2; r(Math.round(x + Math.cos(an) * 7) - 1, Math.round(y + Math.sin(an) * 7) - 1, 3, 3, k % 3 ? [40, 130, 70] : [60, 170, 90]); }
     for (const k of [2, 7, 12, 16]) { const an = (k / 18) * Math.PI * 2; r(Math.round(x + Math.cos(an) * 7), Math.round(y + Math.sin(an) * 7), 1, 1, [230, 50, 60]); }
@@ -362,7 +345,7 @@ export function winterGround(room: Room): void {
 export function winterBack(room: Room, a: number): void {
   const id = room.id;
   if (id === 'park') ice(a);
-  lights(id, a); wreaths(room);
+  stringLights(id, a, WINTER_LIGHTS); wreaths(room);
   if (id === 'lab') advent(a);
   if (id === 'roof') { for (let x = 0; x < 1860; x += 6) { const L = 3 + Math.floor(h1(x * 0.7) * 7); r(x, 454, 2, L, [220, 236, 250]); r(x, 454 + L, 1, 1, K.WHITE); } } // icicles along the parapet
   sleighBits(id, a);

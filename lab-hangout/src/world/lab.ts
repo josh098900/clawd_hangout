@@ -219,7 +219,7 @@ export const LAB_SPOTS: Spot[] = [
   { kind: 'juke', x: 349, y: 446, sx: 349, sy: 446, lift: 0, label: 'MUSIC', area: { x0: 328, y0: 346, x1: 370, y1: 430 } },
   { kind: 'photos', x: 456, y: 446, sx: 456, sy: 446, lift: 0, label: 'PHOTOS', area: { x0: 372, y0: 242, x1: 540, y1: 344 } }, // 7
 ];
-export const LAB_COFFEE = 3, LAB_ARCADE = 4, LAB_JUKE_X = 349;
+export const LAB_COFFEE = 3, LAB_ARCADE = 4;
 let labRoom: Room | null = null;
 
 // ---- standing props (depth-sorted with players) ----

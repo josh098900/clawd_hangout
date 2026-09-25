@@ -7,10 +7,12 @@
 import { BODY, K, type RGB } from '../engine/palette';
 import { PX, mk, r, M, shade, outline, withCtx, lit } from '../engine/pixel';
 
-export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** 0 none, 1 pigeon, 2 cat, 3 crab, 4 duck, 5 ghost */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
+export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** index into PETS (0 none) */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
 /** Things you can put on your desk in the Dev Den (bit i = item i). */
 export const DESK_ITEMS = ['2ND MONITOR', 'PLANT', 'MUG', 'LAVA LAMP', 'FAIRY LIGHTS', 'DRAGON FIGURE', 'STICKERS'] as const;
 export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT', 'PENGUIN'] as const;
+/** What each pet says now and then (same order as PETS). */
+export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON: 'COO', CAT: 'MEOW', CRAB: 'SNIP', DUCK: 'QUACK', GHOST: 'BOO', BAT: 'SQUEAK', PENGUIN: 'NOOT' };
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
 export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT'] as const;

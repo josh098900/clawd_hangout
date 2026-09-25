@@ -16,22 +16,12 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
 /**
  * `use` = index into room.spots you're using (-1 = none). `hold` = what's in your hand
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite, 8 hot dog, 9-15 the Diner's kitchen:
- * patty raw/cooked/burnt, burger, frozen fries, fries, shake). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
+ * patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 hot cocoa). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
  * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor).
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
 export const SPOTS_MAX = 40, HOLD_MAX = 17, POSE_MAX = 5;
 
-/**
- * Room state: small shared values that someone arriving later must also get. Each has a
- * timestamp; the newest wins. When a peer joins, the "host" (lowest id in the room) re-sends
- * everything it has, so the newcomer catches up.
- *   juke  = { n: track (-1 off), t0: wall-clock start (s) }   (the Lab's jukebox)
- *   hi    = { name, score }                                  (the arcade's high score)
- *   board = base64 of the Lab whiteboard's pixels            (see game/board.ts)
- *   build / deploy / notes = the Dev Den's build light, last deploy, and kanban board
- */
-export type StateKey = StateVal['k'];
 /** The Dev Den's build: passing?, commit + deploy counts, and the last commit (who + message). */
 export interface BuildState { ok: boolean; n: number; dep: number; by: string; id: string; msg: string }
 export interface KanbanNote { t: string; c: number }
@@ -47,6 +37,12 @@ export interface GameState {
   alive: number[]; seats: number[]; out: number[]; it: number; last: number; since: number; times: number[];
 }
 export const GAME_MAX = 24;
+/**
+ * Room state: small shared values that someone arriving later must also get (the jukebox, high scores, the
+ * whiteboard, a party game, the Diner's shift, a kart race, the snowman...). Each has a timestamp and the
+ * newest wins; when someone joins, the "host" (lowest id in the room) re-sends everything so they catch up.
+ * Each room keeps its own display copy in its onState (LAB_INFO, DEN_INFO, ...). parseState() checks them all.
+ */
 export type StateVal =
   | { k: 'juke'; v: { n: number; t0: number } } | { k: 'hi'; v: { name: string; score: number } } | { k: 'board'; v: string }
   | { k: 'build'; v: BuildState } | { k: 'deploy'; v: { t0: number; ok: boolean; by: string } } | { k: 'notes'; v: KanbanNote[] }
@@ -176,8 +172,10 @@ export interface LobbyPerson { id: string; name: string; room: RoomId }
 
 export type Provider = 'discord' | 'google';
 export const PROVIDERS: Provider[] = ['discord', 'google'];
-/** Who you are: nobody yet (pick guest or log in), a guest (this browser only), or an account. */
-/** `provider` = the login used this time; `linked` = every login attached to this player (Supabase links logins that share an email). */
+/**
+ * Who you are: nobody yet (pick guest or log in), a guest (this browser only), or an account. `provider` = the login
+ * used this time; `linked` = every login attached to this player (Supabase links logins that share an email).
+ */
 export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string; linked?: string[] }
 /** A world server and how full it is. `friends` = which of the ids you asked about are on it. */
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }

@@ -1,7 +1,7 @@
 # CLAUDE.md — Lab Hangout
 
 A multiplayer 2D pixel hangout. Players are little "lab critters" (or Clawd) who walk around
-eight rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
+24 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
 play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
@@ -101,7 +101,9 @@ src/
                        (ornaments per server, lighting show at :30, Secret Santa presents under it), SANTA'S SLEIGH at :15/:45
                        (8 presents to catch on the Square), the 12-present hunt, the Lab's advent calendar, the Park's snowman +
                        frozen pond (skating), snowballs, New Year's Eve (countdown, fireworks, confetti); installWinter() like Halloween
-    halloween.ts       October dressing over every room (pumpkins, webs, lights, bats, fog), the 8 trick-or-treat
+    dressing.ts        what both seasons share: where strings of lights hang in each room (LIGHT_LINES), drawing them in a
+                       season's colours, and which doors get a cobweb / wreath (wallDoors)
+    halloween.ts       October dressing (pumpkins, cobwebs, lights, bats + fog outside), the 8 trick-or-treat
                        doors, the haunted Crypt's candle puzzle; installHalloween() appends the spots at runtime
     garden.ts          the Rooftop's community garden (8 beds at its right end): SEEDS, growth() (same sums as the
                        server), plant sprites per seed + stage, GARDEN.plots (fetched every 15 s while on the roof)
@@ -334,7 +336,6 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
   jukebox / high score / board / game / crypt. Fine for friends, not for public launch.
 - Party games are run by whoever started them (the host). If the host leaves mid-game it goes
   stale and is ignored after ~12 s. The host judges who sat down, so a cheating host can cheat.
-- Unlocks (CROWN hat, fish log, constellations) live in localStorage: per browser, not per account.
 - Chat and names are filtered + rate-limited on the server; notes, the whiteboard and room
   state only get the client-side filter/limits in net/filter.ts.
 
@@ -353,13 +354,13 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
   display copy in that room's `onState` (like `DEN_INFO`/`LAB_INFO`). Catch-up for newcomers is automatic.
 - Room hooks worth knowing: `music` (a `juke` spot cycles its tracks), `talkers` (non-avatar
   things you TALK to, like the duck), `watch` (camera target while seated), `dimNow`/`bgAlt`/`glowMul`.
-- New room checklist also: add the id to `RoomId`/`ROOM_IDS` (room.ts), `ROOMS` + `roomState` in main.ts,
-  a `.plate.<id>` style, and a door to it from an existing room (`edge: true` for open set edges).
 - Things that must line up for everyone but never change (NPC days, day/night, films, fireworks
   on the hour, slop waves, pomodoro): compute them from `Date.now()`, don't send messages.
-- New room checklist: `world/<name>.ts` exporting `make<Name>()` → add to `ROOM_IDS` in
-  room.ts and `ROOMS` in main.ts → add a door in an existing room pointing at it → add a
-  `.plate.<id>` colour in styles.css.
+- New room checklist: `world/<name>.ts` exporting `make<Name>()` → add the id to `RoomId`/`ROOM_IDS`
+  (room.ts), `ROOMS` + `roomState` in main.ts → a door to it from an existing room (`edge: true` for open
+  set edges) → a `.plate.<id>` style in styles.css → its seasonal dressing: string lights in
+  `world/dressing.ts`, pumpkins in halloween.ts `PUMPKINS`, a tree in winter.ts `XTREES` (doors get cobwebs and
+  wreaths by themselves).
 
 ## IP / branding (important)
 - **Clawd is here on purpose.** The owner deliberately added Anthropic's Clawd mascot as a

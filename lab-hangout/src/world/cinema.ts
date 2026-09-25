@@ -332,7 +332,6 @@ export const CINEMA_SPOTS: Spot[] = [
   { kind: 'soda', x: 170, y: 452, sx: 170, sy: 452, lift: 0, label: 'SODA', area: { x0: 146, y0: 332, x1: 206, y1: 380 } },
   { kind: 'booth', x: 348, y: 452, sx: 348, sy: 452, lift: 0, label: 'PHOTO', area: { x0: 314, y0: 308, x1: 382, y1: 440 } },
 ];
-export const CINEMA_BOOTH = 20;
 CINEMA_SPOTS.push({ kind: 'party', game: 'chairs', x: 460, y: 482, sx: 460, sy: 482, lift: 0, label: 'MUSICAL CHAIRS', area: { x0: 448, y0: 436, x1: 472, y1: 472 } }); // 21
 
 export function makeCinema(): Room {

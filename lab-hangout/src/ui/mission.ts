@@ -28,10 +28,11 @@ export function openMission(start: { x: number; y: number }, h: MissionHooks, on
   const status = document.createElement('div'); Object.assign(status.style, { fontFamily: "'VT323', monospace", fontSize: '20px', color: '#9FEFFF', maxWidth: W * S + 'px', textAlign: 'center' });
   let x = start.x, y = start.y, raf = 0, drag: { px: number; py: number; x: number; y: number } | null = null, lock: { id: string; t0: number } | null = null, last = performance.now();
   const keys = new Set<string>(), done = new Set<string>();
-  const m = openModal('MISSION CONTROL', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); onClose(); });
+  const m = openModal('MISSION CONTROL', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); onClose(); });
   const kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(k)) { keys.add(k); e.preventDefault(); e.stopPropagation(); } };
   const ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true);
+  const unstick = (): void => keys.clear();
+  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
   cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); drag = { px: e.clientX, py: e.clientY, x, y }; cv.style.cursor = 'grabbing'; });
   cv.addEventListener('pointermove', (e) => { if (!drag) return; const k = W / cv.getBoundingClientRect().width; x = drag.x - (e.clientX - drag.px) * k; y = drag.y - (e.clientY - drag.py) * k; });
   const up = () => { drag = null; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);

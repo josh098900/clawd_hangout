@@ -69,7 +69,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, USED_UP, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -386,7 +386,17 @@ async function switchServer(): Promise<void> {
 
 
 // ---------- rooms ----------
-async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
+/**
+ * Go to room `id`. Room changes never overlap: one asked for while another is under way waits for it, and
+ * if several pile up only the newest happens (a door, a hide-and-seek start and a FOLLOW can all ask at once).
+ */
+let roomQueue: Promise<void> = Promise.resolve(), nextRoom: { id: RoomId; at: { x: number; y: number } | null } | null = null;
+function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
+  nextRoom = { id, at };
+  roomQueue = roomQueue.then(() => { const n = nextRoom; nextRoom = null; return n ? switchRoom(n.id, n.at) : undefined; }).catch((e) => { switching = false; void fade(false); console.error(e); });
+  return roomQueue;
+}
+async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
   if (room.id === 'diner' && id !== 'diner') { endTour(false); leaveKitchen(); } // (while the others are still here to hand over to)
   if (decorating() && !isFlat(id)) closeDecorate(true); // walked out while decorating: keep it
   if (isFlat(id) && FLAT.owner !== FLAT.photoOf) loadFlatPhoto(FLAT.owner);
@@ -1620,7 +1630,7 @@ function updateMe(dt: number): void {
   }
   // finished what's in your hand?
   if (me.hold && me.sips >= (USES[me.hold] ?? 5) && !me.emote) {
-    logLine(null, me.hold === HOLD_MUG ? 'Mug empty. Refill it at the coffee machine' : me.hold === HOLD_POPCORN ? 'All the popcorn is gone' : me.hold === HOLD_TOAST ? 'Perfect golden marshmallow!' : me.hold === HOLD_BURNT ? 'Crunchy... and a bit sad' : me.hold === HOLD_MARSH ? 'Raw marshmallow. Bold choice.' : 'Slurp! Soda finished');
+    logLine(null, USED_UP[me.hold] ?? 'All gone');
     me.hold = 0; me.sips = 0; forceSend = true;
   }
   const ax = input.axis();
@@ -1775,7 +1785,7 @@ function render(a: number, t: number): void {
   PX.dim = dim;
   if (isWinter()) winterGround(room);
   room.drawBack(a);
-  if (isHalloween()) halloweenBack(room.id, a);
+  if (isHalloween()) halloweenBack(room, a);
   if (isWinter()) winterBack(room, a);
   for (const c of crews) drawCrewFloor(c);
   // tap marker
@@ -1811,7 +1821,7 @@ function render(a: number, t: number): void {
     }
   }
   for (const tk of room.talkers ?? []) heads.set(tk.id, R.toScreen(tk.x, tk.y - 4));
-  if (isHalloween()) halloweenFront(room.id, a);
+  if (isHalloween()) halloweenFront(room, a);
   if (isWinter()) { drawBalls(); winterFront(room, a, R.cam, OUTDOORS.includes(room.id) && weather().kind === 'snow'); }
   // lanterns: stacked faint discs give a soft falloff (one big disc reads as a flat circle)
   if (room.lantern) for (const it of items) if (it.av) { const ly = it.av.y - liftOf(it.av) - 16; for (let k = 0; k < 6; k++) Gd(it.av.x, ly, 10 + k * 9, room.lantern, 0.06); }

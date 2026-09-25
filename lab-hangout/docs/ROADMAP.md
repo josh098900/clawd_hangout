@@ -35,8 +35,8 @@ Guiding rules (from what already works):
 ## Phase 2 — Collect & unlock
 - [x] Tokens: 6 coins on the Square (each once per 5-min window, server clock), daily +5 bonus, HUD counter
 - [x] The Arcade (down the stairwell on the Square): claw machine (3 tokens, server-rolled prize from 13 hats/faces/outfits/pets, dupes refund 1), 2-player Pong watchable live on the cabinet with a CHAMP board, SLOP INVADERS cabinet, prize counter (your collection), air hockey, PIXEL the attendant, chiptune radio
-- [ ] Tank duel (2-player, networked)
-- [x] Pet pigeon that follows you (feed the pigeons 5 times; a cosmetic unlock kept in the browser, no tokens needed)
+- [x] Tank duel (2-player, networked)
+- [x] Pet pigeon that follows you (feed the pigeons 5 times; a cosmetic unlock kept in your save, no tokens needed)
 - [x] Personal desk in the Dev Den: DESK STUFF shelf (monitor, plant, mug, lava lamp, fairy lights, dragon, stickers); your setup shows on whichever desk you sit at
 
 ## Phase 3 — Party games (built from existing pieces)

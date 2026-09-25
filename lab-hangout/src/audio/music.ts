@@ -77,7 +77,6 @@ export const PARK_TRACKS: Track[] = [
     drums: 'k . s . k . s . k . s . k k s . k . s . k . s . k . s . k s s s',
   },
 ];
-/** The Dev Den radio: slow, soft lo-fi loops. */
 /** The Diner's jukebox: doo-wop-ish tunes written for the game. */
 export const DINER_TRACKS: Track[] = [
   {
@@ -100,6 +99,7 @@ export const DINER_TRACKS: Track[] = [
   },
 ];
 
+/** The Dev Den radio: slow, soft lo-fi loops. */
 export const LOFI: Track[] = [
   {
     name: 'RAINY COMMITS', bpm: 72, wave: 'sine',
@@ -224,7 +224,6 @@ export class MusicPlayer {
   }
 }
 
-/** Looping rain on the window (the Dev Den). Filtered noise; volume 0 to stop. */
 /** A kart's engine: a buzzy note that rises with speed (the Kart Track). set(0) fades it out. */
 export class Engine {
   private o: OscillatorNode | null = null; private o2: OscillatorNode | null = null; private g: GainNode | null = null;
@@ -268,6 +267,7 @@ export class Rumble {
   }
 }
 
+/** Looping rain on the window (the Dev Den) and outside. Filtered noise; volume 0 to stop. */
 export class Rain {
   private g: GainNode | null = null;
   set(vol: number): void {
@@ -292,7 +292,7 @@ export function playPad(i: number, n: number, vol = 1): void {
   const { AC, master, NB } = au, t = AC.currentTime, out = AC.createGain(); out.gain.value = vol; out.connect(master);
   const env = (g: GainNode, pk: number, a: number, d: number) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(pk, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   const osc = (type: OscillatorType, f: number, pk: number, d: number, f1?: number) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + d); env(g, pk, 0.005, d); o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.05); return o; };
-  const hiss = (type: BiquadFilterType, f: number, q: number, pk: number, d: number) => { const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; b.type = type; b.frequency.value = f; b.Q.value = q; env(g, pk, 0.002, d); s.connect(b); b.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05); };
+  const hiss = (type: BiquadFilterType, f: number, q: number, pk: number, d: number) => { const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; s.loop = true; b.type = type; b.frequency.value = f; b.Q.value = q; env(g, pk, 0.002, d); s.connect(b); b.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05); };
   if (i === 0) { osc('square', freq(PENTA[n]), 0.05, 0.35); osc('triangle', freq(PENTA[n]) * 2, 0.02, 0.25); }
   else if (i === 2) { const f = freq(PENTA[n]) / 4; osc('triangle', f, 0.14, 0.45); osc('square', f, 0.03, 0.2); }
   else if (i === 3) { // a little "la": sine with vibrato plus a soft buzzy formant

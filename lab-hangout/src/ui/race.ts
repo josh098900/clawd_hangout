@@ -116,9 +116,10 @@ export function openRace(h: RaceHooks): RaceHandle {
   const keys = new Set<string>();
   const kd = (e: KeyboardEvent) => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'Shift'].includes(k)) { e.preventDefault(); e.stopPropagation(); keys.add(k); } };
   const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true);
+  const unstick = (): void => keys.clear();
+  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
   let raf = 0;
-  const m = openModal('KART RACE', () => { engine.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); h.onClose(); });
+  const m = openModal('KART RACE', () => { engine.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); h.onClose(); });
   const hold = (label: string, k: string) => { const b = button(label, () => {}); b.classList.add('hold'); b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => keys.delete(k)); return b; };
   const againBtn = button('RACE AGAIN', () => h.again()); againBtn.style.display = 'none';
   m.body.append(cv, info, ...(touch ? [row(hold('◀', 'ArrowLeft'), hold('DRIFT', ' '), hold('▶', 'ArrowRight'), hold('BRAKE', 'ArrowDown'))] : []), row(againBtn, button('LEAVE', m.close, true)));

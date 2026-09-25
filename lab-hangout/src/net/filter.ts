@@ -1,6 +1,7 @@
 // A small client-side word filter for everything people type (names, chat, kanban notes).
-// It is a first line of defence only: anyone can bypass client code, so the real filter has
-// to live on the server (see docs/ROADMAP.md, Phase 0). Matches are masked, not dropped.
+// It is a first line of defence only: anyone can bypass client code. Chat and names are also
+// filtered on the server (0002_security.sql); notes and the whiteboard only get this one. Matches
+// are masked, not dropped.
 
 // Stems, with common look-alike swaps handled below. Kept short on purpose: false positives
 // ("Scunthorpe") are worse than misses in a friendly room, so only whole-word-ish matches.

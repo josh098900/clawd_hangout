@@ -404,7 +404,7 @@ export class SupabaseTransport implements Transport {
     const { error } = await this.sb.rpc('report_player', { who: id, reason });
     if (error) throw new Error(error.message);
   }
-  async tokens(): Promise<number> { const { data } = await this.sb.rpc('my_tokens'); return typeof data === 'number' ? data : 0; }
+  async tokens(): Promise<number> { const { data, error } = await this.sb.rpc('my_tokens'); if (error) throw new Error(error.message); return typeof data === 'number' ? data : 0; }
   async claimCoin(i: number): Promise<number | null> { const { data, error } = await this.sb.rpc('claim_coin', { coin: i }); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
   async claimDaily(): Promise<number | null> { const { data, error } = await this.sb.rpc('claim_daily'); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
   sendEmote(kind: EmoteKind): void { void this.ch?.send({ type: 'broadcast', event: 'emote', payload: { id: this.selfId, kind } }); }
