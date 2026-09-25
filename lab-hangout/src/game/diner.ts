@@ -33,7 +33,8 @@ const DISH_HOLD: Record<Dish, number> = { B: HOLD_BURGER, F: HOLD_FRIES, S: HOLD
 
 export interface DinerState {
   host: string;
-  /** Wall-clock start (ms), the ticket seed, and how many cooks it was started for (1-4: sets the pace). */
+  /** Wall-clock start (ms), the ticket seed, and how many cooks it was started for (1-4: sets the pace; 0 = COOKIE's
+   *  practice run on the tour: one ticket, no rush, never sent to anyone). */
   t0: number; seed: number; lvl: number;
   ids: string[]; names: string[]; hands: number[];
   /** When each grill slot / fryer basket got its food (wall ms), 0 = empty; the shake machine likewise. */
@@ -54,6 +55,7 @@ function mix(n: number): number {
 const GAP = [22, 18, 15, 12];
 /** Every ticket of this shift: what it wants, when it comes in and when it's due (wall ms). */
 export function tickets(g: DinerState): Ticket[] {
+  if (g.lvl === 0) return [{ i: 0, dishes: ['B', 'F', 'S'], at: g.t0, due: g.t0 + 3600e3 }];
   const out: Ticket[] = [], gap = GAP[Math.max(1, Math.min(4, g.lvl)) - 1];
   for (let i = 0; ; i++) {
     const at = 3 + i * gap; if (at > SHIFT_S - 25) break;
@@ -70,7 +72,7 @@ export const ticketDone = (g: DinerState, t: Ticket): boolean => (g.served[t.i] 
 export const openTickets = (g: DinerState, now = Date.now()): Ticket[] => tickets(g).filter((t) => t.at <= now && now <= t.due && !ticketDone(g, t));
 /** Tickets that ran out of time (by `now`, and before the shift ended). */
 export const missed = (g: DinerState, now = Date.now()): number => tickets(g).filter((t) => t.due < Math.min(now, shiftEnd(g)) && !ticketDone(g, t)).length;
-export const shiftEnd = (g: DinerState): number => g.t0 + SHIFT_S * 1000;
+export const shiftEnd = (g: DinerState): number => g.t0 + (g.lvl === 0 ? 3600 : SHIFT_S) * 1000;
 /** The score: points for finished tickets, minus 5 for each missed one. */
 export const score = (g: DinerState, now = Date.now()): number => g.pts - 5 * missed(g, now);
 
@@ -85,6 +87,8 @@ export const fryAt = (g: DinerState, k: number, now = Date.now()) => cookState(g
 export const shakeAt = (g: DinerState, now = Date.now()) => cookState(g.shake, T.SHAKE, 1e9, now);
 export const live = (g: DinerState | null, now = Date.now()): g is DinerState => !!g && now >= g.t0 - 2000 && now < shiftEnd(g); // (2 s of grace for clocks a little apart)
 
+/** COOKIE's practice kitchen for the tour (local only). */
+export const practiceShift = (me: string, name: string, now = Date.now()): DinerState => ({ ...newShift(me, name, 1, now), lvl: 0 });
 export function newShift(host: string, name: string, cooks: number, now = Date.now()): DinerState {
   return { host, t0: now, seed: Math.floor(Math.random() * 99999), lvl: Math.max(1, Math.min(4, cooks)), ids: [host], names: [name], hands: [0], grill: [0, 0], fry: [0, 0], shake: 0, served: [], pts: 0, done: 0 };
 }

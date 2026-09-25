@@ -225,6 +225,11 @@ export class Npcs {
 
   /** NPCs who've stepped out for now (COOKIE takes a break while players run a kitchen shift). */
   readonly away = new Set<string>();
+  /** NPCs walked by hand in THIS browser only (COOKIE giving you the Diner tour): id -> where to walk to. */
+  readonly puppet = new Map<string, { x: number; y: number }>();
+  /** Let go of a puppet: it walks back to where its routine has got to (instead of jumping there). */
+  release(id: string): void { if (this.puppet.delete(id)) this.homing.add(id); }
+  private homing = new Set<string>();
   inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season()) && !this.away.has(n.def.id)); }
 
   /**
@@ -234,6 +239,17 @@ export class Npcs {
   update(rooms: Record<RoomId, Room>, here: RoomId, now: number, taken: (i: number) => boolean): void {
     const T = Date.now() / 1000;
     for (const n of this.list) {
+      const pp = this.puppet.get(n.def.id);
+      if (pp) { // walk straight to the spot we've been told, then stand there
+        const av = n.av, dx = pp.x - av.x, dy = pp.y - av.y, d = Math.hypot(dx, dy), st = Math.min(d, (d > 200 ? 200 : 130) / 60); // a brisk jog (a run from far away), one step a frame
+        const moving = d > 1.5;
+        if (moving) { av.x += (dx / d) * st; av.y += (dy / d) * st; av.walkDist += st; if (Math.abs(dx) > 1) av.dir = dx > 0 ? 1 : -1; }
+        else if (av.moving) av.stopT = now;
+        if (now < n.faceUntil) av.dir = n.faceDir;
+        av.moving = moving; av.use = -1; av.hold = 0; if (av.pose) { av.pose = 0; av.poseT0 = now; }
+        n.seg = -1;
+        continue;
+      }
       const room = rooms[n.def.room], av = n.av, u = T % n.cycle, lap = Math.floor(T / n.cycle);
       let i = n.segs.findIndex((s) => u >= s.t0 && u < s.t1); if (i < 0) i = n.segs.length - 1;
       const s = n.segs[i], k = s.t1 > s.t0 ? (u - s.t0) / (s.t1 - s.t0) : 1;
@@ -242,6 +258,11 @@ export class Npcs {
       if (s.stop?.use !== undefined) {
         const sp = room.spots[s.stop.use];
         if (!(here === n.def.room && taken(s.stop.use))) { use = s.stop.use; x = sp.x; y = sp.y; }
+      }
+      if (this.homing.has(n.def.id)) { // walking back to the routine after being a puppet
+        const hx = x - av.x, hy = y - av.y, hd = Math.hypot(hx, hy);
+        if (hd > 4) { const st = Math.min(hd, 130 / 60); av.x += (hx / hd) * st; av.y += (hy / hd) * st; av.walkDist += st; if (Math.abs(hx) > 1) av.dir = hx > 0 ? 1 : -1; av.moving = true; continue; }
+        this.homing.delete(n.def.id);
       }
       const d = Math.hypot(x - av.x, y - av.y);
       if (moving) { av.walkDist += d; if (Math.abs(s.bx - s.ax) > 1) av.dir = s.bx > s.ax ? 1 : -1; }
@@ -265,6 +286,10 @@ export class Npcs {
   }
 
   /** A player said hi: turn to face them, wave, and answer. */
+  /** Turn to face x for a few seconds. */
+  face(n: Npc, x: number, now: number): void { n.faceDir = x < n.av.x ? -1 : 1; n.faceUntil = now + 3; }
+  byId(id: string): Npc | undefined { return this.list.find((n) => n.def.id === id); }
+
   talk(n: Npc, fromX: number, now: number): void {
     n.faceDir = fromX < n.av.x ? -1 : 1; n.faceUntil = now + 4;
     if (!n.av.emote) n.av.emote = { kind: 'wave', t0: now };

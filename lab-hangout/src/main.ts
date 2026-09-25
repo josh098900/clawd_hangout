@@ -22,8 +22,9 @@ import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, POND, pondEdge } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
-import { makeDiner, DINER } from './world/diner';
-import { ST, cookAct, live as shiftLive, newShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
+import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
+import { TOUR, BURNT, isBurnt, retryStep, type TourStep } from './game/dinertour';
+import { ST, cookAct, live as shiftLive, newShift, practiceShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
 import { syncTickets } from './ui/tickets';
 import { OUTDOORS, WEATHER_NEWS, drawWeather, forceWeather, lightning as stormBolt, raining, weather } from './world/weather';
 import { drawCrewFloor, drawCrewTag, findCrews, type Crew } from './game/dance';
@@ -340,7 +341,7 @@ async function switchServer(): Promise<void> {
 
 // ---------- rooms ----------
 async function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
-  if (room.id === 'diner' && id !== 'diner') leaveKitchen(); // (while the others are still here to hand over to)
+  if (room.id === 'diner' && id !== 'diner') { endTour(false); leaveKitchen(); } // (while the others are still here to hand over to)
   switching = true;
   tapTarget = null;
   await fade(true);
@@ -898,6 +899,7 @@ function setPose(p: number): void {
   if (me.pose === POSE_DANCE) SFX.joy(); else if (me.pose === POSE_FLOOR) SFX.sit();
 }
 function talkTo(n: Npc): void {
+  if (n.def.id === 'npc-cookie' && !tour && !shiftLive(DINER.g)) { startTour(true); me.dir = n.av.x < me.x ? -1 : 1; return; }
   npcs.talk(n, me.x, now());
   me.dir = n.av.x < me.x ? -1 : 1;
   SFX.chat();
@@ -930,7 +932,7 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
-  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
+  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
@@ -1288,7 +1290,7 @@ function render(a: number, t: number): void {
     if (av) { const y = Math.round(av.y - liftOf(av) - 56 - Math.abs(Math.sin(a * 5)) * 2); txtOutlined('IT!', Math.round(av.x - tw('IT!', 2) / 2), y, [255, 90, 90], 2); Gd(av.x, av.y - 16, 22, [255, 60, 60], 0.35); }
   }
   if (pendingShot) { pendingShot = false; capture(); }
-  if (playing) { drawDoorHints(a); drawActionHint(a, actNow); }
+  if (playing) { drawDoorHints(a); drawActionHint(a, actNow); if (tour && room.id === 'diner') drawTourArrow(a); }
   for (const c of crews) drawCrewTag(c);
   room.drawFront?.(a);
   if (outdoors) drawWeather(room, R.cam, a, 1 - dayness());
@@ -1339,6 +1341,8 @@ function leaveKitchen(): void {
 }
 function clockIn(): void {
   if (!settled()) return;
+  if (tour && tour.step < TOUR.length - 1) { toast('Finish the tour with COOKIE first (or SKIP TOUR)'); return; }
+  if (tour) endTour(true);
   if (shiftLive(DINER.g)) { toast('A shift is already on: grab a station and help out!'); return; }
   const cooks = 1 + [...others.keys()].filter((id) => !id.startsWith('bot-')).length;
   setState({ k: 'diner', v: newShift(net.selfId, me.name, cooks) });
@@ -1346,6 +1350,7 @@ function clockIn(): void {
 }
 /** Press E at kitchen station `st`: the host applies it, everyone else asks the host. */
 function cook(st: number, quiet = false): void {
+  if (tour) { tourCook(st); return; }
   const g = DINER.g;
   if (!shiftLive(g)) { if (!quiet) toast('Clock in first: the time clock is by the kitchen door'); return; }
   if (!settled()) return;
@@ -1362,7 +1367,9 @@ function cook(st: number, quiet = false): void {
 function dinerStep(dt: number, t: number): void {
   const g = DINER.g, inDiner = room.id === 'diner' && playing, on = inDiner && shiftLive(g);
   npcs.away.clear(); if (on) npcs.away.add('npc-cookie');
-  syncTickets(on ? g : null);
+  syncTickets(tour ? tour.g : on ? g : null);
+  if (inDiner && settled()) tourStep();
+  if (tour) return;
   if (!inDiner || !g) { if (isKitchen(me.hold) && room.id !== 'diner') { me.hold = 0; forceSend = true; } return; }
   if (!settled()) return;
   // the host walked out: the first cook still here (by id) takes over
@@ -1400,9 +1407,83 @@ function shiftOver(g: DinerState): void {
 }
 /** The top banner in the Diner during a shift. */
 function dinerLine(): string {
+  if (tour && room.id === 'diner') return tourStepNow().bar;
   const g = DINER.g; if (room.id !== 'diner' || !shiftLive(g)) return '';
   const left = Math.max(0, Math.ceil((g.t0 + SHIFT_S * 1000 - Date.now()) / 1000));
   return 'KITCHEN SHIFT · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
+}
+
+// ---------- COOKIE's tour of the kitchen (game/dinertour.ts) ----------
+/** The tour: which step, the private practice kitchen, when this step started, and the step to go back to after a burn. */
+let tour: { step: number; g: DinerState; t0: number; said: string; back: number } | null = null;
+const skipBtn = document.createElement('button');
+skipBtn.type = 'button'; skipBtn.className = 'pill'; skipBtn.textContent = 'SKIP TOUR'; skipBtn.style.display = 'none';
+skipBtn.addEventListener('click', () => { endTour(true); toast('Tour skipped. TALK to COOKIE any time to see it again', 3500); });
+emoteBar.appendChild(skipBtn);
+const tourStepNow = (): TourStep => (tour && tour.back >= 0 ? BURNT : TOUR[tour?.step ?? 0]);
+function startTour(again = false): void {
+  if (tour || shiftLive(DINER.g)) return;
+  if (isKitchen(me.hold)) me.hold = 0;
+  tour = { step: again ? 1 : 0, g: practiceShift(net.selfId, me.name), t0: now(), said: '', back: -1 };
+  DINER.tour = tour.g; skipBtn.style.display = '';
+  // COOKIE comes straight over: if he's far off, he runs in from just out of view
+  const ck = npcs.byId('npc-cookie');
+  if (ck && Math.abs(ck.av.x - me.x) > 360) { ck.av.x = clamp(me.x + (ck.av.x > me.x ? 250 : -250), 30, 1370); ck.av.y = clamp(me.y, 500, 660); }
+  if (again) say('npc-cookie', 'The tour? Happy to! Follow me.', now(), false);
+}
+function endTour(done: boolean): void {
+  if (!tour) return;
+  tour = null; DINER.tour = null; npcs.release('npc-cookie'); skipBtn.style.display = 'none';
+  if (isKitchen(me.hold)) { me.hold = 0; forceSend = true; }
+  if (done && !save.data.stats.dinerTour) save.update((d) => { d.stats.dinerTour = 1; });
+}
+/** Where a tour step points: the station's stand point (COOKIE waits beside it) and the top of its picture (the arrow). */
+function tourSpot(at: TourStep['at']): { x: number; y: number; top: number } {
+  if (at === 'you') return { x: me.x + (me.x > 1300 ? -30 : 30), y: me.y + 2, top: me.y - 60 };
+  const sp = DINER_SPOTS.find((q) => (at === 'clock' ? q.kind === 'shift' : q.kind === 'cook' && q.n === at))!;
+  return { x: sp.sx, y: sp.sy, top: sp.area.y0 };
+}
+/** Run the tour: start it for first-timers, walk COOKIE, say each line, move on when a step is done. */
+function tourStep(): void {
+  if (!tour) {
+    if (!save.data.stats.dinerTour && !shiftLive(DINER.g) && playing && !editing) startTour();
+    return;
+  }
+  if (shiftLive(DINER.g)) { endTour(false); toast('A real shift just started! Jump in: COOKIE will show you around another time', 4000); return; }
+  const t = now();
+  if (isBurnt(me.hold) && tour.back < 0) { tour.back = retryStep(tour.step); tour.t0 = t; }
+  const st = tourStepNow(), sp = tourSpot(st.at), cookie = npcs.byId('npc-cookie');
+  const cx = st.at === 'you' ? sp.x : sp.x + (sp.x > 1300 ? -30 : 30);
+  npcs.puppet.set('npc-cookie', { x: cx, y: sp.y + 6 });
+  if (cookie && !cookie.av.moving) npcs.face(cookie, me.x, t);
+  const key = tour.step + ':' + tour.back;
+  const near = cookie ? Math.hypot(cookie.av.x - cx, cookie.av.y - sp.y - 6) < 40 : true;
+  if (tour.said !== key && cookie && (near || t - tour.t0 > (st.at === 'you' ? 6 : 3))) { tour.said = key; say('npc-cookie', st.say, t, false); SFX.chat(); }
+  const done = st.done ? st.done({ hold: me.hold, g: tour.g }) : t - tour.t0 > (st.wait ?? 5) && tour.said === key;
+  if (!done) return;
+  if (tour.back >= 0) { tour.step = tour.back; tour.back = -1; tour.t0 = t; return; }
+  if (tour.step >= TOUR.length - 1) { endTour(true); return; }
+  tour.step++; tour.t0 = t;
+  if (TOUR[tour.step].done && tour.step > 2) SFX.chime();
+}
+/** E at a station on the tour: the practice kitchen, just for you. */
+function tourCook(st: number): void {
+  if (!tour) return;
+  const res = cookAct(tour.g, net.selfId, me.name, st);
+  if ('err' in res) { toast(res.err, 1800); SFX.blip(); return; }
+  tour.g = res.g; DINER.tour = res.g;
+  me.hold = res.g.hands[res.g.ids.indexOf(net.selfId)] ?? 0; forceSend = true;
+  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
+  else if (st === ST.PASS) { if (res.ticket) { SFX.bell(); SFX.score(); } else SFX.chime(); }
+  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
+}
+/** A big bouncing arrow over where the tour wants you. */
+function drawTourArrow(a: number): void {
+  if (!tour) return;
+  const st = tourStepNow(); if (st.at === 'you') return;
+  const sp = tourSpot(st.at), x = Math.round(sp.x), y = Math.round(sp.top - 14 - Math.abs(Math.sin(a * 4)) * 5), c: [number, number, number] = [124, 242, 156];
+  lit(() => { r(x - 2, y - 8, 5, 8, c); for (let j = 0; j < 6; j++) r(x - 6 + j, y + j, 13 - j * 2, 1, c); });
+  Gd(x, y, 12, c, 0.45);
 }
 
 // ---------- loop ----------
@@ -1594,6 +1675,8 @@ if (import.meta.env.DEV && params.has('debug')) {
     follow: (id: string) => { following = id; followT = 0; }, stopFollow: () => { following = null; },
     spots: () => room.spots.map((sp) => ({ kind: sp.kind, n: sp.n })), candleOrder: () => candleOrder(),
     doorsOpen: () => room.doors.map((d) => !!doorDest(d)),
+    talkCookie: () => { const n = npcs.byId('npc-cookie'); if (n) talkTo(n); },
+    tour: () => (tour ? { step: tour.step, back: tour.back, bar: tourStepNow().bar } : null), tourDone: () => !!save.data.stats.dinerTour,
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },

@@ -19,7 +19,7 @@ const W = 1400, H = 700, FL = 470;
 /** Where the kitchen starts (the pillar). */
 export const KITCHEN_X = 770;
 /** The live shift (room state 'diner'), the best shift so far, and the jukebox. */
-export const DINER = { g: null as DinerState | null, best: null as { name: string; score: number } | null, juke: 0, jukeT0: 0 };
+export const DINER = { g: null as DinerState | null, /** COOKIE's practice kitchen while you're on the tour (drawn instead of g) */ tour: null as DinerState | null, best: null as { name: string; score: number } | null, juke: 0, jukeT0: 0 };
 
 /** Station x centres (index = ST): fridge, freezer, grill, fryer, buns, shakes, bin, pass. */
 const SX = [1296, 1362, 1020, 1130, 912, 1222, 1100, 822];
@@ -106,7 +106,7 @@ function ticketCard(x: number, y: number, n: number, dishes: Dish[], served: num
 }
 
 function drawBack(a: number): void {
-  const g = DINER.g, now = Date.now(), on = live(g, now);
+  const g = DINER.tour ?? DINER.g, now = Date.now(), on = live(g, now);
   // cars going by outside at night
   lit(() => { for (let k = 0; k < 3; k++) { const x = ((a * (60 + k * 25) + k * 400) % 900) - 150; for (const [x0, x1] of [[96, 424], [476, 604]]) if (x > x0 && x + 16 < x1) { r(x, 386, 16, 4, CONFETTI[k]); r(x + 14, 387, 3, 2, [255, 240, 200]); } } });
   // the neon sign over the windows (one letter flickers)

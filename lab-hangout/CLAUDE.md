@@ -104,6 +104,8 @@ src/
                        beat (crewPose), and the floor lights up; worked out in every browser, nothing is sent
   game/diner.ts        the Diner's co-op kitchen game: tickets (from t0 + seed), cookAct() (pure: host applies, others predict),
                        missed tickets / shift end / score all derived from the clock
+  game/dinertour.ts    COOKIE's hands-on kitchen tour for first-timers (TOUR steps; a local practice kitchen, lvl 0;
+                       COOKIE is a local 'puppet' NPC meanwhile). TALK to COOKIE to replay it
   game/hideseek.ts     hide and seek across rooms (seeker's browser runs it, on the lobby channel)
   game/bots.ts         local demo bots (wander, use spots, play party games, jam), with routeTo() pathing
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
