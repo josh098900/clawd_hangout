@@ -15,10 +15,11 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
 /**
  * `use` = index into room.spots you're using (-1 = none). `hold` = what's in your hand
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite, 8 hot dog, 9-15 the Diner's kitchen:
- * patty raw/cooked/burnt, burger, frozen fries, fries, shake). `pose` = 0 normal, 1 dancing, 2 sitting on the floor.
+ * patty raw/cooked/burnt, burger, frozen fries, fries, shake). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
+ * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor).
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 15, POSE_MAX = 4;
+export const SPOTS_MAX = 40, HOLD_MAX = 15, POSE_MAX = 5;
 
 /**
  * Room state: small shared values that someone arriving later must also get. Each has a
@@ -54,7 +55,13 @@ export type StateVal =
   | { k: 'garden'; v: { n: number } } | { k: 'sand'; v: string }
   | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } }
   | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] }
-  | { k: 'flat'; v: { n: number; party: number | null } };
+  | { k: 'flat'; v: { n: number; party: number | null } }
+  | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } };
+/**
+ * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
+ * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
+ */
+export interface ScopeState { x: number; y: number; by: string; saw: string; at: number }
 /** The fastest lap on each circuit (index = track, see game/kart.ts TRACKS), or null. */
 export type KartRecord = { name: string; ms: number } | null;
 export type StateMsg = StateVal & { ts: number };
@@ -79,6 +86,7 @@ export type NetEvent =
   | { type: 'tank'; id: string; t: TankMsg }
   | { type: 'flat'; id: string; f: FlatMsg }
   | { type: 'world'; id: string; w: HideSeek }
+  | { type: 'junk'; id: string; n: number }
   | { type: 'status'; text: string };
 
 /** Flats: whose door is how open, and the layout (all from the database). */
@@ -170,6 +178,8 @@ export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
 /** A garden bed on the Rooftop with something growing in it. Times are ms since 1970, `grown` is seconds of growth credited up to `calcAt` (see world/garden.ts growth()). */
 export interface Plot { bed: number; owner: string; ownerName: string; seed: number; plantedAt: number; lastWater: number; grown: number; calcAt: number }
+/** A hydroponic tray on the Space Station with a STAR MELON in it (0015_space.sql). `plantedAt` = ms since 1970. */
+export interface Tray { tray: number; owner: string; ownerName: string; plantedAt: number }
 /** The Pier's contest scoreboard (see 0010_fishing.sql). */
 export interface ContestBoard { live: boolean; top: { name: string; fish: string; cm: number }[]; last: { name: string; fish: string; cm: number; prize: number; anglers: number; at: number } | null; won: boolean }
 /** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
@@ -215,6 +225,15 @@ export interface Transport {
   /** Reel one in: the server picks the fish and its size (and enters it in a live contest). */
   catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }>;
   contestBoard(): Promise<ContestBoard>;
+  /** The Space Station's hydroponic trays on your server (only the ones with a melon in). */
+  trays(): Promise<Tray[]>;
+  /** Plant a STAR MELON (3 tokens). Resolves with your balance. */
+  spacePlant(tray: number): Promise<number>;
+  /** Harvest your ripe melon: +5 and (unless you have one) a comet bloom seed; rotten = it went off. */
+  spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }>;
+  spaceDigUp(tray: number): Promise<void>;
+  /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
+  spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
   /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
   dinerTip(score: number): Promise<{ tokens: number; paid: number }>;
   /** Today's 3 quests (the same for everyone) and which you've handed in. */
@@ -283,6 +302,8 @@ export interface Transport {
   sendFlat(f: FlatMsg): void;
   /** The Arcade's TANK DUEL: your tank ~15 times a second during a match (see ui/tanks.ts). */
   sendTank(t: TankMsg): void;
+  /** The spacewalk: you grabbed floating thing `n` (world/spacewalk.ts), so it vanishes for everyone. */
+  sendJunk(n: number): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -399,6 +420,11 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   }
   if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
   if (o.k === 'flat' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13), party = v.party === null ? null : num(v.party, 0, 1e11); return n === null || party === undefined || (v.party !== null && party === null) ? null : { id: o.id, s: { k: 'flat', v: { n, party }, ts } }; }
+  if (o.k === 'scope' && v && typeof v === 'object') {
+    const x = num(v.x, 0, 1e4), y = num(v.y, 0, 1e4), at = num(v.at, 0, 1e11), saw = typeof v.saw === 'string' && /^[A-Z0-9 ?!]{0,24}$/.test(v.saw) ? v.saw : null;
+    return x === null || y === null || at === null || saw === null ? null : { id: o.id, s: { k: 'scope', v: { x, y, by: cleanName(v.by), saw, at }, ts } };
+  }
+  if (o.k === 'trays' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'trays', v: { n }, ts } }; }
   if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
   if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
     const recs: KartRecord[] = [];
@@ -458,6 +484,10 @@ function parseRace(v: Record<string, unknown>): RaceState | null {
   if (!isId(v.host) || t0 === null || typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 1e6) return null;
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(names) || names.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !cols.every((c) => Number.isInteger(c) && c >= 0 && c < 64)) return null;
   return { host: v.host as string, t0, seed, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), cols: cols as number[] };
+}
+export function parseJunk(p: unknown): { id: string; n: number } | null {
+  const o = p as Record<string, unknown> | null;
+  return o && isId(o.id) && typeof o.n === 'number' && Number.isInteger(o.n) && o.n >= 0 && o.n < 1e10 ? { id: o.id, n: o.n } : null;
 }
 export function parseTank(p: unknown): { id: string; t: TankMsg } | null {
   const o = p as Record<string, unknown> | null;

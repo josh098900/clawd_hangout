@@ -16,6 +16,7 @@ export const SEEDS: { name: string; cost: number; growS: number; pays: number; f
   { name: 'TOMATO', cost: 4, growS: 21600, pays: 10 },
   { name: 'PUMPKIN', cost: 5, growS: 43200, pays: 15 },
   { name: 'MOONFLOWER', cost: 0, growS: 28800, pays: 25, find: true },
+  { name: 'COMET BLOOM', cost: 0, growS: 21600, pays: 20, find: true }, // found in a STAR MELON from the Space Station (0015_space.sql)
 ];
 /** Bed centres (x, front edge y): two rows of four. Index = bed id 0..7. */
 export const BEDS: [number, number][] = [1150, 1240, 1330, 1420].flatMap((x) => [[x, 532], [x, 612]] as [number, number][]).sort((p, q) => p[1] - q[1] || p[0] - q[0]);
@@ -51,7 +52,7 @@ function plant(x: number, y: number, seed: number, stage: number, wilted: boolea
   const lf = wilted ? WILT : LEAF, ld = wilted ? shade(WILT, 0.75) : LEAF_DK, droop = wilted ? 2 : 0, sway = Math.round(Math.sin(a * 1.4 + x) * (wilted ? 0 : 1));
   if (stage === 0) { r(x - 3, y - 2, 7, 2, [70, 48, 32]); r(x + 5, y - 9, 1, 8, [150, 110, 70]); r(x + 3, y - 10, 5, 3, [240, 236, 220]); return; } // mound + seed marker
   if (stage === 1) { r(x, y - 4, 1, 4, ld); r(x - 3 + sway, y - 6 + droop, 3, 2, lf); r(x + 1 + sway, y - 6 + droop, 3, 2, lf); return; }
-  const tall = seed === 1 ? 30 : seed === 2 ? 18 : seed === 4 ? 20 : seed === 3 ? 8 : 9, h = stage === 2 ? Math.round(tall * 0.6) : tall;
+  const tall = seed === 1 ? 30 : seed === 2 ? 18 : seed === 4 ? 20 : seed === 5 ? 24 : seed === 3 ? 8 : 9, h = stage === 2 ? Math.round(tall * 0.6) : tall;
   if (seed === 3) { // pumpkin: a low vine along the soil
     for (let k = -14; k <= 14; k += 2) r(x + k, y - 2 - Math.round(Math.abs(Math.sin(k * 0.4)) * 2), 2, 1, ld);
     for (const lx of [-11, -3, 6, 12]) { r(x + lx, y - 6 + droop, 4, 3, lf); r(x + lx, y - 6 + droop, 2, 1, M(lf, [255, 255, 255], 0.2)); }
@@ -61,10 +62,10 @@ function plant(x: number, y: number, seed: number, stage: number, wilted: boolea
     if (seed === 0 || seed === 2) for (let k = -2; k <= 2; k++) r(x + k * 2 + sway, y - h - 1 + Math.abs(k) + droop, 2, 3, lf);
   }
   if (stage === 3) { // flowers / buds
-    const fc: RGB = seed === 1 || seed === 3 || seed === 2 ? [255, 214, 90] : seed === 4 ? [200, 220, 255] : [255, 255, 255];
+    const fc: RGB = seed === 1 || seed === 3 || seed === 2 ? [255, 214, 90] : seed === 4 ? [200, 220, 255] : seed === 5 ? [255, 120, 230] : [255, 255, 255];
     if (seed === 1) { r(x + sway - 2, y - h - 3, 5, 4, LEAF_DK); r(x + sway - 1, y - h - 4, 3, 1, fc); }
     else if (seed === 3) r(x - 2, y - 9, 3, 3, fc);
-    else if (seed === 4) { lit(() => r(x + sway - 1, y - h - 3, 3, 3, fc)); Gd(x + sway, y - h - 2, 6, fc, 0.25); }
+    else if (seed === 4 || seed === 5) { lit(() => r(x + sway - 1, y - h - 3, 3, 3, fc)); Gd(x + sway, y - h - 2, 6, fc, 0.25); }
     else for (const [dx, dy] of [[-3, 6], [2, 9], [-1, 12]] as [number, number][]) if (h > dy) r(x + dx + sway, y - dy, 2, 2, fc);
   }
   if (stage === 4) { // the crop
@@ -72,6 +73,14 @@ function plant(x: number, y: number, seed: number, stage: number, wilted: boolea
     else if (seed === 1) { const cx = x + sway, cy = y - h - 3; for (let k = 0; k < 10; k++) { const an = k * 0.628 + a * 0.2; r(Math.round(cx + Math.cos(an) * 5) - 1, Math.round(cy + Math.sin(an) * 5) - 1, 3, 3, [255, 214, 60]); } r(cx - 3, cy - 3, 7, 7, [120, 70, 30]); r(cx - 2, cy - 2, 2, 2, [160, 100, 50]); }
     else if (seed === 2) for (const [dx, dy] of [[-4, 6], [2, 8], [-2, 12], [3, 14]] as [number, number][]) { r(x + dx + sway, y - dy, 4, 4, [230, 50, 50]); r(x + dx + sway, y - dy, 1, 1, [255, 150, 140]); }
     else if (seed === 3) { const o: RGB = [232, 120, 36]; for (let j = 0; j < 10; j++) { const hw = Math.round(8 * Math.sqrt(1 - ((j - 5) / 5.5) ** 2)); r(x + 2 - hw, y - 11 + j, hw * 2, 1, j > 7 ? shade(o, 0.8) : o); } r(x + 1, y - 13, 2, 3, [80, 130, 60]); r(x - 3, y - 10, 1, 8, shade(o, 0.8)); r(x + 6, y - 10, 1, 8, shade(o, 0.8)); }
+    else if (seed === 5) { // a comet: a hot star-shaped head with a sparkling tail streaming off it
+      const cx = x + sway, cy = y - h - 4, tail: RGB[] = [[255, 120, 230], [123, 97, 255], [95, 231, 255]];
+      lit(() => {
+        for (let k = 0; k < 9; k++) { const u = k / 9, tx = cx - 3 - k * 2, ty = cy + Math.round(Math.sin(a * 3 + k) * 1.2) + Math.round(u * 3); r(tx, ty, 2 - (k > 5 ? 1 : 0), 1, tail[k % 3]); if ((a * 4 + k) % 3 < 0.6) r(tx, ty - 2, 1, 1, K.WHITE); }
+        r(cx - 2, cy - 1, 5, 3, [255, 236, 250]); r(cx - 1, cy - 2, 3, 5, [255, 236, 250]); r(cx, cy - 3, 1, 7, [255, 200, 245]); r(cx - 3, cy, 7, 1, [255, 200, 245]); r(cx, cy, 1, 1, K.WHITE);
+      });
+      Gd(cx, cy, 16, [255, 120, 230], 0.35 + 0.15 * Math.sin(a * 2.4)); Gd(cx - 8, cy + 1, 10, [95, 231, 255], 0.2);
+    }
     else { const c: RGB = [230, 240, 255]; lit(() => { r(x + sway - 3, y - h - 5, 7, 5, c); r(x + sway - 1, y - h - 7, 3, 9, c); r(x + sway - 1, y - h - 4, 3, 3, [150, 200, 255]); }); Gd(x + sway, y - h - 3, 14, [170, 210, 255], 0.45 + 0.15 * Math.sin(a * 2)); }
     if (!wilted) lit(() => { const t = (a * 1.2 + x * 0.01) % 1; r(x + 8, y - 16 - Math.round(t * 6), 1, 1, K.WHITE); r(x - 9, y - 10 - Math.round(((t + 0.5) % 1) * 6), 1, 1, [255, 240, 180]); });
   }

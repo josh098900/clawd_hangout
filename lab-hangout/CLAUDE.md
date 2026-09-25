@@ -6,6 +6,9 @@ play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
 ```
+  SPACE STATION ── rocket (every 20 min, from the pad) ── ROOF's SPACEPORT (far right)
+    ├── airlock → SPACEWALK
+    └── escape pod → CITY PARK (the pond)
                 ROOF (garden) ── ladder ── DEV DEN ── stairs ── THE LAB ── exit ── THE SQUARE
                                                                                   ├── red doors → CINEMA
                                                                                   ├── tower door → STAGE
@@ -42,6 +45,9 @@ Handy URLs while developing:
 - LOCAL-mode test switches: `?signin` starts signed out (the guest / Discord / Google chooser, all
   faked per tab), `?autherr=identity_already_exists` pretends a provider refused a link (the merge
   path), `?cap=N` shrinks every server to N players (to see FULL)
+- `?flight=N` (LOCAL / dev) shifts this browser's rocket clock by N seconds (give every test window the same N so they
+  agree); `__hangout.flightAt(k)` jumps the 20-minute loop to k s in (0 liftoff, 45 docked, 840 undock, 885 touchdown).
+  `?grow=N` also speeds up the station's STAR MELONS.
 - `?weather=rain|storm|fog|snow|clear` pins the weather in this browser (any mode; the server still
   decides whether rain waters the gardens). `?debug` adds `weather(k)`, `crews()` and `danceBots(x, y)`
 - `/?debug` (dev server only): exposes `window.__hangout` (`go`, `at`, `use`, `pose`, `item`, `feed`,
@@ -67,7 +73,21 @@ src/
     plaza.ts           THE SQUARE set (1400x780; THE LOFTS apartment block at the right end), voxel installations, lamps, benches, cinema front, day/night (wall clock)
     cinema.ts          THE CINEMA set (1100x720): lobby, concession stand, photo booth, screen + the 80 s film, seats
     den.ts             THE DEV DEN (1000x680): desks, build status screen, kanban, rack, DEPLOY, duck; pomodoro + lightning (wall clock)
-    roof.ts            THE ROOFTOP GARDEN (1500x700): topiaries, hammocks, telescope, fireworks (state + hourly), day/night
+    roof.ts            THE ROOFTOP GARDEN (1860x700): topiaries, hammocks, telescope, fireworks (state + hourly), day/night;
+                       the SPACEPORT at the far right: the launch pad, tower, scoreboard, the rocket (rocketOnRoof: rising,
+                       landing, hatch) and the camera tilting up to follow a launch (rocketTop)
+    space.ts           the space programme: the rocket's timetable (flight(): a 20 min loop from the wall clock; launches at
+                       :00/:20/:40, docked ~13 min, home, ~5 min boarding on the pad), zero g / g-force / shake for the capsule,
+                       drawRocket, the little rotating Earth (drawEarth: continent + cloud maps re-projected 4x a second), stars
+    rocket.ts          THE ROCKET (760x620): the capsule (6 seats, mission clock screens, the porthole showing the whole trip);
+                       its hatch opens onto the roof on the pad and onto the station once docked (Door.route)
+    station.ts         THE SPACE STATION (1500x700, zero g): the dock, HYDROPONICS (6 trays per server: STAR MELONS, STATION.trays),
+                       the big window (Earth turning, the Moon), MISSION CONTROL's big screen (room state 'scope'), the airlock,
+                       the escape pod (to the Park's pond), COSMO (the critter from the Cinema's film)
+    spacewalk.ts       THE SPACEWALK (1400x800, free float): the hull above, Earth's curve below; stardust and space junk drift by on
+                       the clock (floatersNow); grab = a 'junk' broadcast; WALK is your haul, paid when you go back in
+    sky.ts             the telescope's sky panorama (planets, the Moon with the film's flag, a comet every 5 min, a rare UFO, the
+                       Square seen from orbit), all from the clock; skyView draws any patch of it
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
     stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights
     pier.ts            THE PIER (1300x720): beach, pier + fishing, bonfire + marshmallows, lighthouse, day/night
@@ -154,6 +174,7 @@ src/
   ui/typing.ts         CODE: the Dev Den typing game (3 lines -> a commit)
   ui/kanban.ts         the Dev Den kanban board
   ui/stars.ts          the rooftop telescope's constellation game
+  ui/mission.ts        MISSION CONTROL: steer the station's telescope over the sky (world/sky.ts), hold on something to log it
   net/filter.ts        client-side word filter + per-sender token-bucket rate limits
 supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0001 profiles · 0002 security (members, private channels, chat, reports) ·
@@ -167,7 +188,10 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0012 diner (diner_tip: 1 + score/40, max 5 a shift, 15 a day; the diner quest + HEAD CHEF badge) ·
                        0013 karts (the kart + tank quests, SPEED DEMON + TANK ACE badges) ·
                        0014 apartments (furniture_owned, apartments, my_flat/get_flat/flat_doors/buy_furniture/save_flat/
-                       set_door/flat_party/let_in; public.can_enter_flat gates the flat.<owner> channels and chat)
+                       set_door/flat_party/let_in; public.can_enter_flat gates the flat.<owner> channels and chat) ·
+                       0015 space (space_trays + space_plant/space_harvest/space_dig_up: STAR MELONS, 3 tokens, ripe in 30 min,
+                       pay 5 + a COMET BLOOM seed; plant() takes any found seed; spacewalk_pay: 1 per 8 points, 4 a walk,
+                       one a minute, 12 a day; the launch / spacewalk / comet quests + ASTRONAUT badge)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -178,7 +202,7 @@ docs/ART_STYLE.md      the style bible
 6. DOM overlays positioned via `R.toScreen()`.
 
 ### Coordinates
-Rooms can be up to 1600x800 (`WMAX`/`HMAX` in renderer.ts); raise those if a set gets bigger.
+Rooms can be up to 1900x800 (`WMAX`/`HMAX` in renderer.ts); raise those if a set gets bigger.
 World pixels. An avatar's `(x, y)` is its **feet**. Larger y = nearer the camera. The camera
 scale is an integer number of device pixels per world pixel (`Renderer.layout`).
 
@@ -215,6 +239,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | kart race | room state `race` (host: t0 = GO, seed, ids/names/cols in grid order; others ask to join with a `kart` msg `j: 1`, the host adds them) + broadcast `kart` (your kart, 12 Hz racing, 6-8 with 3-4 racers, 2 Hz on the grid) + `kartbest` (fastest lap per circuit); CPU karts from `cpuAt` | `{ r, x, y, a, v, lap, g, c, fin, best, b, d, j? }` |
 | tank duel | broadcast `tank` ~15/s per side during a match (shells in flight, score, hits landed, P1's phase; vs CPU also the CPU tank) | `{ s, x, y, a, sh, sc, hit, inv, ph?, o?, osc? }` |
 | flats | RPCs `my_flat` (made with a starter kit), `get_flat(owner)` (refused if you may not go in), `flat_doors(ids)`, `buy_furniture(what)`, `save_flat(layout)` (only furniture you own), `set_door`, `flat_party(on)`, `let_in(who)`; channels `hangout:<server>:<room>.<owner>` (joinRoom's `inst`); room state `flat` { n: layout revision, party }; lobby broadcast `flat` { k: knock / in / no / party, to, nm, until } | layout `{ rooms: { liv, bed, kit: { w, f, items: [[id, x, row, flip]] } }, show }` |
+| space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
@@ -232,7 +257,10 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
 8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
-4 rowing a boat (moves only where `room.water()` is true). Spot lists are append-only, like look options.
+4 rowing a boat (moves only where `room.water()` is true), 5 floating up high (weightless: SPACE pushed you off the floor; walking
+doesn't clear it, it ends after FLOAT_S). Weightless rooms (`room.zeroG()`) move you with momentum (`drift` in main.ts) and
+avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) puts helmets on and SPACE fires a jetpack.
+Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the
 cinema film (80 s loop) and jukebox playback are all computed from `Date.now()`, so every

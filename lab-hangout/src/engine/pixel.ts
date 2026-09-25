@@ -172,6 +172,10 @@ export function Gd(cx: number, cy: number, rad: number, c: RGB, a: number): void
   g.arc(cx, cy, Math.max(0.5, rad), 0, 6.2832);
   g.fill();
 }
+/** A big soft light: several weak discs stacked from `r1` in to `r0` (one big disc reads as a flat circle). */
+export function Gsoft(cx: number, cy: number, r0: number, r1: number, c: RGB, a: number, n = 6): void {
+  for (let k = 0; k < n; k++) Gd(cx, cy, r1 - (r1 - r0) * (k / (n - 1)), c, a / n * 1.6);
+}
 export function Gline(x0: number, y0: number, x1: number, y1: number, c: RGB, a: number, w: number): void {
   a *= PX.gmul;
   if (a <= 0.004) return;

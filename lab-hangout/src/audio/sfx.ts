@@ -67,6 +67,15 @@ export const SFX = {
   flap: () => { for (let i = 0; i < 4; i++) noise(700, 1.2, 0.04, 0.05, i * 0.05); },
   beep: () => { tone('square', 1200, 1200, 0.05, 0.02); tone('square', 900, 900, 0.06, 0.02, 0.07); },
   zap: () => tone('square', 1400, 500, 0.08, 0.03),
+  // space (world/space.ts, station.ts, spacewalk.ts)
+  tminus: () => tone('square', 880, 880, 0.09, 0.03),
+  ignite: () => { noise(120, 0.6, 2.5, 0.3, 0, 60); noise(600, 0.8, 1.2, 0.12, 0, 200); tone('sawtooth', 70, 40, 2.2, 0.05); },
+  clunk: () => { noise(160, 1, 0.3, 0.22, 0, 80); tone('square', 90, 55, 0.25, 0.05); noise(1200, 3, 0.05, 0.05, 0.12); },
+  bonk: () => { tone('sine', 240, 150, 0.12, 0.05); noise(500, 2, 0.05, 0.04); },
+  whoosh: () => { noise(700, 0.7, 0.55, 0.07, 0, 2200); tone('sine', 300, 600, 0.3, 0.02); },
+  jet: () => noise(1600, 0.8, 0.28, 0.06, 0, 500),
+  hiss: () => { noise(4000, 0.6, 1.1, 0.07, 0, 1200); tone('sine', 180, 120, 0.4, 0.03, 0.9); },
+  splash: () => { noise(1800, 0.7, 0.6, 0.18, 0, 500); for (let i = 0; i < 5; i++) noise(rnd(2500, 4000), 4, 0.05, 0.05, 0.25 + i * 0.07); },
   boom: () => noise(500, 0.8, 0.25, 0.14, 0, 90),
   /** the Subway's door chime */
   /** the Diner: the service bell on the pass */

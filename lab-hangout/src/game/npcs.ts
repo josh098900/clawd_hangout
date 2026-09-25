@@ -187,6 +187,21 @@ const DEFS: NpcDef[] = [
     chat: ['welcome to the garden!', 'the topiaries are from the film', 'try the telescope at night', 'fireworks go off every hour', 'mind the hammocks, they are comfy', 'the bunny took me three weeks'],
   },
   {
+    // the critter from the Cinema's film, A CRITTER IN SPACE (same look: mint, goggles), in a space helmet
+    id: 'npc-cosmo', name: 'COSMO', room: 'station', speed: 30,
+    look: { c: 0, hat: 14, face: 2, fit: 0, sp: 0 },
+    stops: [
+      { x: 170, y: 506, wait: 10, say: ['welcome aboard!', 'mind the gap. there is no floor. well, sort of', 'the rocket home leaves from here'] },
+      { x: 360, y: 500, wait: 14, say: ['star melons LOVE the pink light', 'grow one, then plant its seed on the roof', 'hello little melon'] },
+      { use: 7, wait: 22, say: ['there is home', 'i can see the Square from here!', 'the Moon! i planted a flag on that'] },
+      { x: 960, y: 520 },
+      { use: 9, wait: 18, say: ['comet spotted!', 'is that... a UFO?', 'nudge it left a bit'] },
+      { x: 1260, y: 510, wait: 8, say: ['suit up, the airlock is right here', 'grab some stardust for me'] },
+      { x: 700, y: 600, wait: 8, pose: 1, say: ['zero-g dance break!', 'boing'] },
+    ],
+    chat: ['hi! yes, i am THE critter from A CRITTER IN SPACE', 'press SPACE to push off the floor. wheee', 'grow a STAR MELON in the trays: 3 tokens, ripe in half an hour', 'the melon has a COMET BLOOM seed in it, for the roof garden', 'the airlock takes you on a spacewalk: grab stardust, bring it in, get tokens', 'mission control: find a comet with the telescope', 'the rocket home leaves every 20 minutes', 'the escape pod lands you in the park pond. splash!'],
+  },
+  {
     id: 'npc-sage', name: 'SAGE', room: 'den', speed: 38, cycle: 1800, // one pomodoro: code for the focus, break for the break
     look: { c: 1, hat: 3, face: 1, fit: 0, sp: 0 },
     stops: [

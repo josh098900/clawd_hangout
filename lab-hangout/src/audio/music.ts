@@ -229,6 +229,29 @@ export class Engine {
   stop(): void { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.1); }
 }
 
+/** The Space Station's music: slow and floaty (plays in the rocket once docked, the station and on a spacewalk). */
+export const ORBIT_TRACK: Track = {
+  name: 'ORBIT', bpm: 72, wave: 'triangle',
+  lead: 'E5 - - . G5 - B5 - A5 - - . E5 - - . D5 - - . F#5 - A5 - G5 - - . D5 - - .',
+  bass: 'E2 . . . B2 . . . A2 . . . E2 . . . D2 . . . A2 . . . G2 . . . D2 . . .',
+  drums: 'k . . . h . . . s . . . h . . . k . . . h . . . s . . . h . h .',
+};
+/** A low roar (the rocket's engines), 0..1. */
+export class Rumble {
+  private g: GainNode | null = null;
+  set(vol: number): void {
+    const au = audio();
+    if (!au || !soundOn) { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.2); return; }
+    if (!this.g) {
+      const { AC, master, NB } = au, s = AC.createBufferSource(), f = AC.createBiquadFilter();
+      s.buffer = NB; s.loop = true; f.type = 'lowpass'; f.frequency.value = 170;
+      this.g = AC.createGain(); this.g.gain.value = 0;
+      s.connect(f); f.connect(this.g); this.g.connect(master); s.start();
+    }
+    this.g.gain.setTargetAtTime(vol * 0.5, this.g.context.currentTime, 0.25);
+  }
+}
+
 export class Rain {
   private g: GainNode | null = null;
   set(vol: number): void {

@@ -12,7 +12,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -154,6 +154,16 @@ export class SupabaseTransport implements Transport {
   async setDoor(door: DoorMode): Promise<void> { const { error } = await this.sb.rpc('set_door', { door }); if (error) throw new Error(error.message); }
   async flatParty(on: boolean): Promise<number | null> { const { data, error } = await this.sb.rpc('flat_party', { on_: on }); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
   async letIn(who: string): Promise<void> { const { error } = await this.sb.rpc('let_in', { who }); if (error) throw new Error(error.message); }
+  async trays(): Promise<Tray[]> {
+    if (!this.server) return [];
+    const { data, error } = await this.sb.from('space_trays').select('tray, owner, owner_name, planted_at').eq('server', this.server);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((p) => ({ tray: Number(p.tray), owner: String(p.owner), ownerName: cleanName(p.owner_name) || 'SOMEONE', plantedAt: Date.parse(p.planted_at) }));
+  }
+  async spacePlant(tray: number): Promise<number> { const { data, error } = await this.sb.rpc('space_plant', { tray }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> { const o = await this.rpcJson('space_harvest', { tray }); return { tokens: Number(o.tokens) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null, rotten: o.rotten === true }; }
+  async spaceDigUp(tray: number): Promise<void> { const { error } = await this.sb.rpc('space_dig_up', { tray }); if (error) throw new Error(error.message); }
+  async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('spacewalk_pay', { pts: Math.max(0, Math.round(pts)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   async contestBoard(): Promise<ContestBoard> {
     const o = await this.rpcJson('contest_board', {});
@@ -259,6 +269,7 @@ export class SupabaseTransport implements Transport {
     ch.on('broadcast', { event: 'state' }, ({ payload }) => { const v = parseState(payload); if (v && v.id !== this.selfId) this.on({ type: 'state', id: v.id, s: v.s }); });
     ch.on('broadcast', { event: 'note' }, ({ payload }) => { const v = parseNote(payload); if (v && v.id !== this.selfId) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); });
     ch.on('broadcast', { event: 'tank' }, ({ payload }) => { const v = parseTank(payload); if (v && v.id !== this.selfId) this.on({ type: 'tank', id: v.id, t: v.t }); });
+    ch.on('broadcast', { event: 'junk' }, ({ payload }) => { const v = parseJunk(payload); if (v && v.id !== this.selfId) this.on({ type: 'junk', id: v.id, n: v.n }); });
     ch.on('broadcast', { event: 'kart' }, ({ payload }) => { const v = parseKart(payload); if (v && v.id !== this.selfId) this.on({ type: 'kart', id: v.id, k: v.k }); });
     ch.on('broadcast', { event: 'cook' }, ({ payload }) => { const v = parseCook(payload); if (v && v.id !== this.selfId) this.on({ type: 'cook', id: v.id, st: v.st }); });
     ch.on('broadcast', { event: 'pong' }, ({ payload }) => { const v = parsePong(payload); if (v && v.id !== this.selfId) this.on({ type: 'pong', id: v.id, p: v.p }); });
@@ -308,6 +319,7 @@ export class SupabaseTransport implements Transport {
   sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
   sendFlat(f: FlatMsg): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'flat', payload: { id: this.selfId, ...f } }); }
   sendTank(t: TankMsg): void { void this.ch?.send({ type: 'broadcast', event: 'tank', payload: { id: this.selfId, ...t } }); }
+  sendJunk(n: number): void { void this.ch?.send({ type: 'broadcast', event: 'junk', payload: { id: this.selfId, n } }); }
   sendKart(k: KartMsg): void { void this.ch?.send({ type: 'broadcast', event: 'kart', payload: { id: this.selfId, ...k } }); }
   sendCook(st: number): void { void this.ch?.send({ type: 'broadcast', event: 'cook', payload: { id: this.selfId, st } }); }
   sendPong(p: PongMsg): void { void this.ch?.send({ type: 'broadcast', event: 'pong', payload: { id: this.selfId, ...p } }); }

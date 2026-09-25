@@ -7,7 +7,7 @@ import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
 
 const OUTLINE = K.OUTLINE;
 import { alpha, oval, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX } from '../engine/pixel';
-import { bump, eOB, h1, seg, lerp } from '../engine/math';
+import { bump, eOB, eOut, eIO, h1, seg, lerp } from '../engine/math';
 import { drawUmbrella, wind } from '../world/weather';
 import { crewPose } from '../game/dance';
 
@@ -38,7 +38,16 @@ export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <
 export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4 };
 export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
-export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4;
+export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4,
+  /** weightless and pushed off the floor (SPACE in zero g): up high for FLOAT_S, walking doesn't clear it */ POSE_FLOAT = 5;
+export const FLOAT_S = 6;
+/** How high a POSE_FLOAT avatar is, `ps` seconds after pushing off: up, hang there, drift back down. */
+export const floatH = (ps: number): number => (ps < 0 ? 0 : ps < 1.2 ? 46 * eOut(ps / 1.2) : ps < FLOAT_S - 1.6 ? 46 + 4 * Math.sin((ps - 1.2) * 1.8) : ps < FLOAT_S ? (46 + 4 * Math.sin((FLOAT_S - 2.8) * 1.8)) * (1 - eIO((ps - (FLOAT_S - 1.6)) / 1.6)) : 0);
+/**
+ * The room everyone's being drawn in, set by main.ts each frame: weightless (everyone bobs and
+ * swims), out in open space (no shadows, helmets on, no pets), and the G-force squashing everyone.
+ */
+export const ENV = { zeroG: false, free: false, g: 0 };
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -167,7 +176,7 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     P.sy = 0.96 + 0.015 * Math.sin(a * 2.2 + av.seed * 6); P.lean = 0;
     if (us < 0.5) P.sy -= 0.12 * Math.exp(-us * 8) * Math.cos(us * 20);
     const sw = Math.sin(a * 2.8 + av.seed * 9); P.lift = sw > 0.55 ? 1 : sw < -0.55 ? 2 : 0;
-  } else if (using === 'desk') {
+  } else if (using === 'desk' || using === 'mission') {
     // hunched over the laptop, typing in bursts
     P.sy = 0.94 + 0.01 * Math.sin(a * 2); P.lean = 0.8; P.arm = 'wave'; P.wave = Math.sin(a * 22) * (Math.sin(a * 0.9 + av.seed * 7) > -0.2 ? 1 : 0);
     P.eyes = (a * 0.31 + av.seed) % 1 < 0.04 ? 'b' : 'n'; if ((a * 0.13 + av.seed) % 1 < 0.05) { P.eyes = 'w'; P.mouth = 'o'; }
@@ -190,6 +199,17 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
   } else if (using === 'arcade' || using === 'claw' || using === 'pong') {
     P.eyes = 'w'; P.lean = Math.round(Math.sin(a * 3.1)) * 1.5; P.ant = Math.sin(a * 9) * 1.5;
     if ((a * 1.3 + av.seed) % 1 < 0.08) P.mouth = 'O';
+  }
+  // weightless: bob in the air, swim instead of walking, and float up high after pushing off
+  if (ENV.zeroG && av.use < 0 && av.pose !== POSE_BOAT) {
+    const bob = 5 + 2.5 * Math.sin(a * 1.1 + av.seed * 6);
+    if (av.moving) { hopY = 0; P.lift = Math.floor(a * 2.2 + av.seed * 4) % 2 ? 1 : 2; P.arm = 'wave'; P.wave = Math.sin(a * 5 + av.seed) * 1.6; P.lean = av.dir * 1.5; P.sy = 1 + 0.02 * Math.sin(a * 4); }
+    hopY += bob; P.ant = Math.sin(a * 1.3 + av.seed * 5) * 2.2;
+    if (ENV.free) { P.lean += Math.sin(a * 0.7 + av.seed * 9) * 2; if (!av.moving) P.lift = Math.sin(a * 1.2 + av.seed * 3) > 0 ? 1 : 2; }
+    if (av.pose === POSE_FLOAT) { hopY += floatH(ps); if (ps < 1.2) { P.arm = 'up'; P.eyes = 's'; P.mouth = 'O'; } else { P.eyes = 'h'; P.lean += Math.sin(ps * 1.4) * 2.5; } }
+  }
+  if (ENV.g > 0.05) { // pressed into your seat by the rocket
+    P.sy *= 1 - 0.12 * ENV.g; hopY *= 1 - ENV.g; if (ENV.g > 0.4) { P.eyes = 'w'; P.mouth = 'o'; P.ant = -3 * ENV.g; P.arm = 'rest'; }
   }
   // pop-in when someone arrives
   const bu = now - av.born;
@@ -287,7 +307,7 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
   if (d > 300) { p.x = tx; p.y = ty; } // it teleported (a door): so does the pet
   const k = Math.min(1, dt * (d > 60 ? 5 : 3)); p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
   const flies = kind === 1, ghost = kind === 5 || kind === 6;
-  const zT = ghost ? 9 + Math.sin(a * 2.2 + av.seed * 7) * 2 : d > 60 ? (flies ? 18 : Math.abs(Math.sin(a * 18)) * 4) : d > 4 ? Math.abs(Math.sin(a * 14)) * 2 : 0;
+  const zT = (ghost ? 9 + Math.sin(a * 2.2 + av.seed * 7) * 2 : d > 60 ? (flies ? 18 : Math.abs(Math.sin(a * 18)) * 4) : d > 4 ? Math.abs(Math.sin(a * 14)) * 2 : 0) + (ENV.zeroG ? 8 + Math.sin(a * 1.5 + av.seed * 3) * 3 : 0);
   p.z += (zT - p.z) * Math.min(1, dt * 8);
   if (Math.abs(tx - p.x) > 1) p.dir = tx > p.x ? 1 : -1;
   const x = Math.round(p.x), y = Math.round(p.y - p.z), d2 = p.dir, fly = flies && p.z > 6, still = !fly && d < 4;
@@ -395,14 +415,15 @@ function drawSheet(x: number, y: number, a: number, seed: number): void {
 
 /** `brolly`: out in the rain, so hold an umbrella (world/weather.ts). */
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0, brolly = false): { headX: number; headY: number } {
-  if (av.look.pet) drawPet(av, a, now, av.look.pet);
+  if (av.look.pet && !ENV.free) drawPet(av, a, now, av.look.pet); // (pets wait inside during a spacewalk)
   const { P, hopY } = poseFor(av, a, now, using);
-  // contact shadow shrinks while airborne (none when seated: the seat is the ground)
+  const look = ENV.free && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside
+  // contact shadow shrinks while airborne (none when seated: the seat is the ground; none out in space)
   const sk = Math.max(0.4, 1 - hopY / 30);
-  if (!lift) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
+  if (!lift && !ENV.free) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
   const boat = av.pose === POSE_BOAT;
   if (boat) drawBoat(av.x, av.y, a, false, av.moving, av.seed);
-  const { TX, c } = stampCritter(av.look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0), dim);
+  const { TX, c } = stampCritter(look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0), dim);
   if (boat) drawBoat(av.x, av.y, a, true, av.moving, av.seed);
   if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
   if (av.hold) {

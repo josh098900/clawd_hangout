@@ -2,16 +2,21 @@
 // replanted in planters on a roof deck: a hedge bunny, a swan and a little dragon. String
 // lights, hammocks, a telescope (a constellation game) and a fireworks crate anyone can light.
 // The sky shares the Square's day/night loop; fireworks go off by themselves on the hour.
+// Past the garden, at the far right end, is the SPACEPORT: the launch pad where the rocket to the
+// Space Station stands between flights (world/space.ts runs its clock; you board by walking into its hatch).
 
 import { K, DK, RK, CONFETTI } from '../engine/palette';
-import { PX, mk, r, line, disc, txt, tw, alpha, lit, Gd, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, line, disc, txt, tw, alpha, lit, G, Gd, Gsoft, withCtx, M, shade, puff } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { StateMsg } from '../net/transport';
 import type { Room, Prop, Spot } from './room';
 import { GARDEN, GARDEN_BLOCKERS, GARDEN_PROPS, GARDEN_SPOTS, gardenBack } from './garden';
+import { SK } from '../engine/palette';
+import { DEPART, LAND, PAD_BASE, PAD_X, clockText, drawRocket, flight, type Flight } from './space';
+import type { Door } from './room';
 
-const W = 1500, H = 700, SKYLINE = 400, LEDGE = 440; // the community garden is the far right end (world/garden.ts)
+const W = 1860, H = 700, SKYLINE = 400, LEDGE = 440; // the community garden is the far right end (world/garden.ts)
 const HUT = { x: 12, y: 332, w: 84, h: LEDGE + 10 - 332 };
 const HUT_DOOR = { x: 34, y: 366, w: 36, h: 84 };
 const POLES = [150, 470, 790, 1050];
@@ -51,6 +56,17 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
     const Hh = HUT; r(Hh.x, Hh.y, Hh.w, Hh.h, RK.HUT); r(Hh.x, Hh.y, Hh.w, 3, RK.HUT_HI); r(Hh.x - 4, Hh.y - 6, Hh.w + 8, 7, RK.HUT_DK); r(Hh.x + Hh.w - 4, Hh.y + 3, 4, Hh.h - 3, RK.HUT_DK);
     const D = HUT_DOOR; r(D.x - 2, D.y - 2, D.w + 4, D.h + 2, RK.HUT_DK); r(D.x, D.y, D.w, D.h, [110, 84, 60]); r(D.x, D.y, D.w, 2, [140, 108, 78]); r(D.x + 28, D.y + 40, 3, 6, K.GOLD);
     r(D.x - 2, D.y - 16, D.w + 4, 10, [30, 34, 44]); txt('DEN', D.x + D.w / 2 - tw('DEN') / 2 + 3, D.y - 14, [200, 225, 255]); r(D.x + 4, D.y - 13, 3, 5, [200, 225, 255]);
+    // the SPACEPORT: a concrete launch pad with a painted target and hazard stripes, and its sign
+    const px0 = 1530, px1 = 1850, py0 = LEDGE + 18, py1 = 580;
+    r(px0, py0, px1 - px0, py1 - py0, SK.CONCRETE); for (let y = py0; y < py1; y += 22) r(px0, y, px1 - px0, 1, SK.CONCRETE_DK); for (let x = px0; x < px1; x += 40) r(x, py0, 1, py1 - py0, SK.CONCRETE_DK);
+    for (let i = 0; i < 300; i++) r(px0 + Math.floor(h1(i * 1.7) * (px1 - px0)), py0 + Math.floor(h1(i * 2.3) * (py1 - py0)), 1, 1, SK.CONCRETE2);
+    for (let dy = -20; dy <= 20; dy++) { const w = Math.floor(Math.sqrt(400 - dy * dy) * 3); r(PAD_X - w, PAD_BASE + 14 + dy, 3, 1, SK.HAZ); r(PAD_X + w - 3, PAD_BASE + 14 + dy, 3, 1, SK.HAZ); } // the painted target
+    for (let x = px0; x < px1; x += 16) { r(x, py1 - 6, 8, 6, SK.HAZ); r(x + 8, py1 - 6, 8, 6, SK.HAZ_DK); }
+    r(PAD_X - 34, PAD_BASE - 6, 68, 10, SK.CONCRETE_DK); r(PAD_X - 34, PAD_BASE - 6, 68, 2, SK.CONCRETE2); // the plinth the rocket stands on
+    r(px0 - 4, py0 - 2, 4, py1 - py0 + 2, SK.CONCRETE_DK);
+    // the scoreboard behind the pad (its lights are drawn live)
+    r(1768, 352, 4, 90, RK.POLE); r(1838, 352, 4, 90, RK.POLE); r(1760, 344, 90, 40, SK.TRIM); r(1763, 347, 84, 34, SK.SCREEN);
+    r(1512, 376, 4, 70, RK.POLE); r(1592, 376, 4, 70, RK.POLE); r(1506, 364, 96, 18, SK.TRIM); r(1508, 366, 92, 14, day ? SK.HULL : [40, 50, 80]); txt('SPACEPORT', 1554 - tw('SPACEPORT', 2) / 2, 368, day ? SK.NOSE : [200, 225, 255], 2);
     // flower planters along the ledge
     for (let x = 140; x < 1040; x += 110) { r(x, LEDGE + 16, 60, 14, RK.PLANTER); r(x, LEDGE + 16, 60, 2, RK.PLANTER_HI); for (let k = 0; k < 9; k++) { const fx = x + 3 + k * 6 + Math.floor(h1(x + k) * 3); r(fx, LEDGE + 8 + Math.floor(h1(x * k + 1) * 4), 2, 9, RK.HEDGE); r(fx - 1, LEDGE + 6 + Math.floor(h1(x * k + 1) * 4), 4, 3, CONFETTI[Math.floor(h1(x * 3 + k) * CONFETTI.length)]); } }
   });
@@ -91,6 +107,7 @@ function drawBack(a: number): void {
       }
     });
   }
+  padBoard(a);
   // hut lamp
   lit(() => r(HUT_DOOR.x + HUT_DOOR.w / 2 - 2, HUT_DOOR.y - 22, 4, 3, [255, 230, 170])); Gd(HUT_DOOR.x + HUT_DOOR.w / 2, HUT_DOOR.y - 20, 12, [255, 214, 150], 0.35 * (0.3 + night));
 }
@@ -134,6 +151,57 @@ const crate: Prop = {
 };
 const bench: Prop = { y: 612, draw() { const x = 300, y = 612, w = 64; r(x - w / 2, y - 20, w, 3, K.WOOD); r(x - w / 2, y - 20, w, 1, K.WOOD_HI); r(x - w / 2, y - 10, w, 4, K.WOOD_HI); r(x - w / 2, y - 7, w, 2, K.WOOD); for (const lx of [x - 28, x + 25]) r(lx, y - 20, 3, 20, [60, 50, 40]); } };
 
+// ---------- the SPACEPORT ----------
+/** Where the rocket is over the pad right now: how high it has risen, its engine, its hatch; null = away in space. */
+export function rocketOnRoof(f: Flight = flight()): { rise: number; flame: number; door: number } | null {
+  if (f.phase === 'pad') { const since = f.k - LAND; return { rise: 0, flame: f.left < 3 ? (3 - f.left) / 3 * 0.5 : 0, door: Math.min(1, since / 2, Math.max(0, f.left - 3)) }; }
+  if (f.phase === 'up') return f.k < 16 ? { rise: 3.2 * f.k * f.k + 4 * f.k, flame: 1, door: 0 } : null;
+  if (f.phase === 'down') { const d = LAND - f.k; return d < 14 ? { rise: 3.2 * d * d + 4 * d, flame: d > 0.4 ? 0.75 : d / 0.4 * 0.75, door: 0 } : null; } // down on its engines, tail first
+  return null;
+}
+/** The top of the rocket while it's climbing away or coming in to land, for the camera (main.ts); null otherwise. */
+export function rocketTop(): number | null { const o = rocketOnRoof(), f = flight(); return o && (f.phase === 'up' || f.phase === 'down') ? PAD_BASE - o.rise - 164 : null; }
+const TOWER_X = 1628;
+const launchPad: Prop = {
+  y: PAD_BASE,
+  draw(a: number) {
+    const f = flight(), o = rocketOnRoof(f);
+    // the launch tower: a red lattice, a beacon on top, and the arm that swings away before liftoff
+    const tx = TOWER_X, top = 300;
+    r(tx - 11, top, 22, PAD_BASE - top, SK.TOWER); for (let y = top; y < PAD_BASE; y += 10) { line(tx - 11, y, tx + 10, y + 10, SK.TOWER_DK); line(tx + 10, y, tx - 11, y + 10, SK.TOWER_DK); r(tx - 11, y, 22, 1, SK.TOWER_DK); } r(tx + 8, top, 3, PAD_BASE - top, SK.TOWER_DK);
+    lit(() => r(tx - 2, top - 5, 4, 4, (a % 1.2) < 0.4 ? SK.LED_RED : shade(SK.LED_RED, 0.35))); if ((a % 1.2) < 0.4) Gd(tx, top - 3, 10, SK.LED_RED, 0.4);
+    const armOut = f.phase === 'pad' && f.left > 12 && o ? 1 : 0, sw = armOut ? 0 : 1;
+    for (let k = 0; k < 44; k++) { const u = k / 44, x = Math.round(tx + 11 + u * 44 * (1 - sw * 0.8)), y = Math.round(372 - u * sw * 30); r(x, y, 1, 5, SK.TOWER); r(x, y + 5, 1, 1, SK.TOWER_DK); }
+    if (o) drawRocket(PAD_X, PAD_BASE - o.rise, a, o.door, o.flame);
+    // smoke: billowing off the pad at liftoff and touchdown, and a trail up the sky behind a launch
+    const tl = f.phase === 'up' ? f.k : f.phase === 'pad' && f.left < 3 ? -f.left : null; // seconds since liftoff
+    if (tl !== null && tl < 20) for (let i = 0; i < 40; i++) {
+      const b = -3 + i * 0.35, age = tl - b; if (age < 0 || age > 9) continue;
+      const side = h1(i * 3.3) - 0.5, riseAt = b > 0 ? 3.2 * b * b + 4 * b : 0;
+      puff(PAD_X + side * 30 + side * age * 22, PAD_BASE - riseAt + 6 - (b > 0 ? 0 : age * 2), age, 9, 16 + (b > 0 ? 8 : 12), i % 3 ? SK.SMOKE : SK.SMOKE_DK, 0.75);
+    }
+    const land = f.phase === 'down' ? f.k - LAND : f.phase === 'pad' && f.k - LAND < 6 ? f.k - LAND : null; // seconds since touchdown: the dust it kicks up
+    if (land !== null && land > -3) for (let i = 0; i < 16; i++) { const age = land + 1 - i * 0.05; const side = h1(i * 7.1) - 0.5; puff(PAD_X + side * 40 + side * Math.max(0, age) * 30, PAD_BASE + 6, age, 4, 14, SK.SMOKE, 0.6); }
+    if (o && o.flame > 0.3) { G(PAD_X - 160, 440, 320, 200, SK.FLAME, 0.04 * o.flame); Gsoft(PAD_X, PAD_BASE + 10, 20, 110, SK.FLAME, 0.2 * o.flame); }
+  },
+};
+function padBoard(a: number): void {
+  const f = flight();
+  const l1 = f.phase === 'pad' ? (f.left < 11 ? 'LIFTOFF IN' : 'NEXT LAUNCH') : f.phase === 'up' ? (f.k < 10 ? 'LIFTOFF!' : 'TO SPACE') : f.phase === 'docked' ? 'IN ORBIT' : 'COMING HOME';
+  const l2 = f.phase === 'pad' ? (f.left < 11 ? String(Math.ceil(f.left)) : clockText(f.left)) : f.phase === 'up' ? 'GOOD LUCK' : f.phase === 'docked' ? 'BACK IN ' + clockText(f.left + (LAND - DEPART)) : 'LANDS ' + clockText(f.left);
+  const hot = (f.phase === 'pad' && f.left < 11) || (f.phase === 'up' && f.k < 10);
+  lit(() => { txt(l1, 1805 - tw(l1) / 2, 351, [255, 180, 60]); txt(l2, 1805 - tw(l2, 2) / 2, 362, hot && (a % 1) < 0.5 ? SK.LED_RED : SK.LED, 2); });
+  G(1763, 347, 84, 34, hot ? SK.LED_RED : SK.LED, 0.08);
+  if (f.phase === 'pad' && f.left > 11 && f.k - LAND > 2) lit(() => { const t = 'BOARDING NOW'; if ((a % 1.6) < 1.1) txt(t, PAD_X - tw(t) / 2, PAD_BASE + 36, K.GOLD); });
+}
+const padBench: Prop = { y: 612, draw() { const x = 1782, y = 612, w = 60; r(x - w / 2, y - 20, w, 3, K.WOOD); r(x - w / 2, y - 20, w, 1, K.WOOD_HI); r(x - w / 2, y - 10, w, 4, K.WOOD_HI); r(x - w / 2, y - 7, w, 2, K.WOOD); for (const lx of [x - 26, x + 23]) r(lx, y - 20, 3, 20, [60, 50, 40]); } };
+/** Walk into the rocket's open hatch to board (only while it's on the pad with the hatch open). */
+const rocketDoor: Door = {
+  trigger: { x0: PAD_X - 12, y0: 505, x1: PAD_X + 12, y1: 512 }, to: 'rocket', arrive: { x: 70, y: 504 }, label: 'ROCKET',
+  area: { x0: PAD_X - 22, y0: PAD_BASE - 164, x1: PAD_X + 22, y1: PAD_BASE + 4 },
+  route: () => { const f = flight(); return f.phase === 'pad' && f.left > 4 && f.k - LAND > 2 ? { to: 'rocket', arrive: { x: 70, y: 504 }, label: 'BOARD THE ROCKET' } : null; },
+};
+
 // ---------- spots (index = network id: append only) ----------
 export const ROOF_SPOTS: Spot[] = [
   { kind: 'hammock', x: 400, y: 521, sx: 400, sy: 532, lift: 16, label: 'HAMMOCK', area: { x0: 360, y0: 480, x1: 440, y1: 520 } },
@@ -142,6 +210,7 @@ export const ROOF_SPOTS: Spot[] = [
   { kind: 'fireworks', x: 540, y: 490, sx: 540, sy: 490, lift: 0, label: 'FIREWORKS', area: { x0: 524, y0: 446, x1: 556, y1: 480 } },
   ...[-14, 14].map((dx): Spot => ({ kind: 'sit', x: 300 + dx, y: 613, sx: 300 + dx, sy: 622, lift: 6, label: 'SIT', area: { x0: 268, y0: 590, x1: 332, y1: 612 } })),
   ...GARDEN_SPOTS, // 6..13
+  ...[1768, 1796].map((x): Spot => ({ kind: 'sit', x, y: 613, sx: x, sy: 622, lift: 6, label: 'SIT', area: { x0: 1752, y0: 590, x1: 1812, y1: 612 } })), // 14, 15: the viewing bench by the pad
 ];
 
 export function makeRoof(): Room {
@@ -156,8 +225,10 @@ export function makeRoof(): Room {
       ...[400, 660].flatMap((cx, i) => { const y = i ? 600 : 520; return [{ x0: cx - 42, y0: y - 4, x1: cx - 38, y1: y + 2 }, { x0: cx + 38, y0: y - 4, x1: cx + 42, y1: y + 2 }]; }),
       ...POLES.map((x) => ({ x0: x - 3, y0: 464, x1: x + 3, y1: 472 })),
       ...GARDEN_BLOCKERS, { x0: 1102, y0: 460, x1: 1136, y1: 470 }, { x0: 1458, y0: 460, x1: 1480, y1: 470 },
+      { x0: PAD_X - 40, y0: 486, x1: PAD_X + 40, y1: 504 }, { x0: 1616, y0: 486, x1: 1640, y1: 504 }, // the rocket on its plinth, the launch tower
+      { x0: 1752, y0: 604, x1: 1812, y1: 614 }, // the viewing bench
     ],
-    doors: [{ trigger: { x0: 34, y0: 462, x1: 70, y1: 470 }, to: 'den', arrive: { x: 270, y: 458 }, label: 'DEV DEN', area: { x0: 30, y0: 348, x1: 74, y1: 462 } }],
+    doors: [{ trigger: { x0: 34, y0: 462, x1: 70, y1: 470 }, to: 'den', arrive: { x: 270, y: 458 }, label: 'DEV DEN', area: { x0: 30, y0: 348, x1: 74, y1: 462 } }, rocketDoor],
     spots: ROOF_SPOTS, inUse: new Map(),
     onState(s: StateMsg) { if (s.k === 'fw') ROOF_INFO.fw = s.v; else if (s.k === 'garden') GARDEN.dirty = true; },
     spawn: { x: 60, y: 480 },
@@ -169,7 +240,7 @@ export function makeRoof(): Room {
     bg: mk(W, H), bgAlt: mk(W, H),
     build: () => build.call(room),
     drawBack,
-    props: [...POLES.map(pole), topiary(210, 506, 'BUN', BUNNY), topiary(820, 486, 'SWAN', SWAN), topiary(1010, 576, 'DRAGON', DRAGON), hammock(360, 440, 520), hammock(620, 700, 600), telescope, crate, bench, ...GARDEN_PROPS],
+    props: [...POLES.map(pole), topiary(210, 506, 'BUN', BUNNY), topiary(820, 486, 'SWAN', SWAN), topiary(1010, 576, 'DRAGON', DRAGON), hammock(360, 440, 520), hammock(620, 700, 600), telescope, crate, bench, ...GARDEN_PROPS, launchPad, padBench],
   };
   return room;
 }

@@ -11,8 +11,8 @@ import { clamp } from './math';
 
 export interface Camera { x: number; y: number; w: number; h: number; sc: number }
 
-/** The biggest room this can draw (the Rooftop is 1500 wide). Only the camera's view is copied to the screen. */
-export const WMAX = 1600, HMAX = 800;
+/** The biggest room this can draw (the Rooftop is 1860 wide). Only the camera's view is copied to the screen. */
+export const WMAX = 1900, HMAX = 800;
 /** How many world pixels tall we try to show. Smaller = chunkier pixels. */
 const TARGET_H = 320, TARGET_W = 360, TARGET_W_PORTRAIT = 200;
 /** CSS px reserved at the bottom for the emote + chat bar. */

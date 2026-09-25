@@ -12,6 +12,8 @@ export interface SaveData {
   friends: [string, string][];
   feeds: number; hi: number;
   fish: string[]; stars: string[];
+  /** What you've spotted through the Space Station's telescope (planets, comets, the Square). */
+  sky: string[];
   /** Crops you've harvested on the Rooftop (seed names). */
   crops: string[];
   /** Today's quest progress (see game/quests.ts): the day, and a count per quest. */
@@ -39,7 +41,7 @@ function counts(v: unknown): { day: string; c: Record<string, number> } {
 export function clean(v: unknown): SaveData {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const friends = Array.isArray(o.friends) ? o.friends.filter((f): f is [string, string] => Array.isArray(f) && typeof f[0] === 'string' && f[0].length <= 64 && typeof f[1] === 'string').slice(0, 100).map(([id, nm]) => [id, nm.slice(0, 16)] as [string, string]) : [];
-  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), crops: strs(o.crops, 16, 16), q: counts(o.q), stats: tally(o.stats) };
+  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), sky: strs(o.sky, 64, 24), crops: strs(o.crops, 16, 16), q: counts(o.q), stats: tally(o.stats) };
 }
 const maxOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = Math.max(o[k] ?? 0, v); return o; };
 export function merge(a: SaveData, b: SaveData): SaveData {
@@ -47,7 +49,7 @@ export function merge(a: SaveData, b: SaveData): SaveData {
   return {
     unlocks: [...new Set([...a.unlocks, ...b.unlocks])], friends: [...fr].slice(0, 100),
     feeds: Math.max(a.feeds, b.feeds), hi: Math.max(a.hi, b.hi),
-    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], crops: [...new Set([...a.crops, ...b.crops])],
+    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], sky: [...new Set([...a.sky, ...b.sky])], crops: [...new Set([...a.crops, ...b.crops])],
     q: a.q.day === b.q.day ? { day: a.q.day, c: maxOf(a.q.c, b.q.c) } : a.q.day > b.q.day ? a.q : b.q,
     stats: maxOf(a.stats, b.stats),
   };

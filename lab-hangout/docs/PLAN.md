@@ -29,11 +29,11 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 ## Progress
 Steps 1-10 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest,
 weather + group dances, the Diner + COOKIE's tour, the Kart Track + tank duel, THE LOFTS apartments;
-migrations 0007-0014). **Next: step 11, the Space Station** (below). New SQL, if any, goes in 0015.
-Notes for step 11: the Rooftop is 1500 wide with the garden at its right end, so the launch pad
-needs a spot that fits the camera band; the critter from the film is allowed as an NPC there
-(it's the film's, used with permission, see CLAUDE.md); keep the launch on the wall clock like the
-fireworks and the train.
+migrations 0007-0014). **Step 11, the Space Station, is built** (migration 0015; waiting for Josh to
+try it). What was decided: launches every 20 min (:00/:20/:40) from a SPACEPORT added past the roof
+garden (the roof is now 1860 wide), drift-and-push-off zero g, all four extras (spacewalk, star melon
+hydroponics, mission control's telescope, the SPACE HELMET), free to fly. The station's NPC is COSMO,
+the critter from the Cinema's own film A CRITTER IN SPACE. **Next: step 12, karaoke.**
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

@@ -13,7 +13,7 @@ export const DESK_ITEMS = ['2ND MONITOR', 'PLANT', 'MUG', 'LAVA LAMP', 'FAIRY LI
 export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT'] as const;
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET'] as const;
 export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK'] as const;
 export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
@@ -22,7 +22,7 @@ export type Slot = 'hat' | 'face' | 'fit' | 'pet';
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
 export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
@@ -234,7 +234,7 @@ const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
 const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]] };
 /** How far each prize hat (6..10) rises above its brim row. */
-const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15];
+const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
 
 /** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
@@ -284,6 +284,19 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
     R(-8, b - 3, 16, 3, w); R(-8, b - 1, 16, 1, sh); R(-8, b - 3, 16, 1, [255, 255, 255]);
     for (let j = 3; j < 15; j++) { const hw = j < 10 ? 7 : 7 + Math.round(Math.sqrt(Math.max(0, 9 - (j - 12) * (j - 12)))) - (j > 13 ? 3 : 0); R(-hw, b - j, hw * 2, 1, w); R(hw - 2, b - j, 2, 1, sh); }
     R(-3, b - 14, 1, 2, sh); R(2, b - 13, 1, 2, sh); R(-6, b - 12, 12, 1, [255, 255, 255]);
+    return null;
+  }
+  if (hat === 14) { // space helmet: a glass fishbowl over the whole head (antenna and all) on a metal collar
+    const rim: RGB = [200, 236, 255], rim2: RGB = [150, 200, 235], cy = b + 5, rad = 17;
+    for (let k = 0; k < 64; k++) {
+      const an = Math.PI * (0.92 + (k / 63) * 1.16), x = Math.round(Math.cos(an) * rad), y = Math.round(cy + Math.sin(an) * rad);
+      R(x, y, 1, 1, an > Math.PI * 1.3 && an < Math.PI * 1.55 ? [255, 255, 255] : an > Math.PI * 1.6 ? rim2 : rim);
+    }
+    for (const s of [-1, 1]) R(s < 0 ? -rad : rad - 1, cy, 1, 4, rim2); // down the sides to the collar
+    lit(() => { R(-11, cy - 9, 2, 1, [255, 255, 255]); R(-12, cy - 8, 1, 3, [255, 255, 255]); R(-9, cy - 12, 3, 1, [230, 246, 255]); }); // the shine, top-left
+    const col: RGB = [150, 158, 172], colHi: RGB = [200, 206, 216], y0 = cy + 4;
+    R(-rad, y0, rad * 2, 3, col); R(-rad, y0, rad * 2, 1, colHi); R(-rad, y0 + 2, rad * 2, 1, shade(col, 0.75));
+    R(-3, y0 + 1, 2, 1, [124, 242, 156]); R(2, y0 + 1, 2, 1, [255, 90, 90]); // status lights on the collar
     return null;
   }
   // halo: a glowing gold ring bobbing over the head

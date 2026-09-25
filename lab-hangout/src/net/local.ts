@@ -6,9 +6,10 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
+import { TRAY_SPEED } from '../world/station';
 import { PRICE, STARTER } from '../world/furniture';
 import { raining } from '../world/weather';
 import { QUESTS } from '../game/quests';
@@ -16,7 +17,7 @@ import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat'; p: Record<string, unknown> };
+type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
@@ -107,7 +108,7 @@ export class LocalTransport implements Transport {
     if (!s) throw new Error('no such seed');
     if (all.some((p) => p.owner === this.selfId)) throw new Error('you already have a plant growing');
     if (all.some((p) => p.bed === bed)) throw new Error('that bed is taken');
-    if (s.find) { if (!this.inv().includes('seed:4')) throw new Error('you have no moonflower seed'); try { localStorage.setItem('labhangout.localInv', JSON.stringify(this.inv().filter((i) => i !== 'seed:4'))); } catch { /* ignore */ } }
+    if (s.find) { const k = 'seed:' + seed; if (!this.inv().includes(k)) throw new Error('you have no ' + s.name.toLowerCase() + ' seed'); try { localStorage.setItem('labhangout.localInv', JSON.stringify(this.inv().filter((i) => i !== k))); } catch { /* ignore */ } }
     else { if (this.wallet() < s.cost) throw new Error('a ' + s.name + ' seed costs ' + s.cost + ' tokens'); this.wallet(this.wallet() - s.cost); }
     const now = Date.now(), name = (await this.loadProfile())?.name ?? 'YOU';
     this.beds([...all, { bed, owner: this.selfId, ownerName: name, seed, plantedAt: now, lastWater: now, grown: 0, calcAt: now }]);
@@ -154,6 +155,42 @@ export class LocalTransport implements Transport {
       rank = 1 + new Set(list.filter((e) => e.id !== this.selfId && e.cm > mine).map((e) => e.id)).size;
     }
     return { fish: fish.name, rarity: fish.rarity, cm, contest: cl.live, rank };
+  }
+  // ---- the Space Station's trays + spacewalk pay, kept in this browser per server (same rules as 0015_space.sql) ----
+  private trayList(v?: Tray[]): Tray[] {
+    const k = 'labhangout.localTrays.' + (this.server ?? 'none');
+    if (v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } return v; }
+    try { return (JSON.parse(localStorage.getItem(k) || '[]') as Tray[]).filter((p) => (Date.now() - p.plantedAt) / 1000 * TRAY_SPEED.k < 88200); } catch { return []; }
+  }
+  async trays(): Promise<Tray[]> { return this.trayList(); }
+  async spacePlant(tray: number): Promise<number> {
+    const all = this.trayList();
+    if (tray < 0 || tray > 5) throw new Error('no such tray');
+    const mine = all.find((p) => p.owner === this.selfId); if (mine) throw new Error('you already have a star melon growing (tray ' + (mine.tray + 1) + ')');
+    if (all.some((p) => p.tray === tray)) throw new Error('that tray is taken');
+    if (this.wallet() < 3) throw new Error('a star melon seed costs 3 tokens');
+    this.wallet(this.wallet() - 3);
+    this.trayList([...all, { tray, owner: this.selfId, ownerName: (await this.loadProfile())?.name ?? 'YOU', plantedAt: Date.now() }]);
+    return this.wallet();
+  }
+  async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> {
+    const all = this.trayList(), p = all.find((q) => q.tray === tray);
+    if (!p) throw new Error('nothing growing there');
+    if (p.owner !== this.selfId) throw new Error('that is not your melon');
+    if ((Date.now() - p.plantedAt) / 1000 * TRAY_SPEED.k < 1800) throw new Error('not ripe yet');
+    this.trayList(all.filter((q) => q !== p)); this.wallet(this.wallet() + 5);
+    const bonus = this.inv().includes('seed:5') ? null : (this.inv('seed:5'), 'seed:5');
+    return { tokens: this.wallet(), bonus, rotten: false };
+  }
+  async spaceDigUp(tray: number): Promise<void> { const all = this.trayList(); if (!all.some((p) => p.tray === tray && p.owner === this.selfId)) throw new Error('that is not your melon'); this.trayList(all.filter((p) => p.tray !== tray)); }
+  private lastWalk = 0;
+  async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> {
+    if (pts <= 0) return { tokens: this.wallet(), paid: 0 };
+    if (Date.now() - this.lastWalk < 60000) throw new Error('one spacewalk a minute');
+    const k = 'labhangout.localWalks.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
+    const paid = Math.max(0, Math.min(4, Math.floor(pts / 8), 12 - today));
+    this.lastWalk = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
+    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
   }
   /** Same rules as diner_tip() in 0012_diner.sql: 1 + 1 per 40 points (max 5), 15 a day, one per 150 s. */
   private lastTip = 0;
@@ -350,6 +387,7 @@ export class LocalTransport implements Transport {
   async flatParty(on: boolean): Promise<number | null> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].party = on ? Date.now() / 1000 + 1800 : null; this.flats(all); return all[this.selfId].party ?? null; }
   async letIn(who: string): Promise<void> { const all = this.flats(), f = all[this.selfId]; if (!f) throw new Error('move in first'); f.inv = { ...(f.inv ?? {}), [who]: Date.now() + 1800e3 }; this.flats(all); }
   sendTank(t: TankMsg): void { this.post('tank', { id: this.selfId, ...t }); }
+  sendJunk(n: number): void { this.post('junk', { id: this.selfId, n }); }
   sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
   sendCook(st: number): void { this.post('cook', { id: this.selfId, st }); }
   sendPong(p: PongMsg): void { this.post('pong', { id: this.selfId, ...p }); }
@@ -390,6 +428,7 @@ export class LocalTransport implements Transport {
       case 'state': { const v = parseState(w.p); if (v) this.on({ type: 'state', id: v.id, s: v.s }); break; }
       case 'note': { const v = parseNote(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); break; }
       case 'tank': { const v = parseTank(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'tank', id: v.id, t: v.t }); break; }
+      case 'junk': { const v = parseJunk(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'junk', id: v.id, n: v.n }); break; }
       case 'kart': { const v = parseKart(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kart', id: v.id, k: v.k }); break; }
       case 'cook': { const v = parseCook(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'cook', id: v.id, st: v.st }); break; }
       case 'pong': { const v = parsePong(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'pong', id: v.id, p: v.p }); break; }

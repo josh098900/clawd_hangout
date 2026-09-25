@@ -58,6 +58,12 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.karts { background: linear-gradient(90deg, rgba(120, 20, 24, .95), rgba(40, 40, 50, .9)); border-left: 5px solid #FFFFFF; }
 .plate.karts .sub { color: #FFD8D8; } .plate.karts .big { color: #FFFFFF; text-shadow: 0 3px 0 #300808, 0 0 14px rgba(255, 90, 90, .6); }
 .plate.lofts { background: linear-gradient(90deg, rgba(20, 60, 50, .95), rgba(40, 100, 84, .9)); border-left: 5px solid #C8AA5A; }
+.plate.rocket { background: linear-gradient(90deg, rgba(40, 46, 66, .95), rgba(160, 40, 50, .9)); border-left: 5px solid #F2F4F8; }
+.plate.rocket .sub { color: #FFD8D8; } .plate.rocket .big { color: #FFFFFF; text-shadow: 0 3px 0 #300808, 0 0 14px rgba(255, 120, 90, .6); }
+.plate.station { background: linear-gradient(90deg, rgba(8, 12, 36, .95), rgba(40, 60, 120, .9)); border-left: 5px solid #8FD8FF; }
+.plate.station .sub { color: #C8F0FF; } .plate.station .big { color: #FFFFFF; text-shadow: 0 3px 0 #040818, 0 0 14px rgba(143, 216, 255, .7); }
+.plate.spacewalk { background: linear-gradient(90deg, rgba(3, 4, 12, .95), rgba(30, 90, 170, .85)); border-left: 5px solid #F2C230; }
+.plate.spacewalk .sub { color: #FFE9A8; } .plate.spacewalk .big { color: #FFFFFF; text-shadow: 0 3px 0 #02040C, 0 0 14px rgba(255, 214, 90, .6); }
 .plate.lofts .sub { color: #F0E0B0; } .plate.lofts .big { color: #FFF8E8; text-shadow: 0 3px 0 #0A241C, 0 0 14px rgba(200, 170, 90, .6); }
 .plate.flat, .plate.flatbed, .plate.flatkit { background: linear-gradient(90deg, rgba(90, 60, 40, .95), rgba(150, 104, 64, .9)); border-left: 5px solid #FFD65A; }
 .plate.flat .sub, .plate.flatbed .sub, .plate.flatkit .sub { color: #FFE9C8; } .plate.flat .big, .plate.flatbed .big, .plate.flatkit .big { color: #FFFAF0; text-shadow: 0 3px 0 #301808, 0 0 14px rgba(255, 214, 90, .5); }
@@ -111,6 +117,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #FFB85A; outline-
 #emotes .pill { font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 9px; font-weight: 400; padding: 8px 10px; }
 #emotes .pill kbd { font: inherit; color: #FFB870; }
 #emotes .pill.act { background: rgba(217, 119, 87, .88); }
+#emotes .pill.float { background: rgba(60, 110, 200, .88); }
+#emotes .pill.float kbd { color: #C8F0FF; }
 #pad { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
 #pad .pill { font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 9px; font-weight: 400; padding: 10px 9px; touch-action: manipulation; }
 #pad .pill kbd { font: inherit; color: #FFB870; }
@@ -180,6 +188,7 @@ body:has(#start:not(.hidden)) :is(#bar, #hud, #log) { visibility: hidden; }
 @media (max-width: 559px) {
   #emotes .pill.emo { display: none; }
   #emotes .pill.more kbd { display: none; }
+  #emotes .pill.float kbd { display: none; }
   .lbl-more::before { content: 'EMOTES'; }
   #toast { top: calc(env(safe-area-inset-top, 0px) + 58px); }
   #gamebar { top: calc(env(safe-area-inset-top, 0px) + 100px); font-size: 9px; }

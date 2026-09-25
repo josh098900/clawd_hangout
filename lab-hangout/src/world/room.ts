@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -33,7 +33,7 @@ export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number 
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -117,6 +117,18 @@ export interface Room {
   water?(x: number, y: number): boolean;
   /** Multiplier for all soft glow (lamps fade out in daylight). */
   glowMul?(): number;
+  /** Weightless right now (the Space Station, the rocket once its engines stop): you drift, bounce off walls, everyone bobs. */
+  zeroG?(): boolean;
+  /** Out in open space (the spacewalk): no floor to stand on, helmets on, SPACE fires your jetpack. */
+  freeFloat?: boolean;
+  /** How hard the set is shaking (0..1): the rocket launching. */
+  shake?(): number;
+  /** G-force (0..1) squashing everyone (the rocket's burn). */
+  gForce?(): number;
+  /** Everyone here is clipped on to a safety line from this point (the spacewalk). */
+  tether?: { x: number; y: number };
+  /** Things that come and go and depth-sort with players (the spacewalk's stardust and junk). */
+  extras?(a: number): Prop[];
 }
 
 export const inside = (r: Rect, x: number, y: number): boolean => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
