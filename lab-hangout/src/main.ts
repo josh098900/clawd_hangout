@@ -51,7 +51,7 @@ import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
 import { setSeason, isHalloween, isWinter, season } from './world/season';
-import { WINTER, OUTDOOR, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, winterBack, winterFront, winterProps } from './world/winter';
+import { WINTER, OUTDOOR, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
 import { openAdvent, openSendGift, openTree, showGift } from './ui/winter';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
 import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
@@ -1458,8 +1458,8 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
-  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.area.y0 - 8] }; }
-  if (isWinter() && OUTDOOR.includes(room.id) && !me.hold && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
+  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
+  if (isWinter() && !me.hold && onSnow(room, me.x, me.y) && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
   return null;
@@ -1773,6 +1773,7 @@ function render(a: number, t: number): void {
   if (alt > 0.004) { R.wctx.globalAlpha = alt; R.wctx.drawImage(room.bgAlt!, 0, 0); R.wctx.globalAlpha = 1; }
   const dim = room.dimNow?.() ?? room.dim;
   PX.dim = dim;
+  if (isWinter()) winterGround(room);
   room.drawBack(a);
   if (isHalloween()) halloweenBack(room.id, a);
   if (isWinter()) winterBack(room, a);

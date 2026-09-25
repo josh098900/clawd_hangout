@@ -149,23 +149,71 @@ function sleighBits(room: RoomId, a: number): void {
 }
 
 // ---------- snow, lights, wreaths ----------
+type Box = [number, number, number, number];
+/** How far (x, y) is outside a box (negative = inside). */
+const outside = ([x0, y0, x1, y1]: Box, x: number, y: number): number => Math.max(x0 - x, x - x1, y0 - y, y - y1);
+/** A stairwell down (opening, railings), and a sign on a post: what to keep clear of snow. */
+const stairwell = (x: number, y: number, top: number): Box[] => [[x - 28, y - 2, x + 28, y + 26], [x - 28, y - top, x - 26, y + 26], [x + 26, y - top, x + 28, y + 26], [x - 28, y - top, x + 28, y - top + 2]];
+const sign = (board: Box, px: number, py: number, foot: number): Box[] => [board, [px, py, px + 2, foot]];
+/**
+ * Where snow lies in each outdoor room. `top`: where it starts (the Pier's only on the beach, not the sea).
+ * `clear`: kept clear (things painted on the ground: stairs down, grates, signs, the path, the pad), with a
+ * bank of snow round the edge so the big ones look shovelled. `dust`: only a light covering (the roof deck, the pier's planks).
+ */
+const SNOW: Partial<Record<RoomId, { top?: number; clear?: Box[]; dust?: Box[]; clearAt?: (x: number, y: number) => number }>> = {
+  plaza: { clear: [
+    ...sign([1356, 588, 1390, 598], 1376, 598, 622), // PIER>
+    [1100, 684, 1140, 698], ...sign([1140, 652, 1170, 662], 1146, 662, 698), // the Crypt's grate
+    ...stairwell(186, 680, 12), ...sign([200, 620, 256, 638], 226, 638, 708), // the Arcade
+    ...stairwell(760, 682, 14), ...sign([776, 618, 826, 632], 800, 632, 708), // the Subway
+  ] },
+  pier: { top: 558, clear: [[16, 556, 62, 568]], dust: [[700, 420, 760, 548]] }, // the beach below the wet sand, the "<- SQUARE" in the sand
+  park: {
+    clear: [
+      [40, 470, 180, 490], [52, 490, 56, 530], [164, 490, 168, 530], // CITY PARK
+      ...stairwell(120, 690, 14), ...sign([134, 626, 190, 640], 160, 640, 716), // the subway
+      [760, 602, 840, 616], [796, 596, 799, 618], [836, 596, 839, 618], ...sign([756, 572, 796, 584], 775, 584, 602), // the boat dock
+      [1382, 640, 1562, 708], // the sandbox
+    ],
+    clearAt: (x, y) => Math.min(Math.abs(y - (580 + Math.round(Math.sin(x * 0.006) * 26))) - 10, // the path, shovelled
+      (Math.hypot((x - POND.x) / (POND.rx + 8), (y - POND.y) / (POND.ry + 5)) - 1) * (POND.ry + 5)), // the pond
+  },
+  roof: { clear: [...Array.from({ length: 9 }, (_, k): Box => [139 + k * 110, 444, 201 + k * 110, 471]), [1526, 456, 1852, 581]], dust: [[120, 471, 1020, 660]] }, // the planters, the launch pad (the engines melt it); the deck
+};
+/** Where the snow starts, how far a point is from anything kept clear (negative = on it), and whether it's only dusted. */
+function snowPlan(room: Room): { top: number; gap: (x: number, y: number) => number; dusty: (x: number, y: number) => boolean } {
+  const plan = SNOW[room.id] ?? {}, clear = plan.clear ?? [];
+  return {
+    top: plan.top ?? room.floor.y0 - 12,
+    gap: (x, y) => Math.min(plan.clearAt?.(x, y) ?? 99, ...clear.map((b) => outside(b, x, y))),
+    dusty: (x, y) => (plan.dust ?? []).some((b) => outside(b, x, y) <= 0),
+  };
+}
+/** Is there snow to scoop here? (Not on the cleared path, the sandbox, the pad, the pier or the sea.) */
+export function onSnow(room: Room, x: number, y: number): boolean {
+  if (!OUTDOOR.includes(room.id)) return false;
+  const p = snowPlan(room); return y >= p.top && p.gap(x, y) >= 0 && !p.dusty(x, y);
+}
 const snowCache = new Map<RoomId, HTMLCanvasElement>();
-/** Snow lying on an outdoor room's ground (made once): drifts along the back, patches everywhere else. */
+/** Snow lying on an outdoor room's ground (made once): a drift along the back, a soft blanket, the things on the ground left clear. */
 function snowLayer(room: Room): HTMLCanvasElement {
   let cv = snowCache.get(room.id); if (cv) return cv;
-  cv = mk(room.w, room.h); const f = room.floor;
+  cv = mk(room.w, room.h); const f = room.floor, { top, gap, dusty } = snowPlan(room);
   withCtx(cv.getContext('2d')!, () => {
     PX.dim = 0; PX.emit = false;
     const s1: RGB = [236, 242, 250], s2: RGB = [212, 222, 238], s3: RGB = [190, 204, 226];
-    // a smooth blanket: soft light and shade in big gentle patches, the odd bit of ground peeking through, sparkles
-    for (let y = f.y0 - 12; y < Math.min(room.h, f.y1 + 40); y += 2) for (let x = 0; x < room.w; x += 2) {
-      if (room.id === 'park' && ((x - POND.x) / (POND.rx + 8)) ** 2 + ((y - POND.y) / (POND.ry + 5)) ** 2 < 1) continue;
+    // a smooth blanket: soft light and shade in big gentle patches, the odd bit of ground peeking through
+    for (let y = top; y < room.h; y += 2) for (let x = 0; x < room.w; x += 2) {
+      const g = gap(x + 1, y + 1);
+      if (g < 0) continue; // kept clear
+      const dust = dusty(x, y);
+      if (g < 3 && !dust) { r(x, y, 2, 2, s1); continue; } // the bank round a cleared bit
       const n = vnoise(x / 70, y / 22, 1e6, 7) * 0.7 + vnoise(x / 18, y / 8, 1e6, 13) * 0.3;
-      if (n < 0.22) continue; // bare ground
+      if (n < (dust ? 0.56 : 0.22)) continue; // bare ground (most of it, where it's only a dusting)
       r(x, y, 2, 2, n > 0.62 ? s1 : n > 0.4 ? s2 : s3);
     }
-    for (let i = 0; i < room.w / 3; i++) { const x = Math.floor(h1(i * 3.1) * room.w), y = f.y0 + Math.floor(h1(i * 7.3) * (f.y1 - f.y0 + 30)); r(x, y, 1, 1, K.WHITE); }
-    for (let x = 0; x < room.w; x += 2) { const hh = 4 + Math.round(h1(x * 0.13) * 5 + Math.sin(x * 0.05) * 2); r(x, f.y0 - 10 - hh + 8, 2, hh, s1); } // a drift along the back
+    for (let i = 0; i < room.w / 3; i++) { const x = Math.floor(h1(i * 3.1) * room.w), y = top + 12 + Math.floor(h1(i * 7.3) * (f.y1 - top + 18)); if (gap(x, y) > 3 && !dusty(x, y)) r(x, y, 1, 1, K.WHITE); } // sparkles
+    for (let x = 0; x < room.w; x += 2) { const hh = 4 + Math.round(h1(x * 0.13) * 5 + Math.sin(x * 0.05) * 2); if (gap(x + 1, top) > 0) r(x, top + 10 - hh, 2, hh, s1); } // a drift along the back
   });
   snowCache.set(room.id, cv); return cv;
 }
@@ -306,10 +354,13 @@ export function installWinter(rooms: Record<RoomId, Room>, labTracks?: import('.
 }
 
 // ---------- drawing ----------
-/** Behind the players: snow on the ground, lights, wreaths, the sleigh, the pond, the advent calendar, New Year's fireworks. */
+/** Snow lying on the ground outside: straight over the set's backdrop, so everything that moves (the sea, the sandbox, the rocket's smoke) is on top. */
+export function winterGround(room: Room): void {
+  if (OUTDOOR.includes(room.id)) PX.ctx.drawImage(snowLayer(room), 0, 0);
+}
+/** Behind the players: lights, wreaths, the sleigh, the pond, the advent calendar, New Year's fireworks. */
 export function winterBack(room: Room, a: number): void {
   const id = room.id;
-  if (OUTDOOR.includes(id)) PX.ctx.drawImage(snowLayer(room), 0, 0);
   if (id === 'park') ice(a);
   lights(id, a); wreaths(room);
   if (id === 'lab') advent(a);
