@@ -5,7 +5,7 @@
 // ui/race.ts (top down); game/kart.ts has the circuit and the CPU karts.
 
 import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
-import { PX, mk, r, txt, tw, lit, G, Gd, withCtx, M, shade, disc } from '../engine/pixel';
+import { mk, r, txt, tw, lit, G, Gd, M, shade, disc, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { CPU_NAMES, LAPS, MAX_RACERS, RACE_MAX_S, TRACKS, TRACK_H, TRACK_W, cpuAt, raceTime, trackOf } from '../game/kart';
 import type { KartMsg, KartRecord, RaceState, StateMsg } from '../net/transport';
@@ -18,8 +18,8 @@ export const PIT_X = [330, 520, 710, 900];
 const SCREEN = { x: 470, y: 304, w: 360, h: 96 };
 
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // an evening sky
     for (let y = 0; y < 330; y += 4) r(0, y, W, 4, M([40, 30, 80], [240, 130, 90], Math.max(0, (y - 120) / 210)));
     for (let i = 0; i < 60; i++) r(Math.floor(h1(i * 3.3) * W), Math.floor(h1(i * 7.1) * 180), 1, 1, [220, 220, 255]);

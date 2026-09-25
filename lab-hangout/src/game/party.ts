@@ -8,6 +8,7 @@
 //   player who spent the least time as IT wins.
 
 import type { GameState } from '../net/transport';
+import { mmss } from '../engine/format';
 
 export const wall = (): number => Date.now() / 1000;
 
@@ -81,11 +82,10 @@ export function winner(g: GameState): number {
   return best;
 }
 
-const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 /** One line for the banner at the top of the screen. */
 export function banner(g: GameState): string {
   const L = Math.ceil(left(g)), w = winner(g);
-  if (g.kind === 'tag') return g.phase === 'play' ? 'TAG · ' + g.names[g.it] + ' IS IT! · ' + mmss(left(g)) : 'TAG OVER · WINNER: ' + (g.names[w] ?? '?') + ' (least time as IT)';
+  if (g.kind === 'tag') return g.phase === 'play' ? 'TAG · ' + g.names[g.it] + ' IS IT! · ' + mmss(left(g), 'down') : 'TAG OVER · WINNER: ' + (g.names[w] ?? '?') + ' (least time as IT)';
   switch (g.phase) {
     case 'ready': return 'MUSICAL CHAIRS · ' + g.alive.length + ' PLAYERS · GET READY ' + L;
     case 'music': return 'MUSICAL CHAIRS · ROUND ' + g.round + ' · ' + g.alive.length + ' LEFT · KEEP MOVING!';

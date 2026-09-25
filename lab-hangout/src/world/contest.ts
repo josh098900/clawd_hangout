@@ -2,6 +2,7 @@
 // wins (see supabase/migrations/0010_fishing.sql, which rolls every catch). The scoreboard on
 // its post at the end of the pier shows the live top 5, or the countdown and the last winner.
 
+import { mmss } from '../engine/format';
 import type { RGB } from '../engine/palette';
 import { r, txt, tw, lit, Gd } from '../engine/pixel';
 import type { ContestBoard } from '../net/transport';
@@ -12,7 +13,6 @@ export function contestClock(nowMs = Date.now()): { live: boolean; left: number;
   const s = (nowMs / 1000) % 3600, live = s >= 1800 && s < 2400;
   return { live, left: live ? 2400 - s : 0, next: live ? 0 : (s < 1800 ? 1800 - s : 5400 - s) };
 }
-export const mmss = (sec: number): string => { const n = Math.max(0, Math.ceil(sec)); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
 export const CONTEST = { board: null as ContestBoard | null, fetchedAt: 0 };
 
 /** The scoreboard, on a post in the water by the end of the pier. */

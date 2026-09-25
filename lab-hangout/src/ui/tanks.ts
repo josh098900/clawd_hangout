@@ -9,7 +9,7 @@
 // turn, SPACE or F fire. Touch: the buttons.
 
 import { K, type RGB } from '../engine/palette';
-import { PX, r, txt, tw, withCtx, disc, M } from '../engine/pixel';
+import { r, txt, tw, disc, M, bake } from '../engine/pixel';
 import type { TankMsg } from '../net/transport';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
@@ -150,8 +150,7 @@ export function openTanks(h: TankHooks): TankHandle {
     draw(now, osc);
   };
   const draw = (now: number, osc: number) => {
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       r(0, 0, TW, TH, [26, 30, 22]); for (let y = 0; y < TH; y += 10) for (let x = (y / 10) % 2 ? 5 : 0; x < TW; x += 10) r(x, y, 1, 1, [40, 46, 34]);
       r(0, 0, TW, 3, [90, 90, 100]); r(0, TH - 3, TW, 3, [90, 90, 100]); r(0, 0, 3, TH, [90, 90, 100]); r(TW - 3, 0, 3, TH, [90, 90, 100]);
       for (const [x0, y0, x1, y1] of BLOCKS) { r(x0, y0, x1 - x0, y1 - y0, [110, 100, 80]); r(x0, y0, x1 - x0, 1, [150, 140, 110]); r(x0, y1 - 1, x1 - x0, 1, [70, 62, 50]); }
@@ -172,7 +171,6 @@ export function openTanks(h: TankHooks): TankHandle {
       if (ph === 0) txt('WAITING...', TW / 2 - tw('WAITING...') / 2, TH / 2 + 14, [150, 160, 190]);
       if (ph === 3) { const s2 = sc >= TANK_WIN ? 'YOU WIN!' : 'DEFEAT'; txt(s2, TW / 2 - tw(s2, 2) / 2, TH / 2 - 6, sc >= TANK_WIN ? K.GOLD : [255, 120, 120], 2); }
     });
-    PX.dim = pd; PX.emit = pe;
   };
   raf = requestAnimationFrame(step);
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) (window as unknown as Record<string, unknown>).__tank = { me, opp: () => (them ? [them.x, them.y] : null), cpu: () => cpu, score: () => [sc, cpu ? cpuSc : them?.sc ?? 0], ph: () => ph }; // tests

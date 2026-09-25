@@ -9,7 +9,7 @@
 // 4 s pulling out) and the ride to the next one takes RIDE_S.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, txt, tw, lit, G, Gd, withCtx, M } from '../engine/pixel';
+import { PX, mk, r, line, txt, tw, lit, G, Gd, M, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { Door, Prop, Room, RoomId, Spot } from './room';
@@ -50,8 +50,8 @@ const BAND: RGB = [40, 120, 90];
 
 function buildStation(this: Room, n: number): void {
   const st = STATIONS[n], TILE = st.tile, TILE_LN = st.tileLn;
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, SW, 316, [22, 24, 30]); for (let x = 60; x < SW; x += 220) r(x, 314, 120, 5, [50, 54, 62]);
     // tiled wall above the tracks, a green band and the station name set into the tiles
     r(0, 322, SW, TRAIN_TOP - 322, TILE); for (let y = 322; y < TRAIN_TOP; y += 8) r(0, y, SW, 1, TILE_LN); for (let y = 322, j = 0; y < TRAIN_TOP; y += 8, j++) for (let x = (j % 2) * 8; x < SW; x += 16) r(x, y, 1, 8, TILE_LN);
@@ -186,8 +186,8 @@ const WINDOWS: [number, number][] = [[70, 230], [380, 620], [780, 930]];
 const WIN_Y0 = 358, WIN_Y1 = 426, DOOR_TOP = 348, SEAT_Y = 456;
 
 function buildCar(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, CW, 300, [200, 204, 210]); r(0, 300, CW, 22, [236, 232, 220]);
     for (let x = 20, i = 0; x < CW; x += 160, i++) { r(x, 301, 120, 20, CONFETTI[i % CONFETTI.length].map((v) => Math.round(v * 0.8 + 40)) as RGB); r(x + 4, 304, 50, 3, [255, 255, 255]); r(x + 4, 310, 70, 2, [60, 60, 70]); r(x + 4, 315, 40, 2, [60, 60, 70]); }
     r(0, 322, CW, CFLOOR - 322, [214, 218, 224]); r(0, 322, CW, 2, [236, 240, 244]);

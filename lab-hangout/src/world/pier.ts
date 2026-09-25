@@ -4,7 +4,7 @@
 // sea follow the Square's day/night loop.
 
 import { K, DK, PK } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, txt, tw, alpha, lit, G, Gd, Gline, withCtx, M, shade } from '../engine/pixel';
+import { mk, r, line, disc, oval, txt, tw, alpha, lit, G, Gd, Gline, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { Room, Prop, Spot } from './room';
@@ -17,8 +17,8 @@ const MOON_X = 980;
 
 // ---------- the set ----------
 function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
-  withCtx(ctx, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(ctx, () => {
+    
     const S0 = day ? DK.SKY0 : K.SKY0, S1 = day ? DK.SKY1 : K.SKY1, S2 = day ? DK.SKY2 : K.SKY2;
     for (let y = 0; y < HORIZON; y += 4) { const u = y / HORIZON; r(0, y, W, 4, u < 0.6 ? M(S0, S1, u / 0.6) : M(S1, S2, (u - 0.6) / 0.4)); }
     if (!day) { for (let i = 0; i < 200; i++) r(Math.floor(h1(i * 6.1) * W), Math.floor(h1(i * 3.3) * (HORIZON - 40)), 1, 1, h1(i) > 0.8 ? [220, 225, 255] : [120, 130, 180]); for (let dy = -14; dy <= 14; dy++) { const w = Math.floor(Math.sqrt(196 - dy * dy)); r(MOON_X - w, 120 + dy, 2 * w + 1, 1, [240, 240, 220]); } }

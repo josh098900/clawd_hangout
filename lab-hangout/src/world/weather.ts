@@ -9,7 +9,7 @@
 // Rain also makes the fish bite faster at the Pier (main.ts).
 
 import { r, alpha, lit, line } from '../engine/pixel';
-import { h1 } from '../engine/math';
+import { h1, ihash } from '../engine/math';
 import { season } from './season';
 import type { Room, RoomId } from './room';
 
@@ -28,12 +28,7 @@ export const OUTDOORS: RoomId[] = ['plaza', 'pier', 'roof', 'park'];
 const SLOT = 900, FADE = 50;
 
 /** 0..999 for slot `slot` (a 32-bit integer mix: the server's private.weather_roll() gives the same). */
-export function roll(slot: number): number {
-  let h = slot >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
-  return ((h ^ (h >>> 16)) >>> 0) % 1000;
-}
+export const roll = (slot: number): number => ihash(slot) % 1000;
 function kindOf(slot: number): Sky {
   const n = roll(slot), k: Sky = n < 450 ? 'clear' : n < 700 ? 'rain' : n < 830 ? 'storm' : 'fog';
   if (season() === 'winter' && n < 200) return 'snow'; // (winter: some of the clear spells snow too; only in the game, the gardens don't mind)

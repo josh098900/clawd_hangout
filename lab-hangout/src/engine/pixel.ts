@@ -41,6 +41,15 @@ export function withCtx<T>(c: CanvasRenderingContext2D, fn: () => T): T {
     PX.ctx = prev;
   }
 }
+/**
+ * Paint into another canvas with the lighting off (no night tint, no flash, not self-lit): baking a set's
+ * backdrop, drawing a sprite or a panel's own canvas. Everything is put back afterwards, even if fn throws.
+ */
+export function bake<T>(c: HTMLCanvasElement | CanvasRenderingContext2D, fn: () => T): T {
+  const ctx = c instanceof HTMLCanvasElement ? c.getContext('2d')! : c, d = PX.dim, f = PX.fl, e = PX.emit;
+  PX.dim = 0; PX.fl = 0; PX.emit = false;
+  try { return withCtx(ctx, fn); } finally { PX.dim = d; PX.fl = f; PX.emit = e; }
+}
 /** Run fn with emissive pixels (ignore dim/flash). */
 export function lit(fn: () => void): void {
   const p = PX.emit;

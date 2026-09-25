@@ -10,6 +10,8 @@
 // Laps: you have to pass the halfway point before crossing the line counts (no reversing over
 // it for free). Your place = how far round you are (laps + progress), finishers by time.
 
+import { ihash } from '../engine/math';
+
 export const TRACK_W = 1040, TRACK_H = 720, HALF = 30, LAPS = 3, MAX_RACERS = 4;
 /** Race: countdown in the lobby before GO (s), and when an unfinished race gives up (s after GO). */
 export const LOBBY_S = 12, RACE_MAX_S = 160;
@@ -135,7 +137,7 @@ export function stepKart(tr: Track, k: Kart, inp: KartInput, dt: number, t: numb
 export const kartDist = (tr: Track, k: { lap: number; seg: number; crossed: boolean }): number => (k.crossed ? k.lap + k.seg / tr.CL.length : k.seg / tr.CL.length - 1);
 
 // ---------- CPU karts ----------
-function mix(n: number): number { let h = n >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; return (h ^ (h >>> 16)) >>> 0; }
+const mix = ihash;
 export const CPU_NAMES = ['ZOOM', 'TURBO', 'NITRO', 'SPARKY'];
 /** CPU kart in grid slot `slot` of the race with this seed, `t` ms after GO: where it is. */
 export function cpuAt(tr: Track, seed: number, slot: number, t: number): { x: number; y: number; a: number; dist: number; fin: number } {

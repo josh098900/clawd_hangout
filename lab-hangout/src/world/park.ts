@@ -6,7 +6,7 @@
 // out at night, and OAK the park keeper looks after it all.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, txt, tw, lit, alpha, G, Gd, withCtx, M, shade } from '../engine/pixel';
+import { mk, r, line, disc, oval, txt, tw, lit, alpha, G, Gd, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { PARK_TRACKS } from '../audio/music';
 import { dayness } from './plaza';
@@ -36,8 +36,8 @@ export function pondEdge(x: number, y: number): number {
 
 // ---------- the set (night + day) ----------
 function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
-  withCtx(ctx, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(ctx, () => {
+    
     const s0: RGB = day ? [120, 180, 236] : [10, 14, 40], s1: RGB = day ? [196, 226, 246] : [40, 40, 84];
     for (let y = 0; y < HORIZON; y += 4) r(0, y, W, 4, M(s0, s1, y / HORIZON));
     if (!day) { for (let i = 0; i < 180; i++) r(Math.floor(h1(i * 4.1) * W), Math.floor(h1(i * 7.7) * 360), 1, 1, h1(i) > 0.8 ? [220, 226, 255] : [120, 130, 180]); for (let dy = -11; dy <= 11; dy++) { const w = Math.floor(Math.sqrt(121 - dy * dy)); r(1300 - w, 250 + dy, 2 * w + 1, 1, [236, 236, 214]); } }

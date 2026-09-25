@@ -11,10 +11,11 @@
 //   * NEW YEAR'S EVE: a countdown to midnight (UTC) and fireworks everywhere outside.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, txt, tw, lit, alpha, G, Gd, Gsoft, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, line, disc, txt, tw, lit, alpha, G, Gd, Gsoft, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { POND, onWater } from './park';
 import { vnoise } from './space';
+import { OUTDOORS } from './weather';
 import { stringLights, wallDoors, type LightStyle } from './dressing';
 import type { Ornament, TreeGift } from '../net/transport';
 import type { Prop, Room, RoomId, Spot } from './room';
@@ -29,7 +30,6 @@ export const WINTER = {
   /** Dev/tests: pretend it's this many seconds before midnight on New Year's Eve (?nye=N). */
   nyeAt: null as number | null,
 };
-export const OUTDOOR: RoomId[] = ['plaza', 'pier', 'park', 'roof'];
 
 // ---------- the present hunt ----------
 export const PRESENTS: { room: RoomId; x: number; y: number }[] = [
@@ -192,7 +192,7 @@ function snowPlan(room: Room): { top: number; gap: (x: number, y: number) => num
 }
 /** Is there snow to scoop here? (Not on the cleared path, the sandbox, the pad, the pier or the sea.) */
 export function onSnow(room: Room, x: number, y: number): boolean {
-  if (!OUTDOOR.includes(room.id)) return false;
+  if (!OUTDOORS.includes(room.id)) return false;
   const p = snowPlan(room); return y >= p.top && p.gap(x, y) >= 0 && !p.dusty(x, y);
 }
 const snowCache = new Map<RoomId, HTMLCanvasElement>();
@@ -200,8 +200,8 @@ const snowCache = new Map<RoomId, HTMLCanvasElement>();
 function snowLayer(room: Room): HTMLCanvasElement {
   let cv = snowCache.get(room.id); if (cv) return cv;
   cv = mk(room.w, room.h); const f = room.floor, { top, gap, dusty } = snowPlan(room);
-  withCtx(cv.getContext('2d')!, () => {
-    PX.dim = 0; PX.emit = false;
+  bake(cv.getContext('2d')!, () => {
+    
     const s1: RGB = [236, 242, 250], s2: RGB = [212, 222, 238], s3: RGB = [190, 204, 226];
     // a smooth blanket: soft light and shade in big gentle patches, the odd bit of ground peeking through
     for (let y = top; y < room.h; y += 2) for (let x = 0; x < room.w; x += 2) {
@@ -339,7 +339,7 @@ export function installWinter(rooms: Record<RoomId, Room>, labTracks?: import('.
 // ---------- drawing ----------
 /** Snow lying on the ground outside: straight over the set's backdrop, so everything that moves (the sea, the sandbox, the rocket's smoke) is on top. */
 export function winterGround(room: Room): void {
-  if (OUTDOOR.includes(room.id)) PX.ctx.drawImage(snowLayer(room), 0, 0);
+  if (OUTDOORS.includes(room.id)) PX.ctx.drawImage(snowLayer(room), 0, 0);
 }
 /** Behind the players: lights, wreaths, the sleigh, the pond, the advent calendar, New Year's fireworks. */
 export function winterBack(room: Room, a: number): void {
@@ -365,7 +365,7 @@ export function winterProps(id: RoomId): Prop[] {
 }
 /** Over everything: gentle snowflakes outdoors (on top of any snowy weather), and New Year's confetti anywhere. */
 export function winterFront(room: Room, a: number, cam: { x: number; y: number; w: number; h: number }, snowing: boolean): void {
-  if (OUTDOOR.includes(room.id) && !snowing) {
+  if (OUTDOORS.includes(room.id) && !snowing) {
     lit(() => { for (let k = 0; k < 60; k++) { const sp = 12 + h1(k) * 14, x = cam.x + ((h1(k * 3.3) * cam.w + Math.sin(a * 0.7 + k) * 20 + a * 6) % cam.w), y = cam.y + ((h1(k * 1.7) * cam.h + a * sp) % cam.h); r(Math.round(x), Math.round(y), k % 5 ? 1 : 2, k % 5 ? 1 : 2, [236, 242, 250]); } });
   }
   const s = nye().since;

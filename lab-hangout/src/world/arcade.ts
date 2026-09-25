@@ -5,7 +5,7 @@
 // COUNTER (your collection) run by PIXEL, and an air hockey table that nobody ever finishes a game on.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, txt, tw, lit, G, Gd, withCtx, M, shade, alpha } from '../engine/pixel';
+import { mk, r, line, disc, oval, txt, tw, lit, G, Gd, M, shade, alpha, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { CHIPTUNES } from '../audio/music';
 import { itemName } from '../entities/critter';
@@ -34,8 +34,8 @@ export function pongSeen(p: PongMsg): void { ARCADE_INFO.pong[p.s] = { ...p, t: 
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // ceiling with a strip of neon tubes, walls in deep violet with a zigzag band
     r(0, 0, W, 214, [14, 10, 26]); for (let x = 0; x < W; x += 80) r(x + 10, 206, 60, 3, [40, 30, 60]);
     r(0, 214, W, LF - 214, [30, 18, 52]);

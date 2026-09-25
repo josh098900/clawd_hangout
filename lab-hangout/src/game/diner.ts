@@ -19,6 +19,7 @@
 // when tickets arrive, which were missed, when the shift ends, and so the final score. (So the
 // shift still ends on time if the host's tab is in the background and its game loop is paused.)
 
+import { ihash } from '../engine/math';
 import { HOLD_BURGER, HOLD_CHAR, HOLD_COOKED, HOLD_FRIES, HOLD_FROZEN, HOLD_PATTY, HOLD_SHAKE } from '../entities/avatar';
 
 export const SHIFT_S = 180, COOKS_MAX = 8;
@@ -46,12 +47,7 @@ export interface DinerState {
 }
 export interface Ticket { i: number; dishes: Dish[]; at: number; due: number }
 
-/** A small integer hash (same idea as the weather's). */
-function mix(n: number): number {
-  let h = n >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
-  return (h ^ (h >>> 16)) >>> 0;
-}
+const mix = ihash;
 const GAP = [22, 18, 15, 12];
 /** Every ticket of this shift: what it wants, when it comes in and when it's due (wall ms). */
 export function tickets(g: DinerState): Ticket[] {

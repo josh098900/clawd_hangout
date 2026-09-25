@@ -4,7 +4,7 @@
 // (0017_photos.sql) and nothing is shown to anyone else until the owner approves it.
 
 import { K, type RGB } from '../engine/palette';
-import { PX, mk, r, txt, tw, withCtx, spr } from '../engine/pixel';
+import { mk, r, txt, tw, spr, bake } from '../engine/pixel';
 import { button, openModal, row, type Modal } from './modal';
 import type { Photo } from '../net/transport';
 
@@ -42,14 +42,12 @@ function stamp2(rows: string[], x: number, y: number): void {
 export function composeStrip(frames: HTMLCanvasElement[], frame: number, stamps: Stamp[]): HTMLCanvasElement {
   const F = FRAMES[frame] ?? FRAMES[0], cv = mk(STRIP_W, stripH(frames.length)), g = cv.getContext('2d')!;
   g.imageSmoothingEnabled = false;
-  const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-  withCtx(g, () => {
+  bake(g, () => {
     r(0, 0, cv.width, cv.height, F.c);
     frames.forEach((f, i) => { const y = BORDER + i * (FH + BORDER); r(BORDER - 1, y - 1, FW + 2, FH + 2, [22, 12, 44]); g.drawImage(f, BORDER, y); });
     const cap = 'LAB HANGOUT'; txt(cap, Math.round(STRIP_W / 2 - tw(cap) / 2), cv.height - CAPTION + 4, F.ink);
     for (const s of stamps) { const st = STICKERS[s.i]; if (st) stamp2(st.rows, Math.round(s.x - st.rows[0].length), Math.round(s.y - st.rows.length)); }
   });
-  PX.dim = pd; PX.emit = pe;
   return cv;
 }
 /** Decorate a strip, then pin it (or just save it). `pin` resolves when it's sent. */
@@ -68,7 +66,7 @@ export function openPinEditor(frames: HTMLCanvasElement[], pin: (png: string) =>
     swatches.replaceChildren(...FRAMES.map((F, i) => { const b = document.createElement('button'); b.type = 'button'; b.title = F.name; Object.assign(b.style, { width: '28px', height: '28px', background: 'rgb(' + F.c.join(',') + ')', border: i === frame ? '3px solid #FFD65A' : '2px solid #444', cursor: 'pointer' }); b.addEventListener('click', () => { frame = i; syncTools(); redraw(); }); return b; }));
     stickers.replaceChildren(...STICKERS.map((st, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.title = st.name; const c = mk(13, 11);
-      withCtx(c.getContext('2d')!, () => { PX.dim = 0; PX.emit = false; spr(st.rows, P, Math.round(6.5 - st.rows[0].length / 2), Math.round(5.5 - st.rows.length / 2)); });
+      bake(c.getContext('2d')!, () => {spr(st.rows, P, Math.round(6.5 - st.rows[0].length / 2), Math.round(5.5 - st.rows.length / 2)); });
       Object.assign(c.style, { width: '39px', height: '33px', imageRendering: 'pixelated' });
       Object.assign(b.style, { padding: '2px', background: '#1a1426', border: i === pick ? '3px solid #FFD65A' : '2px solid #444', cursor: 'pointer' }); b.appendChild(c);
       b.addEventListener('click', () => { pick = i; syncTools(); }); return b;

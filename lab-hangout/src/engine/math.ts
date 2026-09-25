@@ -5,6 +5,16 @@ export const h1 = (n: number): number => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
 };
+/**
+ * A 32-bit integer hash (the same sums as the server's private.weather_roll(), so the weather matches it).
+ * For anything that must come out the same in every browser: the weather, the Diner's tickets, the CPU karts.
+ */
+export function ihash(n: number): number {
+  let h = n >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
 export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
 export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 /** 0..1 progress of t through [a,b], clamped. */

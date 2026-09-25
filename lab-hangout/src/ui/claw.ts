@@ -3,7 +3,7 @@
 // chute, pop it open. The reveal shows your critter wearing the prize, with a WEAR IT button.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, r, disc, line, txt, tw, withCtx, M } from '../engine/pixel';
+import { r, disc, line, txt, tw, M, bake } from '../engine/pixel';
 import { basePose, composeCritter, itemName, RARITY, type Look } from '../entities/critter';
 import type { ClawResult } from '../net/transport';
 import { SFX } from '../audio/sfx';
@@ -59,8 +59,7 @@ export function openClaw(h: ClawHooks): void {
   };
   const draw = () => {
     const now = performance.now() / 1000, u = t0 >= 0 ? now - t0 : -1;
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       r(0, 0, W, H, [20, 16, 34]); for (let y = 0; y < H; y += 6) r(0, y, W, 1, [26, 20, 42]);
       r(4, 4, W - 8, 3, [140, 140, 160]); r(4, H - 22, 26, 18, [50, 40, 60]); r(6, H - 20, 22, 14, [16, 12, 24]); txt('OUT', 10, H - 16, [150, 140, 170]);
       for (const p of pile) { disc(p.x + 20, p.y, 4, p.c); r(p.x + 17, p.y, 7, 1, K.WHITE); r(p.x + 18, p.y - 3, 2, 1, M(p.c, [255, 255, 255], 0.6)); }
@@ -88,7 +87,6 @@ export function openClaw(h: ClawHooks): void {
         const nm = (res.item.startsWith('pet:') ? 'PET: ' : '') + itemName(res.item); txt(nm, W / 2 - tw(nm) / 2, 96, K.GOLD);
       }
     });
-    PX.dim = pd; PX.emit = pe;
     raf = requestAnimationFrame(draw);
   };
   m.body.append(cv, msg, row(play, wear, button('CLOSE', m.close, true)));

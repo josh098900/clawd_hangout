@@ -4,7 +4,7 @@
 // picks whose). MARGOT the doorman keeps an eye on things. The flats themselves: world/flat.ts.
 
 import { CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, txt, tw, lit, G, Gd, withCtx, shade, disc, line } from '../engine/pixel';
+import { mk, r, txt, tw, lit, G, Gd, shade, disc, line, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import type { DoorMode } from '../net/transport';
 import type { Prop, Room, Spot } from './room';
@@ -15,8 +15,8 @@ export const LOFTS_INFO = { dir: [] as { name: string; door: DoorMode; party: bo
 const LIFT = { x: 620, w: 70 }, BOARD = { x: 300, y: 330, w: 170, h: 100 };
 
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, W, 200, [30, 26, 34]); for (let x = 40; x < W; x += 140) { r(x, 196, 60, 4, [200, 170, 90]); }
     // walls: deep green with brass trim and wood panelling below
     r(0, 200, W, FL - 200, [40, 84, 72]); for (let x = 0; x < W; x += 60) r(x, 200, 2, 190, [34, 72, 62]);

@@ -9,6 +9,14 @@ import { audio, soundOn } from './sfx';
 
 export interface Track { name: string; bpm: number; wave: OscillatorType; lead: string; bass: string; drums: string; /** the lead's loudness (default 0.05): karaoke's guide melody is quieter */ leadVol?: number }
 
+/** A spooky one: on the Lab's jukebox and the Arcade's speakers. */
+const MIDNIGHT_CREEP: Track = {
+  name: 'MIDNIGHT CREEP', bpm: 96, wave: 'triangle',
+  lead: 'E4 . G4 . A#4 . A4 . G4 . E4 . D#4 - - . E4 . G4 . B4 . A#4 . A4 . G4 . E4 - - .',
+  bass: 'E2 . . E2 . . B1 . E2 . . E2 . . A#1 . E2 . . E2 . . B1 . C2 . . B1 . . A#1 .',
+  drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
+};
+
 export const TRACKS: Track[] = [
   {
     name: 'LAB GROOVE', bpm: 112, wave: 'square',
@@ -34,12 +42,7 @@ export const TRACKS: Track[] = [
     bass: 'C3 . C3 . G2 . C3 . C3 . G2 . C3 . G2 . E3 . E2 . C3 . A2 . B2 . A#2 A2 . . G2 .',
     drums: 'k h s h k h s h k h s h k h s s k h s h k h s h k h s h k s s s',
   },
-  {
-    name: 'MIDNIGHT CREEP', bpm: 96, wave: 'triangle',
-    lead: 'E4 . G4 . A#4 . A4 . G4 . E4 . D#4 - - . E4 . G4 . B4 . A#4 . A4 . G4 . E4 - - .',
-    bass: 'E2 . . E2 . . B1 . E2 . . E2 . . A#1 . E2 . . E2 . . B1 . C2 . . B1 . . A#1 .',
-    drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
-  },
+  MIDNIGHT_CREEP,
 ];
 /** The Arcade's speakers: chiptunes (on by default, the MUSIC cabinet skips tracks). */
 export const CHIPTUNES: Track[] = [
@@ -55,12 +58,7 @@ export const CHIPTUNES: Track[] = [
     bass: 'A2 A2 A3 A2 A2 A2 A3 A2 F2 F2 F3 F2 F2 F2 F3 F2 G2 G2 G3 G2 G2 G2 G3 G2 E2 E2 E3 E2 E2 E2 E3 E2',
     drums: 'k h s h k h s h k h s h k h s s k h s h k h s h k h s h k s k s',
   },
-  {
-    name: 'MIDNIGHT CREEP', bpm: 96, wave: 'triangle',
-    lead: 'E4 . G4 . A#4 . A4 . G4 . E4 . D#4 - - . E4 . G4 . B4 . A#4 . A4 . G4 . E4 - - .',
-    bass: 'E2 . . E2 . . B1 . E2 . . E2 . . A#1 . E2 . . E2 . . B1 . C2 . . B1 . . A#1 .',
-    drums: 'k . . h s . . h k . k . s . . h k . . h s . . h k . k . s . h h',
-  },
+  MIDNIGHT_CREEP,
 ];
 /** The Park's bandstand: a sunny waltz and a brass-band stroll. */
 export const PARK_TRACKS: Track[] = [
@@ -251,37 +249,26 @@ export const ORBIT_TRACK: Track = {
   bass: 'E2 . . . B2 . . . A2 . . . E2 . . . D2 . . . A2 . . . G2 . . . D2 . . .',
   drums: 'k . . . h . . . s . . . h . . . k . . . h . . . s . . . h . h .',
 };
+/** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
+class NoiseLoop {
+  private g: GainNode | null = null;
+  constructor(private cutoff: number, private scale: number, private ease: number) {}
+  set(vol: number): void {
+    const au = audio();
+    if (!au || !soundOn) { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.2); return; }
+    if (!this.g) {
+      const { AC, master, NB } = au, s = AC.createBufferSource(), f = AC.createBiquadFilter();
+      s.buffer = NB; s.loop = true; f.type = 'lowpass'; f.frequency.value = this.cutoff;
+      this.g = AC.createGain(); this.g.gain.value = 0;
+      s.connect(f); f.connect(this.g); this.g.connect(master); s.start();
+    }
+    this.g.gain.setTargetAtTime(vol * this.scale, this.g.context.currentTime, this.ease);
+  }
+}
 /** A low roar (the rocket's engines), 0..1. */
-export class Rumble {
-  private g: GainNode | null = null;
-  set(vol: number): void {
-    const au = audio();
-    if (!au || !soundOn) { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.2); return; }
-    if (!this.g) {
-      const { AC, master, NB } = au, s = AC.createBufferSource(), f = AC.createBiquadFilter();
-      s.buffer = NB; s.loop = true; f.type = 'lowpass'; f.frequency.value = 170;
-      this.g = AC.createGain(); this.g.gain.value = 0;
-      s.connect(f); f.connect(this.g); this.g.connect(master); s.start();
-    }
-    this.g.gain.setTargetAtTime(vol * 0.5, this.g.context.currentTime, 0.25);
-  }
-}
-
-/** Looping rain on the window (the Dev Den) and outside. Filtered noise; volume 0 to stop. */
-export class Rain {
-  private g: GainNode | null = null;
-  set(vol: number): void {
-    const au = audio();
-    if (!au || !soundOn) { if (this.g) this.g.gain.setTargetAtTime(0, this.g.context.currentTime, 0.2); return; }
-    if (!this.g) {
-      const { AC, master, NB } = au, s = AC.createBufferSource(), f = AC.createBiquadFilter();
-      s.buffer = NB; s.loop = true; f.type = 'lowpass'; f.frequency.value = 1400;
-      this.g = AC.createGain(); this.g.gain.value = 0;
-      s.connect(f); f.connect(this.g); this.g.connect(master); s.start();
-    }
-    this.g.gain.setTargetAtTime(vol, this.g.context.currentTime, 0.4);
-  }
-}
+export class Rumble extends NoiseLoop { constructor() { super(170, 0.5, 0.25); } }
+/** Looping rain on the window (the Dev Den) and outside. Volume 0 to stop. */
+export class Rain extends NoiseLoop { constructor() { super(1400, 1, 0.4); } }
 
 // ---------- the Stage's instruments: 8 pads each, all in C major pentatonic ----------
 const PENTA = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5'];

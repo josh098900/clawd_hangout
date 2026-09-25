@@ -3,7 +3,7 @@
 // constellations are remembered in this browser.
 
 import { K } from '../engine/palette';
-import { PX, r, txt, tw, withCtx, line } from '../engine/pixel';
+import { r, txt, tw, line, bake } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
 import { save } from '../game/save';
@@ -45,8 +45,7 @@ export function openStars(onClose: () => void): void {
     }
   });
   const draw = () => {
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       r(0, 0, W, H, [6, 8, 24]);
       const t = performance.now() / 1000;
       for (const [x, y, b] of noise) r(x, y, 1, 1, (t * 0.7 + b * 5) % 1 < 0.15 ? [120, 130, 180] : b > 0.6 ? [210, 220, 255] : [140, 150, 200]);
@@ -60,7 +59,6 @@ export function openStars(onClose: () => void): void {
       for (const [x, y] of c.pts) r(Math.round(W - 52 + x * 44), Math.round(H - 38 + y * 28), 1, 1, K.WHITE);
       if (done) txt(c.name, W / 2 - tw(c.name) / 2, 4, K.GOLD);
     });
-    PX.dim = pd; PX.emit = pe;
     raf = requestAnimationFrame(draw);
   };
   setup(); draw();

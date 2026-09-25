@@ -6,7 +6,7 @@
 // (the gas is held for you).
 
 import { BODY, K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, disc, txt, tw, withCtx, M, shade, txtOutlined, line } from '../engine/pixel';
+import { mk, r, disc, txt, tw, withCtx, M, shade, txtOutlined, line, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { HALF, LAPS, TRACKS, TRACK_H, TRACK_W, CPU_NAMES, MAX_RACERS, RACE_MAX_S, cpuAt, kartDist, newKart, ordinal, raceTime, stepKart, trackOf, type Kart, type KartInput, type Track } from '../game/kart';
 import type { KartMsg, RaceState } from '../net/transport';
@@ -40,8 +40,8 @@ const GROUND = { grass: { a: [74, 150, 70] as RGB, b: [66, 138, 62] as RGB, tuft
 function baked(tr: Track): { track: HTMLCanvasElement; mini: HTMLCanvasElement } {
   const got = BAKED.get(tr); if (got) return got;
   const CL = tr.CL, gr = GROUND[tr.theme], TRACK = mk(TRACK_W, TRACK_H);
-  withCtx(TRACK.getContext('2d')!, () => {
-    PX.dim = 0; PX.emit = false; PX.fl = 0;
+  bake(TRACK.getContext('2d')!, () => {
+    
     for (let y = 0; y < TRACK_H; y += 24) r(0, y, TRACK_W, 24, (y / 24) % 2 ? gr.a : gr.b); // mowed stripes / wind-blown sand
     for (let i = 0; i < 900; i++) r(Math.floor(h1(i * 2.3) * TRACK_W), Math.floor(h1(i * 5.9) * TRACK_H), tr.theme === 'desert' ? 2 : 1, tr.theme === 'desert' ? 1 : 2, gr.tuft);
     // run-off on the outside of the tight corners (sand, or red gravel in the desert)
@@ -84,8 +84,8 @@ const SPR = new Map<string, HTMLCanvasElement>();
 function kartSprite(col: RGB, ai: number): HTMLCanvasElement {
   const key = col.join(',') + ':' + ai; let c = SPR.get(key); if (c) return c;
   const base = mk(16, 16);
-  withCtx(base.getContext('2d')!, () => {
-    PX.dim = 0; PX.emit = false; PX.fl = 0;
+  bake(base.getContext('2d')!, () => {
+    
     for (const [x, y] of [[3, 3], [10, 3], [3, 11], [10, 11]]) r(x, y, 4, 2, [24, 24, 28]); // tyres
     r(2, 5, 12, 6, col); r(2, 5, 12, 1, M(col, [255, 255, 255], 0.35)); r(2, 10, 12, 1, shade(col, 0.6)); // body
     r(13, 6, 2, 4, shade(col, 0.7)); r(1, 6, 1, 4, [40, 40, 46]); // nose, rear bumper
@@ -186,8 +186,7 @@ export function openRace(h: RaceHooks): RaceHandle {
     draw(rc, t, es);
   };
   const draw = (rc: RaceState | null, t: number, es: Entry[]) => {
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       g.imageSmoothingEnabled = false;
       const ox = Math.round(Math.max(0, Math.min(TRACK_W - VW, camX - VW / 2))), oy = Math.round(Math.max(0, Math.min(TRACK_H - VH, camY - VH / 2)));
       const bk = baked(tr);
@@ -226,7 +225,6 @@ export function openRace(h: RaceHooks): RaceHandle {
       if (kart && t > 0 && !kart.fin && Math.hypot(kart.x - tr.CL[kart.seg].x, kart.y - tr.CL[kart.seg].y) > HALF + 20) txtOutlined('BACK TO THE TRACK!', VW / 2 - tw('BACK TO THE TRACK!') / 2, VH - 20, [255, 120, 120]);
       line(0, 13, VW, 13, [40, 44, 60]);
     });
-    PX.dim = pd; PX.emit = pe;
   };
   raf = requestAnimationFrame(step);
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) (window as unknown as Record<string, unknown>).__race = { kart: () => kart, get CL() { return tr.CL; } }; // test autopilot

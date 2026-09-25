@@ -8,10 +8,11 @@
 //   the AIRLOCK out to the spacewalk, and an ESCAPE POD (splashdown in the Park's pond).
 // COSMO (from the Cinema's film, A CRITTER IN SPACE) floats about showing people round.
 
+import { mmss } from '../engine/format';
 import { K, SK, type RGB } from '../engine/palette';
-import { PX, mk, r, disc, ring, line, txt, tw, lit, G, Gd, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, disc, ring, line, txt, tw, lit, G, Gd, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
-import { CAPSULE_ARRIVE, DEPART, UP_S, clockText, drawEarth, drawMoon, flight, starfield, twinkles } from './space';
+import { CAPSULE_ARRIVE, DEPART, UP_S, drawEarth, drawMoon, flight, starfield, twinkles } from './space';
 import { skyThings, skyView } from './sky';
 import type { ScopeState, StateMsg, Tray } from '../net/transport';
 import type { Door, Prop, Room, Spot } from './room';
@@ -40,8 +41,8 @@ export function trayLine(t: Tray, mine: boolean): string {
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // ceiling: ducts, cable trays and a row of light panels
     r(0, 0, W, WALL, SK.TRIM); for (let x = 0; x < W; x += 40) r(x, 0, 1, WALL, SK.TRIM_HI);
     r(0, 200, W, 10, SK.HULL_DK); r(0, 200, W, 2, SK.SEAM); r(0, 230, W, 6, shade(SK.HULL_DK, 0.8));
@@ -149,7 +150,7 @@ function dockBits(a: number): void {
   else { disc(DOCK_X, 410, 38, SK.PANEL); for (let k = 0; k < 6; k++) { const an = k / 6 * Math.PI * 2 + 0.3; line(DOCK_X, 410, Math.round(DOCK_X + Math.cos(an) * 36), Math.round(410 + Math.sin(an) * 36), SK.SEAM); } disc(DOCK_X, 410, 8, SK.HULL_DK); }
   lit(() => r(DOCK_X - 4, 356, 8, 4, here ? SK.LED : (a % 1) < 0.5 ? SK.LED_RED : shade(SK.LED_RED, 0.4)));
   // the departures board
-  const l1 = 'ROCKET HOME', l2 = here ? (f.left < 30 ? 'LAST CALL! ' : 'BOARD NOW · ') + clockText(f.left) : f.phase === 'up' ? 'ARRIVING...' : f.phase === 'down' ? 'IN FLIGHT' : 'NEXT ONE ' + clockText(f.left + UP_S);
+  const l1 = 'ROCKET HOME', l2 = here ? (f.left < 30 ? 'LAST CALL! ' : 'BOARD NOW · ') + mmss(f.left) : f.phase === 'up' ? 'ARRIVING...' : f.phase === 'down' ? 'IN FLIGHT' : 'NEXT ONE ' + mmss(f.left + UP_S);
   lit(() => { txt(l1, DOCK_X - tw(l1) / 2, 298, [255, 180, 60]); txt(l2, DOCK_X - tw(l2) / 2, 310, here && (f.left > 30 || (a % 1) < 0.6) ? SK.LED : SK.LED_RED); });
 }
 function growLights(a: number): void {

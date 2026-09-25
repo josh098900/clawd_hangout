@@ -5,7 +5,7 @@
 // Keys: W/S or ↑/↓. Touch/mouse: drag on the court.
 
 import { K } from '../engine/palette';
-import { PX, r, txt, tw, withCtx } from '../engine/pixel';
+import { r, txt, tw, bake } from '../engine/pixel';
 import type { PongMsg } from '../net/transport';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
@@ -88,8 +88,7 @@ export function openPong(h: PongHooks): PongHandle {
     raf = requestAnimationFrame(step);
   };
   const draw = (now: number) => {
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       r(0, 0, W, H, [6, 8, 14]); for (let y = 2; y < H; y += 8) r(W / 2 - 1, y, 2, 4, [50, 60, 80]);
       const pl = h.side === 0 ? me.p : them.p, pr = h.side === 1 ? me.p : them.p;
       r(4, Math.round(pl * H - (PH * H) / 2), 3, Math.round(PH * H), K.CYAN); r(W - 7, Math.round(pr * H - (PH * H) / 2), 3, Math.round(PH * H), K.MAG);
@@ -99,7 +98,6 @@ export function openPong(h: PongHooks): PongHandle {
       if (ph === 0) txt('WAITING...', W / 2 - tw('WAITING...') / 2, H / 2, [150, 160, 190]);
       if (ph === 3) { const s = sc[h.side] >= WIN ? 'YOU WIN!' : 'GAME OVER'; txt(s, W / 2 - tw(s, 2) / 2, H / 2 - 6, sc[h.side] >= WIN ? K.GOLD : [255, 120, 120], 2); }
     });
-    PX.dim = pd; PX.emit = pe;
   };
   m.body.append(cv, info, row(button('LEAVE', m.close, true)));
   raf = requestAnimationFrame(step);

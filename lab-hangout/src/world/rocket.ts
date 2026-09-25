@@ -4,19 +4,20 @@
 // sky going black, Earth's curve, the station swinging closer, re-entry, and the roof rushing up.
 // The hatch opens onto the Rooftop on the pad, and onto the station once docked.
 
+import { mmss } from '../engine/format';
 import { K, SK, type RGB } from '../engine/palette';
-import { PX, mk, r, disc, line, txt, tw, lit, G, Gd, withCtx, M, shade, puff } from '../engine/pixel';
+import { PX, mk, r, disc, line, txt, tw, lit, G, Gd, M, shade, puff, bake } from '../engine/pixel';
 import { clamp, h1 } from '../engine/math';
 import { dayness } from './plaza';
-import { DEPART, DOCK_ARRIVE, MECO, PAD_ARRIVE, UP_S, capsuleFloats, clockText, flight, gForce, shake, skyAt, type Flight } from './space';
+import { DEPART, DOCK_ARRIVE, MECO, PAD_ARRIVE, UP_S, capsuleFloats, flight, gForce, shake, skyAt, type Flight } from './space';
 import type { Door, Room, Spot } from './room';
 
 const W = 760, H = 620, WALL = 300, FL = 474, PX0 = 380, PY0 = 382, PR = 44;
 const SEATS = [150, 206, 262, 498, 554, 610];
 
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, W, WALL, SK.TRIM); for (let x = 0; x < W; x += 38) r(x, 0, 1, WALL, SK.TRIM_HI); r(0, WALL - 8, W, 8, shade(SK.TRIM, 0.8));
     // the curved inner wall: lightest in the middle, rounding away at the sides
     for (let x = 0; x < W; x += 2) { const k = Math.abs(x - W / 2) / (W / 2); r(x, WALL, 2, FL - WALL, M(SK.PANEL, SK.HULL_DK, k * k * 0.7)); }
@@ -121,10 +122,10 @@ function portView(f: Flight, a: number): void {
 
 // ---------- live bits ----------
 function screens(f: Flight, a: number): void {
-  const L = f.phase === 'pad' ? 'T-' + clockText(f.left) : f.phase === 'docked' ? 'DOCKED' : 'T+' + clockText(f.phase === 'up' ? f.k : f.k - DEPART);
+  const L = f.phase === 'pad' ? 'T-' + mmss(f.left) : f.phase === 'docked' ? 'DOCKED' : 'T+' + mmss(f.phase === 'up' ? f.k : f.k - DEPART);
   const alt = f.phase === 'up' ? Math.round(f.k < MECO ? (f.k * f.k) / (MECO * MECO) * 380 : 380 + (f.k - MECO) * 1.2) : f.phase === 'down' ? Math.round(Math.max(0, 400 * Math.pow(1 - (f.k - DEPART) / 45, 1.6))) : 0;
   const d = f.k - DEPART;
-  const R = f.phase === 'pad' ? (f.left < 11 ? 'LIFTOFF IN ' + Math.ceil(f.left) : 'NEXT STOP: SPACE STATION') : f.phase === 'up' ? (f.k < MECO ? 'ALTITUDE ' + alt + ' KM' : f.k < UP_S - 3 ? 'ENGINES OFF: ZERO G' : 'DOCKING...') : f.phase === 'docked' ? 'HOME IN ' + clockText(f.left) : d < 15 ? 'HEADING HOME' : d < 30 ? 'RE-ENTRY!' : 'ALTITUDE ' + alt + ' KM';
+  const R = f.phase === 'pad' ? (f.left < 11 ? 'LIFTOFF IN ' + Math.ceil(f.left) : 'NEXT STOP: SPACE STATION') : f.phase === 'up' ? (f.k < MECO ? 'ALTITUDE ' + alt + ' KM' : f.k < UP_S - 3 ? 'ENGINES OFF: ZERO G' : 'DOCKING...') : f.phase === 'docked' ? 'HOME IN ' + mmss(f.left) : d < 15 ? 'HEADING HOME' : d < 30 ? 'RE-ENTRY!' : 'ALTITUDE ' + alt + ' KM';
   const warn = (f.phase === 'pad' && f.left < 11) || (f.phase === 'down' && d > 15 && d < 30);
   lit(() => {
     txt(L, 256 - tw(L, 2) / 2, 328, f.phase === 'pad' && f.left < 11 && (a % 1) < 0.5 ? SK.LED_RED : SK.LED, 2);

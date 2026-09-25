@@ -2,7 +2,7 @@
 // stage are gone; the three voxel creations she built now stand as permanent installations.
 
 import { K, DK, CK, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, txt, alpha, lit, G, Gd, Gline, withCtx, M, shade, tw } from '../engine/pixel';
+import { mk, r, line, txt, alpha, lit, G, Gd, Gline, M, shade, tw, bake } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import type { Room, Prop, Spot } from './room';
 import { FILMS, currentFilm } from './cinema';
@@ -45,8 +45,8 @@ function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
   const SKY0 = day ? DK.SKY0 : K.SKY0, SKY1 = day ? DK.SKY1 : K.SKY1, SKY2 = day ? DK.SKY2 : K.SKY2;
   const CITY0 = day ? DK.CITY0 : K.CITY0, CITY1 = day ? DK.CITY1 : K.CITY1, CITY2 = day ? DK.CITY2 : K.CITY2, TOWER = day ? DK.TOWER : K.TOWER;
   const winA = (c: RGB, k: number): RGB => (day ? (k > 0.85 ? DK.WIN2 : DK.WIN) : shade(c, k > 0.85 ? 0.8 : 0.55));
-  withCtx(ctx, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(ctx, () => {
+    
     for (let y = 0; y < GROUND; y += 4) { const u = y / GROUND; r(0, y, W, 4, u < 0.6 ? M(SKY0, SKY1, u / 0.6) : M(SKY1, SKY2, (u - 0.6) / 0.4)); }
     if (!day) for (let i = 0; i < 190; i++) { const x = Math.floor(h1(i * 3.3) * W), y = Math.floor(h1(i * 7.1) * 330); r(x, y, 1, 1, h1(i) > 0.8 ? [200, 210, 255] : [120, 130, 180]); }
     if (!day) { // moon

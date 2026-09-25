@@ -6,6 +6,7 @@
 
 import type { HideSeek } from '../net/transport';
 import { HS_MAX } from '../net/transport';
+import { mmss } from '../engine/format';
 
 export const HIDE_S = 30, SEEK_S = 180, OVER_S = 10, TAG_DIST = 22;
 
@@ -42,10 +43,10 @@ export const nameIn = (h: HideSeek, id: string): string => h.names[h.ids.indexOf
 
 /** The line across the top of the screen for this player. */
 export function hsBanner(h: HideSeek, me: string): string {
-  const now = Date.now() / 1000, left = (s: number) => { const n = Math.max(0, Math.ceil(s)); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
+  const now = Date.now() / 1000;
   const seeker = me === h.seeker, hiders = h.ids.length - 1, sName = nameIn(h, h.seeker);
   const iFound = h.found.includes(h.ids.indexOf(me));
   if (h.phase === 'hide') return seeker ? 'HIDE & SEEK · YOU ARE IT! COUNTING... ' + Math.ceil(HIDE_S - (now - h.t0)) : 'HIDE & SEEK · HIDE! ' + sName + ' COUNTS TO ' + Math.ceil(HIDE_S - (now - h.t0)) + ' (ANY ROOM)';
-  if (h.phase === 'seek') return (seeker ? 'SEEK! ' : iFound ? 'FOUND! WATCHING · ' : 'SHH... ' + sName + ' IS SEEKING · ') + 'FOUND ' + h.found.length + '/' + hiders + ' · ' + left(SEEK_S - (now - h.t0));
+  if (h.phase === 'seek') return (seeker ? 'SEEK! ' : iFound ? 'FOUND! WATCHING · ' : 'SHH... ' + sName + ' IS SEEKING · ') + 'FOUND ' + h.found.length + '/' + hiders + ' · ' + mmss(SEEK_S - (now - h.t0));
   return h.found.length >= hiders ? sName + ' FOUND EVERYONE!' : 'THE HIDERS WIN! ' + (hiders - h.found.length) + ' NEVER FOUND';
 }

@@ -8,7 +8,7 @@
 import './styles.css';
 import { Renderer } from './engine/renderer';
 import { Input, isTyping } from './engine/input';
-import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, withCtx, alpha, puff } from './engine/pixel';
+import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, alpha, puff, bake } from './engine/pixel';
 import { K, SK } from './engine/palette';
 import { clamp, seg } from './engine/math';
 import { makeLab, LAB_INFO } from './world/lab';
@@ -18,7 +18,7 @@ import { makeRoof, rocketTop, showStart } from './world/roof';
 import { makeRocket } from './world/rocket';
 import { makeSpaceStation, STATION, TRAY_SPEED, trayLine, trayState } from './world/station';
 import { makeSpacewalk, WALK, JUNK, floatersNow } from './world/spacewalk';
-import { CYCLE, DEPART, FLIGHT, LAND, MECO, PAD_X, UP_S, clockText, flight } from './world/space';
+import { CYCLE, DEPART, FLIGHT, LAND, MECO, PAD_X, UP_S, flight } from './world/space';
 import { skyThings, type SkyThing } from './world/sky';
 import { openMission } from './ui/mission';
 import { makeStage, stageNote, INST_COL, STAGE_INFO, bandTotal } from './world/stage';
@@ -51,14 +51,15 @@ import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
 import { setSeason, isHalloween, isWinter, season } from './world/season';
-import { WINTER, OUTDOOR, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
+import { WINTER, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
 import { openAdvent, openSendGift, openTree, showGift } from './ui/winter';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
 import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
 import { openFreeTray, openMyPlant, openMyTray, openSeeds } from './ui/garden';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { fishNamed, logFish } from './game/fish';
-import { CONTEST, contestClock, mmss } from './world/contest';
+import { CONTEST, contestClock } from './world/contest';
+import { mmss } from './engine/format';
 import { makeCrypt, platesDown, setDown, blockCenters, resetBlocks, CRYPT_INFO, OPEN_FOR } from './world/crypt';
 import { owns } from './ui/start';
 import { save } from './game/save';
@@ -143,6 +144,13 @@ let myTokens = 0, danceT = 0;
 let crews: Crew[] = [], crewT = 0, crewCounted = false, crewToastAt = -99;
 /** Weather: the last kind you were told about, the last thunder heard, and when to make the rain water the gardens. */
 let wxSeen = '', thunderId = -1, rainSlot = -1, rainAt = 0;
+/** Error -> readable text, and with a capital letter for a toast. */
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const cap = (m: string): string => (m ? m[0].toUpperCase() + m.slice(1) : m);
+/** A little "+1" (or "HIT!") floating up from (x, y), over your head by default. */
+function floatText(text: string, x = me.x, y = me.y - 50, t0 = now()): void { floaters.push({ x, y, t0, text }); }
+/** Everyone in this room: you (when playing), the other players and bots, and the NPCs here. */
+const everyone = (): Avatar[] => [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)];
 function setTokens(n: number): void { myTokens = n; const el = $('#tokens'); el.textContent = String(n); el.style.display = ''; quests.setTokens(n); }
 /** Fishing: when the bobber went in, when a fish bites, and whether it's biting right now. */
 let fishing: { bite: number; state: 'wait' | 'bite' } | null = null, roast = 0;
@@ -305,7 +313,7 @@ function peopleCard(): void {
     const star = button(friends.has(p.id) ? '★' : '☆', () => { if (friends.has(p.id)) friends.delete(p.id); else friends.set(p.id, p.name); saveFriends(); star.textContent = friends.has(p.id) ? '★' : '☆'; }, true);
     star.title = 'Friend: get a notice when they come online'; Object.assign(star.style, { fontFamily: 'ui-sans-serif, system-ui', fontSize: '16px', padding: '4px 9px' });
     const name = document.createElement('span'); name.textContent = p.name; name.style.flex = '1';
-    const hiding = !!hsLive(hs, net.selfId) && hsLive(hs, net.selfId)!.phase !== 'over'; // no peeking during hide and seek
+    const hiding = !!hsOn(); // no peeking during hide and seek
     const where = document.createElement('span'); where.textContent = hiding ? '???' : ROOMS[p.room].title; where.style.color = '#9FEFFF';
     line.append(star, name, where);
     if (p.room !== room.id && !hiding) line.appendChild(button('GO', () => { m.close(); SFX.door(); void enterRoom(p.room, null); }));
@@ -323,7 +331,7 @@ questBtn.addEventListener('click', () => { if (playing && !editing) { SFX.blip()
 // ---------- servers ----------
 async function chooseServer(mustPick: boolean): Promise<string | null> {
   const want = params.get('server');
-  if (want && mustPick && !net.server) { try { await net.claimSeat(want); return want; } catch (e) { toast(e instanceof Error ? e.message : String(e), 3500); } }
+  if (want && mustPick && !net.server) { try { await net.claimSeat(want); return want; } catch (e) { toast(errText(e), 3500); } }
   return pickServer(net, [...friends.keys()], mustPick);
 }
 async function nameServer(): Promise<void> { try { serverName = (await net.servers([])).find((v) => v.id === net.server)?.name ?? ''; } catch { serverName = ''; } updateCount(); }
@@ -424,7 +432,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
     await net.joinRoom(id, peerState(), onNet, isFlat(id) ? FLAT.owner : undefined);
   } catch (err) {
     console.error(err);
-    toast('Could not join room: ' + (err instanceof Error ? err.message : String(err)), 5000);
+    toast('Could not join room: ' + (errText(err)), 5000);
   }
   bots?.spawn(room);
   net.setLobby(me.name, id);
@@ -463,6 +471,8 @@ $('#chatForm').addEventListener('submit', (e) => {
 chatEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') chatEl.blur(); });
 if (matchMedia('(pointer: coarse)').matches) chatEl.placeholder = 'Tap to chat';
 
+/** Emote even if you only just did (a win, a prize, a photo pose): skips the cooldown. */
+function celebrate(kind: EmoteKind = 'joy'): void { lastEmoteAt = -9; emote(kind); }
 function emote(kind: EmoteKind): boolean {
   const t = now();
   if (!playing || editing || t - lastEmoteAt < EMOTE_COOLDOWN) return false;
@@ -518,8 +528,10 @@ function onHS(prev: HideSeek | null, h: HideSeek): void {
   else if (h.phase === 'seek' && prev && h.found.length > prev.found.length) {
     const who = h.ids[h.found[h.found.length - 1]];
     if (who === net.selfId) { SFX.hurt(); toast('You were found!', 3000); } else { SFX.pop(); toast('FOUND: ' + nameIn(h, who), 2000); }
-  } else if (h.phase === 'over' && prev?.phase !== 'over') { SFX.score(); if (seeker && h.found.length >= h.ids.length - 1) { lastEmoteAt = -9; emote('joy'); } }
+  } else if (h.phase === 'over' && prev?.phase !== 'over') { SFX.score(); if (seeker && h.found.length >= h.ids.length - 1) { celebrate(); } }
 }
+/** A hide-and-seek round that's still being played (not just finished). */
+const hsOn = (): HideSeek | null => { const h = hsLive(hs, net.selfId); return h && h.phase !== 'over' ? h : null; };
 /** The seeker is frozen in the Lab while everyone hides. */
 const hsFrozen = (): boolean => { const h = hsLive(hs, net.selfId); return !!h && h.phase === 'hide' && h.seeker === net.selfId; };
 function hsFrame(): void {
@@ -533,7 +545,7 @@ function hsFrame(): void {
   else if (h.phase !== 'over' && now() - hsSent > 3) setHS({ ...h, ts: Date.now() }); // keep everyone (and newcomers) in sync
 }
 function startHide(): void {
-  if (hsLive(hs, net.selfId) && hsLive(hs, net.selfId)!.phase !== 'over') { toast('A round is already on!'); return; }
+  if (hsOn()) { toast('A round is already on!'); return; }
   const people = [{ id: net.selfId, name: me.name }, ...lobby.map((p) => ({ id: p.id, name: p.name }))];
   if (people.length < 2) { toast('Need at least 2 people on this server', 3500); return; }
   setHS(startHS(people));
@@ -559,7 +571,7 @@ function onGamePhase(g: GameState): void {
     if (g.phase === 'grab') { SFX.chime(); if (imIn(g)) toast('GRAB A SEAT!', 1500); }
     if (g.phase === 'out' && g.out.includes(mine)) { SFX.leave(); toast("You're out! Watch the rest from the side", 3000); }
   } else if (g.kind === 'tag' && g.phase === 'play' && g.ids[g.it] === net.selfId) { SFX.huh(); toast("You're IT! Tag someone", 2000); }
-  if (g.phase === 'over') { SFX.score(); if (winner(g) === mine) { lastEmoteAt = -9; emote('joy'); quests.bump('party'); } }
+  if (g.phase === 'over') { SFX.score(); if (winner(g) === mine) { celebrate(); quests.bump('party'); } }
 }
 function syncGameBar(text: string): void {
   const el = $('#gamebar'); if (el.textContent !== text) { el.textContent = text; el.classList.toggle('on', !!text); }
@@ -627,7 +639,7 @@ function useSpot(i: number): void {
     const ok = Math.random() > 0.15;
     setState({ k: 'deploy', v: { t0: Date.now() / 1000, ok, by: me.name } });
     setState({ k: 'build', v: { ...b, ok, dep: b.dep + (ok ? 1 : 0) } });
-    if (ok) { quests.bump('deploy'); SFX.score(); say(net.selfId, 'SHIPPED IT!', t, true); lastEmoteAt = -9; emote('joy'); } else { SFX.siren(); SFX.boom(); say(net.selfId, 'uh oh.', t, true); lastEmoteAt = -9; emote('huh'); }
+    if (ok) { quests.bump('deploy'); SFX.score(); say(net.selfId, 'SHIPPED IT!', t, true); celebrate(); } else { SFX.siren(); SFX.boom(); say(net.selfId, 'uh oh.', t, true); celebrate('huh'); }
     return;
   }
   me.use = i; me.useT0 = t; me.x = s.x; me.y = s.y; me.moving = false; input.clear();
@@ -643,15 +655,15 @@ function useSpot(i: number): void {
     SFX.blip();
     openDesk(me.look.desk ?? 0, (bits) => { me.look = { ...me.look, desk: bits }; net.updateMe(peerState()); }, () => { applyProfile(me.name, me.look); input.clear(); if (me.use === i) leaveSpot(); });
   }
-  else if (s.kind === 'prizes') { SFX.blip(); openPrizes(wearItem, () => { input.clear(); if (me.use === i) leaveSpot(); }); }
-  else if (s.kind === 'board') openBoard((d) => net.sendDraw(d), () => { input.clear(); if (me.use === i) leaveSpot(); });
+  else if (s.kind === 'prizes') { SFX.blip(); openPrizes(wearItem, closeSpot(i)); }
+  else if (s.kind === 'board') openBoard((d) => net.sendDraw(d), closeSpot(i));
   else if (s.kind === 'booth') { booth = { t0: t, next: 0, emoted: -1, frames: [] }; toast('Smile! 3 photos coming up'); }
   else if (s.kind === 'desk') { SFX.sit(); openCode(); }
   else if (s.kind === 'kart') useKart(i);
-  else if (s.kind === 'kanban') openKanban(() => DEN_INFO.notes, (notes) => setState({ k: 'notes', v: notes }), () => { input.clear(); if (me.use === i) leaveSpot(); });
+  else if (s.kind === 'kanban') openKanban(() => DEN_INFO.notes, (notes) => setState({ k: 'notes', v: notes }), closeSpot(i));
   else if (s.kind === 'rack') { fixEnd = t + 3; SFX.blip(); toast('Fixing the build...'); }
   else if (s.kind === 'mission') openScope(i);
-  else if (s.kind === 'scope') openStars(() => { input.clear(); if (me.use === i) leaveSpot(); });
+  else if (s.kind === 'scope') openStars(closeSpot(i));
   else if (s.kind === 'hammock') SFX.sit();
   else if (s.kind === 'fish') { fishing = { bite: t + (3 + Math.random() * 6) * biteK(), state: 'wait' }; SFX.zap(); toast((isTouch ? 'Wait for a bite, then tap REEL!' : 'Wait for a bite, then press E to REEL!') + (biteK() < 1 ? ' They bite fast in the rain!' : ''), 3000); }
   else if (s.kind === 'instrument') toast(kLive(STAGE_INFO.karaoke) ? (isTouch ? 'Tap the pads as the notes reach the line!' : 'Hit the keys (1-8) as the notes reach the line!') : isTouch ? 'Tap the pads to play' : 'Keys 1-8 play notes. Walk away to stop', 3000);
@@ -659,7 +671,7 @@ function useSpot(i: number): void {
     leaveSpot();
     const first = save.unlock('hat:5');
     applyProfile(me.name, { ...me.look, hat: 5 });
-    SFX.score(); lastEmoteAt = -9; emote('joy');
+    SFX.score(); celebrate();
     toast(first ? 'You found the CROWN! It is yours now (Look menu)' : 'The crown suits you', 4000);
   }
 }
@@ -672,11 +684,11 @@ function refreshGarden(bump = false): void {
 }
 function gardenDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
   if (gardenBusy) return; gardenBusy = true;
-  act().then((r) => { ok(r); refreshGarden(true); }).catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); toast(m[0].toUpperCase() + m.slice(1), 3500); SFX.hurt(); refreshGarden(); }).finally(() => { gardenBusy = false; });
+  act().then((r) => { ok(r); refreshGarden(true); }).catch((e: unknown) => { const m = errText(e); toast(cap(m), 3500); SFX.hurt(); refreshGarden(); }).finally(() => { gardenBusy = false; });
 }
 function waterBed(n: number): void {
   const other = GARDEN.plots.find((q) => q.bed === n)?.owner !== net.selfId;
-  gardenDo(() => net.water(n), (r) => { if (other) quests.bump('water'); if (r.thanked) quests.stat('helped'); setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); });
+  gardenDo(() => net.water(n), (r) => { if (other) quests.bump('water'); if (r.thanked) quests.stat('helped'); setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floatText('+1'); });
 }
 function tendBed(n: number): void {
   const p = GARDEN.plots.find((q) => q.bed === n), mine = GARDEN.plots.find((q) => q.owner === net.selfId && !plantState(q).dead);
@@ -694,8 +706,8 @@ function tendBed(n: number): void {
       water: () => waterBed(n),
       harvest: () => gardenDo(() => net.harvest(n), (r) => {
         quests.bump('harvest'); quests.stat('harvests');
-        setTokens(r.tokens); SFX.score(); lastEmoteAt = -9; emote('joy');
-        const s = SEEDS[r.seed]; floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+' + s.pays });
+        setTokens(r.tokens); SFX.score(); celebrate();
+        const s = SEEDS[r.seed]; floatText('+' + s.pays);
         const first = !save.data.crops.includes(s.name); if (first) save.update((d) => { d.crops.push(s.name); });
         toast('Harvested your ' + s.name + '! +' + s.pays + ' tokens' + (first ? ' · NEW CROP ' + save.data.crops.length + '/' + SEEDS.length : ''), 4000);
         if (r.bonus) { save.addPrize(r.bonus); setTimeout(() => { toast('You found a rare MOONFLOWER seed in the soil! Plant it in any free bed', 5000); SFX.chime(); }, 1800); }
@@ -814,7 +826,7 @@ function songOver(k: KaraokeState): void {
   if (mine === null) return;
   const score = mine, line = resultLine(SONGS[k.song].name, score, band);
   if (score >= 90 && save.unlock('fit:8')) setTimeout(() => { toast('ROCK STAR! You earned the ROCK STAR jacket. Wear it from Look', 5500); SFX.score(); }, 3000);
-  net.karaokeTip(score).then((r) => { setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: '+' + r.paid }); }).catch(() => toast(line, 5000));
+  net.karaokeTip(score).then((r) => { setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) floatText('+' + r.paid, me.x, me.y - 60); }).catch(() => toast(line, 5000));
 }
 
 // ---------- WINTER (world/winter.ts, ui/winter.ts, 0018_winter.sql) ----------
@@ -842,15 +854,15 @@ const prizeName = (p: string): string => (p.startsWith('tokens:') ? '+' + p.slic
 function openPresent(n: number): void {
   if (WINTER.presents.has(n)) { toast('You already opened this one today. More tomorrow!', 2500); return; }
   net.findPresent(n).then((r) => {
-    WINTER.presents.add(n); setTokens(r.tokens); SFX.chime(); floaters.push({ x: PRESENTS[n].x, y: PRESENTS[n].y - 30, t0: now(), text: '+1' });
+    WINTER.presents.add(n); setTokens(r.tokens); SFX.chime(); floatText('+1', PRESENTS[n].x, PRESENTS[n].y - 30);
     toast('A PRESENT! +1 token (' + r.found + '/12 found today)', 3000);
     if (r.prize === 'tokens:5') toast('ALL 12 PRESENTS! You have every winter prize already, so +5 tokens', 5000);
-    else if (r.prize) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('ALL 12 PRESENTS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
-  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(m[0].toUpperCase() + m.slice(1), 3000); });
+    else if (r.prize) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('ALL 12 PRESENTS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(cap(m), 3000); });
 }
 function adventMenu(): void {
   SFX.blip(); void net.adventDoors().then((d) => { WINTER.advent = d; }).catch(() => {});
-  openAdvent({ open: (d) => net.openAdvent(d).then((r) => { setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => input.clear());
+  openAdvent({ open: (d) => net.openAdvent(d).then((r) => { setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => input.clear());
 }
 /** Everyone on the server you could send a present to. */
 const giftPeople = (): { id: string; name: string }[] => lobby.filter((p) => p.id !== net.selfId).map((p) => ({ id: p.id, name: p.name }));
@@ -858,7 +870,7 @@ function sendGiftTo(preset: string | null): void {
   openSendGift(giftPeople(), preset, myTokens, (to, tk, wrap, nt) => net.sendGift(to, tk, wrap, nt).then((bal) => { setTokens(bal); SFX.bells(); toast('Wrapped and under the tree! They\'ll find out who from when they open it', 4500); void refreshTree(); }), () => input.clear());
 }
 function openTreeGift(g: TreeGift): void {
-  net.openGift(g.id).then((r) => { setTokens(r.tokens); SFX.joy(); lastEmoteAt = -9; emote('joy'); showGift(r, g.wrap, () => input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
+  net.openGift(g.id).then((r) => { setTokens(r.tokens); SFX.joy(); celebrate(); showGift(r, g.wrap, () => input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
 }
 function treeMenu(): void {
   SFX.blip(); void refreshTree();
@@ -873,7 +885,7 @@ function rollSnowman(): void {
     else toast(rolls < 12 ? 'Rolling the big ball...' : rolls < 22 ? 'Rolling the middle...' : 'Rolling his head...', 1200);
     return;
   }
-  if (cur.deco < 31) { let i = 0; while (cur.deco & (1 << i)) i++; const deco = cur.deco | (1 << i); setState({ k: 'snowman', v: { day, rolls: cur.rolls, deco } }); SFX.pop(); toast('You gave him ' + SNOW_DECO[i] + (deco === 31 ? '. He\'s perfect!' : ''), 2500); if (deco === 31) { lastEmoteAt = -9; emote('joy'); } return; }
+  if (cur.deco < 31) { let i = 0; while (cur.deco & (1 << i)) i++; const deco = cur.deco | (1 << i); setState({ k: 'snowman', v: { day, rolls: cur.rolls, deco } }); SFX.pop(); toast('You gave him ' + SNOW_DECO[i] + (deco === 31 ? '. He\'s perfect!' : ''), 2500); if (deco === 31) { celebrate(); } return; }
   toast('Isn\'t he lovely? He melts at midnight (a new one tomorrow)', 3000);
 }
 function startSnowfight(): void {
@@ -913,7 +925,7 @@ function ballStep(): void {
     if (u >= 1 && !bl.landed) {
       bl.landed = true;
       if (bl.b.hit === net.selfId) { me.splat = t; SFX.splat(); const nm = others.get(bl.from)?.name ?? 'Someone'; toast('SPLAT! ' + nm + ' got you!', 1800); }
-      else if (bl.b.hit) { const av = others.get(bl.b.hit); if (av) av.splat = t; if (bl.from === net.selfId) { SFX.splat(); floaters.push({ x: bl.b.x1, y: bl.b.y1 - 40, t0: t, text: 'HIT!' }); } }
+      else if (bl.b.hit) { const av = others.get(bl.b.hit); if (av) av.splat = t; if (bl.from === net.selfId) { SFX.splat(); floatText('HIT!', bl.b.x1, bl.b.y1 - 40, t); } }
     }
     if (u > 1.6) balls.splice(k, 1);
   }
@@ -933,11 +945,11 @@ function winterStep(): void {
   ballStep();
   if (Date.now() - WINTER.treeAt > (room.id === 'plaza' ? 30000 : 120000)) void refreshWinter();
   const sl = sleigh();
-  if (sl.t >= 0 && sl.t < 20 && bellsHeard !== sl.pass && OUTDOOR.includes(room.id)) { bellsHeard = sl.pass; SFX.bells(); toast(room.id === 'plaza' ? 'HO HO HO! Santa\'s sleigh! Catch the presents as they land' : 'Sleigh bells! Santa is dropping presents on the Square', 4500); }
+  if (sl.t >= 0 && sl.t < 20 && bellsHeard !== sl.pass && OUTDOORS.includes(room.id)) { bellsHeard = sl.pass; SFX.bells(); toast(room.id === 'plaza' ? 'HO HO HO! Santa\'s sleigh! Catch the presents as they land' : 'Sleigh bells! Santa is dropping presents on the Square', 4500); }
   if (room.id === 'plaza' && sl.t < 330) for (const d of drops(sl.pass)) {
     const key = sl.pass + ':' + d.n; if (WINTER.caught.has(key) || sl.t < d.land || Math.abs(me.x - d.x) > 11 || Math.abs(me.y - d.y) > 9) continue;
     WINTER.caught.add(key); SFX.pop();
-    net.catchSleigh(sl.pass, d.n).then((bal) => { setTokens(bal); SFX.chime(); floaters.push({ x: d.x, y: d.y - 30, t0: now(), text: '+1' }); }).catch((e: unknown) => toast(errText(e), 2500));
+    net.catchSleigh(sl.pass, d.n).then((bal) => { setTokens(bal); SFX.chime(); floatText('+1', d.x, d.y - 30); }).catch((e: unknown) => toast(errText(e), 2500));
   }
   const ls = lightShow(), hour = Math.floor(Date.now() / 3600000);
   if (ls >= 0 && lightHeard !== hour && room.id === 'plaza') { lightHeard = hour; SFX.jingle(); toast('THE TREE LIGHTING! Hang an ornament at THE TREE', 4000); }
@@ -945,13 +957,13 @@ function winterStep(): void {
   if (f && Date.now() - f.t0 >= 90000 && fightDone !== f.t0 && room.id === 'plaza') { fightDone = f.t0; const top = [...fightHits.values()].sort((p, q) => q.n - p.n)[0]; toast(top ? 'SNOWBALL FIGHT OVER! ' + top.name + ' wins with ' + top.n + ' hits!' : 'SNOWBALL FIGHT OVER! Nobody hit anybody...', 5000); SFX.score(); }
   const ny = nye();
   if (ny.left > 0 && ny.left <= 10.5) { const k = Math.ceil(ny.left); if (nyeHeard !== k) { nyeHeard = k; toast(String(k) + '...', 900); SFX.tminus(); } }
-  if (ny.since >= 0 && ny.since < 3 && nyeHeard !== -100) { nyeHeard = -100; toast('HAPPY NEW YEAR ' + ny.year + '!', 6000); SFX.joy(); for (let k = 0; k < 6; k++) setTimeout(() => { SFX.boom(); SFX.pop(); }, k * 450); lastEmoteAt = -9; emote('joy'); }
+  if (ny.since >= 0 && ny.since < 3 && nyeHeard !== -100) { nyeHeard = -100; toast('HAPPY NEW YEAR ' + ny.year + '!', 6000); SFX.joy(); for (let k = 0; k < 6; k++) setTimeout(() => { SFX.boom(); SFX.pop(); }, k * 450); celebrate(); }
 }
 function winterLine(): string {
   if (!isWinter()) return '';
-  const ny = nye(); if (ny.left > 0 && ny.left < 600) return 'NEW YEAR IN ' + clockText(ny.left) + ' · GET TO THE ROOF OR THE SQUARE FOR THE FIREWORKS!';
+  const ny = nye(); if (ny.left > 0 && ny.left < 600) return 'NEW YEAR IN ' + mmss(ny.left) + ' · GET TO THE ROOF OR THE SQUARE FOR THE FIREWORKS!';
   const f = WINTER.snowfight;
-  if (room.id === 'plaza' && f && Date.now() - f.t0 < 90000) { const top = [...fightHits.values()].sort((p, q) => q.n - p.n).slice(0, 3).map((x) => x.name + ' ' + x.n).join(' · '); return 'SNOWBALL FIGHT · ' + clockText(90 - (Date.now() - f.t0) / 1000) + (top ? ' · ' + top : ' · SCOOP SNOW (E) AND THROW!'); }
+  if (room.id === 'plaza' && f && Date.now() - f.t0 < 90000) { const top = [...fightHits.values()].sort((p, q) => q.n - p.n).slice(0, 3).map((x) => x.name + ' ' + x.n).join(' · '); return 'SNOWBALL FIGHT · ' + mmss(90 - (Date.now() - f.t0) / 1000) + (top ? ' · ' + top : ' · SCOOP SNOW (E) AND THROW!'); }
   return '';
 }
 
@@ -1014,8 +1026,8 @@ function shakeNow(): number {
 function spaceLine(): string {
   if (room.id === 'spacewalk') return 'SPACEWALK · HAUL ' + WALK.pts + ' · ' + WALK.dust + ' STARDUST · BACK IN AT THE AIRLOCK TO GET PAID';
   const f = flight();
-  if (room.id === 'roof' && f.phase === 'pad' && f.left < 60) return 'ROCKET LAUNCH IN ' + clockText(f.left) + ' · BOARD AT THE PAD (FAR RIGHT)';
-  if (room.id === 'station' && f.phase === 'docked' && f.left < 60) return 'THE ROCKET HOME LEAVES IN ' + clockText(f.left) + ' · THE DOCK, FAR LEFT';
+  if (room.id === 'roof' && f.phase === 'pad' && f.left < 60) return 'ROCKET LAUNCH IN ' + mmss(f.left) + ' · BOARD AT THE PAD (FAR RIGHT)';
+  if (room.id === 'station' && f.phase === 'docked' && f.left < 60) return 'THE ROCKET HOME LEAVES IN ' + mmss(f.left) + ' · THE DOCK, FAR LEFT';
   return '';
 }
 /** Once a frame: who floats, the countdown and its sounds, the station's trays and telescope news, grabbing stardust. */
@@ -1057,7 +1069,7 @@ function grabStep(): void {
     const j = JUNK[fl.kind]; WALK.pts += j.pts;
     if (fl.kind === 0) { WALK.dust++; quests.bump('spacewalk'); SFX.pop(); if (WALK.dust % 10 === 0) { SFX.chime(); toast(WALK.dust + ' stardust!', 1500); } }
     else { WALK.things++; SFX.chime(); toast('You caught ' + j.name + '! +' + j.pts, 2200); }
-    floaters.push({ x: fl.x, y: fl.y - 36, t0: now(), text: '+' + j.pts });
+    floatText('+' + j.pts, fl.x, fl.y - 36);
   }
 }
 /** Back inside from a spacewalk: get paid for the haul (anything the server refuses for now is kept for next time). */
@@ -1067,7 +1079,7 @@ function payWalk(): void {
   net.spacewalkPay(pts).then((r) => {
     walkOwed = 0; setTokens(r.tokens);
     const what = dust + ' stardust' + (things ? ' and ' + things + ' bit' + (things > 1 ? 's' : '') + ' of space junk' : '');
-    if (r.paid) { SFX.score(); floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: '+' + r.paid }); toast('SPACEWALK HAUL: ' + what + ' · +' + r.paid + ' tokens', 5000); }
+    if (r.paid) { SFX.score(); floatText('+' + r.paid, me.x, me.y - 60); toast('SPACEWALK HAUL: ' + what + ' · +' + r.paid + ' tokens', 5000); }
     else toast('SPACEWALK HAUL: ' + what + (pts < 8 ? ' · bring in 8 or more for a token' : ' · no more spacewalk pay today'), 4500);
   }).catch((e: unknown) => { walkOwed = pts; toast(errText(e) === 'one spacewalk a minute' ? 'Your haul is banked: it pays out after your next spacewalk' : errText(e), 4000); });
 }
@@ -1077,7 +1089,7 @@ function spaceArrive(from: RoomId, id: RoomId): void {
     if (save.unlock('hat:14')) setTimeout(() => { toast('You earned the SPACE HELMET! Wear it from Look', 5000); SFX.score(); }, 3000);
     if (!save.data.stats.station) { quests.stat('station'); toast('Welcome to the SPACE STATION! No gravity up here: ' + (isTouch ? 'tap FLOAT' : 'press SPACE') + ' to push off the floor', 6000); }
   }
-  if (from === 'roof' && id === 'rocket') { const f = flight(); toast('Welcome aboard! Liftoff in ' + clockText(f.left) + '. Strap in at a seat, or float about', 4500); }
+  if (from === 'roof' && id === 'rocket') { const f = flight(); toast('Welcome aboard! Liftoff in ' + mmss(f.left) + '. Strap in at a seat, or float about', 4500); }
   if (id === 'spacewalk') { SFX.hiss(); if (!save.data.stats.walked) { quests.stat('walked'); toast('SPACEWALK! Grab the stardust drifting past. ' + (isTouch ? 'JETPACK' : 'SPACE') + ' fires your jetpack. Come back in through the airlock to get paid', 7000); } }
   if (from === 'spacewalk' && id === 'station') SFX.hiss();
   if (from === 'station' && id === 'park') { SFX.splash(); toast('SPLASHDOWN! The escape pod dropped you in the Park pond', 4500); }
@@ -1091,7 +1103,7 @@ function refreshTrays(bump = false): void {
 }
 function trayDo<T>(act: () => Promise<T>, ok: (r: T) => void): void {
   if (trayBusy) return; trayBusy = true;
-  act().then((r) => { ok(r); refreshTrays(true); }).catch((e: unknown) => { const m = errText(e); toast(m[0].toUpperCase() + m.slice(1), 3500); SFX.hurt(); refreshTrays(); }).finally(() => { trayBusy = false; });
+  act().then((r) => { ok(r); refreshTrays(true); }).catch((e: unknown) => { const m = errText(e); toast(cap(m), 3500); SFX.hurt(); refreshTrays(); }).finally(() => { trayBusy = false; });
 }
 function tendTray(n: number): void {
   const t = STATION.trays.find((q) => q.tray === n), mine = STATION.trays.find((q) => q.owner === net.selfId);
@@ -1101,7 +1113,7 @@ function tendTray(n: number): void {
       harvest: () => trayDo(() => net.spaceHarvest(n), (res) => {
         setTokens(res.tokens);
         if (res.rotten) { toast('It went off, sorry. The tray is free again', 3500); return; }
-        quests.stat('melons'); SFX.score(); lastEmoteAt = -9; emote('joy'); floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+5' });
+        quests.stat('melons'); SFX.score(); celebrate(); floatText('+5');
         toast('Harvested your STAR MELON! +5 tokens', 3500);
         if (res.bonus) { save.addPrize(res.bonus); setTimeout(() => { toast('Inside it: a COMET BLOOM seed! Plant it in any free bed in the Rooftop garden', 5500); SFX.chime(); }, 1800); }
       }),
@@ -1162,10 +1174,10 @@ function knock(n: number): void {
   net.trickOrTreat(n).then((r) => {
     markKnocked(n); setTokens(r.tokens);
     if (r.trick) { quests.stat('tricks'); me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
-    else { SFX.chime(); floaters.push({ x: me.x, y: me.y - 50, t0: now(), text: '+1' }); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
+    else { SFX.chime(); floatText('+1'); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
     if (r.prize === 'tokens:5') toast('ALL 8 DOORS! You have every costume already, so +5 tokens', 5000);
-    else if (r.prize) { save.addPrize(r.prize); SFX.score(); lastEmoteAt = -9; emote('joy'); toast('ALL 8 DOORS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
-  }).catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); if (/already/.test(m)) markKnocked(n); toast(m[0].toUpperCase() + m.slice(1), 3000); })
+    else if (r.prize) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('ALL 8 DOORS! You got the ' + itemName(r.prize) + '! (Look menu)', 6000); }
+  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) markKnocked(n); toast(cap(m), 3000); })
     .finally(() => { knocking = false; });
 }
 /** The haunted Crypt's candles: today's order is on the old scroll. */
@@ -1175,7 +1187,7 @@ function candle(n: number): void {
   if (res === 'wrong') { SFX.boo(); toast('The candles gutter out... a cold laugh echoes. Check the scroll!', 3500); return; }
   SFX.zap();
   if (res === 'solved') {
-    SFX.score(); lastEmoteAt = -9; emote('joy');
+    SFX.score(); celebrate();
     const first = save.unlock('hat:12');
     toast(first ? 'The crypt sighs... you earned the PUMPKIN HEAD! (Look menu)' : 'The candles burn bright. The crypt is pleased.', 5000);
   }
@@ -1183,15 +1195,15 @@ function candle(n: number): void {
 /** The SLOP INVADERS high score of the cabinet you're at (the Lab's or the Arcade's). */
 const roomHi = () => (room.id === 'arcade' ? ARCADE_INFO.hi : LAB_INFO.hi);
 /** Put on a hat / face item / outfit / pet you own ('slot:index'). */
-function wearItem(item: string): void { applyProfile(me.name, withItem(me.look, item)); lastEmoteAt = -9; emote('joy'); }
+function wearItem(item: string): void { applyProfile(me.name, withItem(me.look, item)); celebrate(); }
 function openClawMachine(i: number): void {
   openClaw({
     play: async () => { const r = await net.playClaw(); setTokens(r.tokens); return r; },
     look: () => me.look,
     wear: wearItem,
-    started: () => { ARCADE_INFO.clawT = now(); lastEmoteAt = -9; emote('wow'); quests.bump('claw'); },
+    started: () => { ARCADE_INFO.clawT = now(); celebrate('wow'); quests.bump('claw'); },
     won: (r) => { if (!r.dupe) { save.addPrize(r.item); setState({ k: 'claw', v: { name: me.name, item: r.item } }); } },
-    onClose: () => { input.clear(); if (me.use === i) leaveSpot(); },
+    onClose: closeSpot(i),
   });
 }
 let pong: PongHandle | null = null;
@@ -1204,7 +1216,7 @@ function startPong(i: number): void {
     over: (winner) => {
       const ch = ARCADE_INFO.champ;
       setState({ k: 'champ', v: { name: winner, wins: ch && ch.name === winner ? ch.wins + 1 : 1 } });
-      if (winner === me.name) { lastEmoteAt = -9; emote('joy'); }
+      if (winner === me.name) { celebrate(); }
     },
     won: () => { quests.bump('pong'); quests.stat('pongWins'); },
     onClose: () => { pong = null; input.clear(); if (me.use === i) leaveSpot(); },
@@ -1217,10 +1229,12 @@ function startTank(i: number): void {
     side, myName: me.name,
     opponent: () => { for (const o of others.values()) if (o.use === other) return { id: o.id, name: o.name }; return null; },
     send: (m) => { net.sendTank(m); tankSeen(m); },
-    won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); lastEmoteAt = -9; emote('joy'); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
+    won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); celebrate(); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
     onClose: () => { tank = null; input.clear(); if (me.use === i) leaveSpot(); },
   });
 }
+/** onClose for a panel opened from spot i: hand the keys back to walking and step off the spot. */
+const closeSpot = (i: number) => (): void => { input.clear(); if (me.use === i) leaveSpot(); };
 function leaveSpot(): void {
   const s = room.spots[me.use];
   if (s) { me.x = s.sx; me.y = s.sy; }
@@ -1267,7 +1281,7 @@ const hiddenAv = (av: Avatar, t: number): boolean => !!av.waitMove && t - av.wai
 function playerCard(o: Avatar): void {
   const m = openModal(o.name, () => input.clear());
   const mute = button(muted.has(o.id) ? 'UNMUTE' : 'MUTE', () => { if (muted.has(o.id)) muted.delete(o.id); else { muted.add(o.id); dropBubble(o.id); } toast((muted.has(o.id) ? 'Muted ' : 'Unmuted ') + o.name); m.close(); });
-  const wave = button('WAVE', () => { me.dir = o.x < me.x ? -1 : 1; lastEmoteAt = -9; emote('wave'); m.close(); }, true);
+  const wave = button('WAVE', () => { me.dir = o.x < me.x ? -1 : 1; celebrate('wave'); m.close(); }, true);
   const note = document.createElement('div'); note.textContent = 'Muting hides their chat and emote sounds for you only.';
   Object.assign(note.style, { fontFamily: "'VT323', monospace", fontSize: '18px', color: '#9FEFFF', maxWidth: '300px', textAlign: 'center' });
   const report = button('REPORT', () => {
@@ -1278,7 +1292,7 @@ function playerCard(o: Avatar): void {
   const follow = button(following === o.id ? 'STOP FOLLOWING' : 'FOLLOW', () => {
     m.close();
     if (following === o.id) { following = null; toast('Stopped following ' + o.name); return; }
-    const h = hsLive(hs, net.selfId); if (h && h.phase !== 'over') { toast('No following during hide and seek!'); return; }
+    if (hsOn()) { toast('No following during hide and seek!'); return; }
     following = o.id; followT = 0; toast('Following ' + o.name + ' (walk to stop)', 2500); SFX.blip();
   }, true);
   const chips = document.createElement('div'); net.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
@@ -1290,7 +1304,7 @@ function playerCard(o: Avatar): void {
 let following: string | null = null, followT = 0;
 function followStep(t: number): void {
   if (!following || !playing || switching) return;
-  const h = hsLive(hs, net.selfId); if (h && h.phase !== 'over') { following = null; return; }
+  if (hsOn()) { following = null; return; }
   const o = others.get(following);
   if (o) {
     const tx = clamp(o.x - o.dir * 26, room.floor.x0, room.floor.x1), ty = clamp(o.y + 4, room.floor.y0, room.floor.y1);
@@ -1313,7 +1327,7 @@ function highFive(a: Avatar): void {
     if (b === a || b.emote?.kind !== 'wave' || t - b.emote.t0 > 1.2 || Math.hypot(a.x - b.x, a.y - b.y) > 46) continue;
     const key = [a.id, b.id].sort().join('|'); if (t - (hi5.get(key) ?? -9) < 3) continue;
     hi5.set(key, t);
-    floaters.push({ x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 44, t0: t, text: 'HIGH FIVE!' });
+    floatText('HIGH FIVE!', (a.x + b.x) / 2, Math.min(a.y, b.y) - 44, t);
     SFX.clap(); if (a === me || b === me) { SFX.score(); quests.bump('high5'); }
   }
 }
@@ -1374,9 +1388,9 @@ function reel(): void {
     say(net.selfId, (f.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + f.name + ' (' + c.cm + 'cm)!', now(), true);
     const contest = c.contest && f.rarity !== 'JUNK' ? ' · CONTEST: ' + (c.rank === 1 ? 'YOU LEAD!' : 'NO. ' + c.rank) : '';
     toast((log.isNew ? 'NEW! ' : '') + f.rarity + ' · FISH LOG ' + log.count + '/12' + contest, 3500);
-    if (rare || c.rank === 1) { SFX.score(); lastEmoteAt = -9; emote('joy'); } else SFX.chime();
+    if (rare || c.rank === 1) { SFX.score(); celebrate(); } else SFX.chime();
     if (c.contest) refreshContest();
-  }).catch((e: unknown) => toast(e instanceof Error ? e.message : String(e), 2500));
+  }).catch((e: unknown) => toast(errText(e), 2500));
 }
 // ---------- the fishing contest (world/contest.ts) ----------
 let contestAnnounced = -1, contestAck = '';
@@ -1388,7 +1402,7 @@ function refreshContest(): void {
     let seen = ''; try { seen = localStorage.getItem('labhangout.contestWon') ?? ''; } catch { /* ignore */ }
     if (b.won && key && seen !== key && key !== contestAck) {
       contestAck = key; try { localStorage.setItem('labhangout.contestWon', key); } catch { /* ignore */ }
-      SFX.score(); lastEmoteAt = -9; emote('joy'); quests.mine.add('trophy');
+      SFX.score(); celebrate(); quests.mine.add('trophy');
       toast('YOU WON THE FISHING CONTEST! ' + b.last!.fish + ' ' + b.last!.cm + 'cm · +' + b.last!.prize + ' tokens', 6000);
       net.tokens().then(setTokens).catch(() => {});
     }
@@ -1462,7 +1476,7 @@ function currentAction(): Action | null {
   }
   const sl = slopTarget(me.x, me.y - 16, 170);
   if (sl) return { label: 'THROW', run: () => throwAt(sl), at: [sl.x, sl.y - 18] };
-  if (isWinter() && OUTDOOR.includes(room.id) && me.hold === HOLD_SNOWBALL) { const tg = snowTarget(); return { label: 'THROW', run: throwSnowball, at: tg ? [tg.x, tg.y - liftOf(tg) - 50] : null }; }
+  if (isWinter() && OUTDOORS.includes(room.id) && me.hold === HOLD_SNOWBALL) { const tg = snowTarget(); return { label: 'THROW', run: throwSnowball, at: tg ? [tg.x, tg.y - liftOf(tg) - 50] : null }; }
   const n = nearestNpc(30);
   if (n) return { label: 'TALK', run: () => talkTo(n), at: [n.av.x, n.av.y - liftOf(n.av) - 48] };
   const tk = nearestTalker(26);
@@ -1615,7 +1629,7 @@ function updateMe(dt: number): void {
     const key = coinWindow() + ':' + i;
     if (coinsGot.has(key) || Math.abs(me.x - cx) > 9 || Math.abs(me.y - cy) > 7) return;
     coinsGot.add(key); SFX.pop();
-    net.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); quests.bump('coins'); SFX.chime(); floaters.push({ x: cx, y: cy - 20, t0: now(), text: '+1' }); }).catch(() => {});
+    net.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); quests.bump('coins'); SFX.chime(); floatText('+1', cx, cy - 20); }).catch(() => {});
   });
   // fishing: wait for the bite, then a second to reel it in
   if (fishing && usingOf(me) === 'fish') {
@@ -1721,7 +1735,7 @@ function sendNet(t: number): void {
 const SHOTS = [1.0, 2.3, 3.6], SHOT_POSE: EmoteKind[] = ['wave', 'joy', 'idea'];
 function runBooth(t: number): void {
   const b = booth!, u = t - b.t0;
-  if (b.next < 3 && b.emoted < b.next && u > SHOTS[b.next] - 0.55) { b.emoted = b.next; lastEmoteAt = -9; emote(SHOT_POSE[b.next]); }
+  if (b.next < 3 && b.emoted < b.next && u > SHOTS[b.next] - 0.55) { b.emoted = b.next; celebrate(SHOT_POSE[b.next]); }
   if (b.next < 3 && u > SHOTS[b.next]) { b.next++; SFX.shutter(); flash(); pendingShot = true; }
   if (b.next >= 3 && !pendingShot && u > 4.2) { const frames = b.frames; booth = null; leaveSpot(); showStrip(frames); quests.bump('photo'); }
 }
@@ -1739,9 +1753,7 @@ function showStrip(frames: HTMLCanvasElement[]): void {
   const strip = mk(W, H), g = strip.getContext('2d')!;
   g.fillStyle = '#FAF6EC'; g.fillRect(0, 0, W, H); g.imageSmoothingEnabled = false;
   frames.forEach((f, i) => { g.fillStyle = '#160C2C'; g.fillRect(pad - 3, pad + i * (fh + pad) - 3, fw + 6, fh + 6); g.drawImage(f, pad, pad + i * (fh + pad), fw, fh); });
-  const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-  withCtx(g, () => { const s1 = 'LAB HANGOUT', d = new Date().toLocaleDateString('en-CA'); txt(s1, W / 2 - tw(s1, 3) / 2, H - 40, [217, 119, 87], 3); txt(d, W / 2 - tw(d, 2) / 2, H - 18, [120, 110, 100], 2); });
-  PX.dim = pd; PX.emit = pe;
+  bake(g, () => { const s1 = 'LAB HANGOUT', d = new Date().toLocaleDateString('en-CA'); txt(s1, W / 2 - tw(s1, 3) / 2, H - 40, [217, 119, 87], 3); txt(d, W / 2 - tw(d, 2) / 2, H - 18, [120, 110, 100], 2); });
   const url = strip.toDataURL('image/png'), m = openModal('PHOTO STRIP', () => input.clear());
   const img = document.createElement('img'); img.src = url; img.alt = 'Your photo strip';
   const save = document.createElement('a'); save.className = 'mbtn'; save.href = url; save.download = 'lab-hangout-photo.png'; save.textContent = 'SAVE';
@@ -1861,7 +1873,7 @@ function render(a: number, t: number): void {
 
 // ---------- group dances (game/dance.ts) and the weather (world/weather.ts) ----------
 function crewStep(dt: number, t: number): void {
-  const dancers = [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)].filter((av) => av.pose === POSE_DANCE && !av.moving && av.use < 0);
+  const dancers = everyone().filter((av) => av.pose === POSE_DANCE && !av.moving && av.use < 0);
   crews = findCrews(dancers);
   if (!(playing && me.crew && me.pose === POSE_DANCE && !me.moving)) { crewT = 0; crewCounted = false; return; }
   if (crewT === 0 && t - crewToastAt > 30) { crewToastAt = t; SFX.joy(); toast('GROUP DANCE! ' + me.crew.n + ' of you, in step. Keep it going!', 3000); }
@@ -1968,8 +1980,7 @@ function shiftOver(g: DinerState): void {
 function dinerLine(): string {
   if (tour && room.id === 'diner') return tourStepNow().bar;
   const g = DINER.g; if (room.id !== 'diner' || !shiftLive(g)) return '';
-  const left = Math.max(0, Math.ceil((g.t0 + SHIFT_S * 1000 - Date.now()) / 1000));
-  return 'KITCHEN SHIFT · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
+  return 'KITCHEN SHIFT · ' + mmss((g.t0 + SHIFT_S * 1000 - Date.now()) / 1000) + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
 }
 
 // ---------- the Kart Track (game/kart.ts, ui/race.ts, world/karts.ts) ----------
@@ -2023,7 +2034,7 @@ function useKart(i: number): void {
     finished: (place, ms, best) => {
       const rc2 = KARTS.race; myRaceFin = { r: rc2?.t0 ?? 0, fin: ms };
       quests.bump('kart'); quests.stat('kartRaces');
-      if (place === 1) { quests.stat('kartWins'); lastEmoteAt = -9; emote('joy'); }
+      if (place === 1) { quests.stat('kartWins'); celebrate(); }
       toast((place === 1 ? 'YOU WIN! ' : 'FINISHED ' + ordinal(place) + '! ') + raceTime(ms) + (best ? ' · best lap ' + raceTime(best) : ''), 5000);
       const ti = rc2 ? TRACKS.indexOf(trackOf(rc2.seed)) : 0, rec = KARTS.best[ti];
       if (best && (!rec || best < rec.ms)) { const recs = TRACKS.map((_, i) => KARTS.best[i] ?? null); recs[ti] = { name: me.name, ms: best }; setState({ k: 'kartbest', v: recs }); setTimeout(() => toast('FASTEST LAP ON ' + TRACKS[ti].name + '! Your name is on the board', 4000), 5200); }
@@ -2036,7 +2047,6 @@ function useKart(i: number): void {
 // ---------- THE LOFTS and the flats (world/lofts.ts, world/flat.ts, ui/decorate.ts, ui/flats.ts) ----------
 let flatSeen = '', flatRev = 0, dirAt = 0;
 const flatRooms = () => ({ flat: ROOMS.flat, flatbed: ROOMS.flatbed, flatkit: ROOMS.flatkit });
-const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Up the elevator to your own flat. */
 async function goHome(): Promise<void> {
   try {
@@ -2248,7 +2258,7 @@ function frame(nowMs: number): void {
     }
     for (const av of others.values()) stepRemote(av, t);
     for (const av of [me, ...others.values()]) if (av.emote && t - av.emote.t0 > emoteDur(av.emote.kind)) av.emote = null;
-    ambient.update(room, dt, t, [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)]);
+    ambient.update(room, dt, t, everyone());
     actNow = currentAction(); syncActionBar(); syncPad();
     // the top banner: a party game here, else the slop invasion
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
@@ -2271,7 +2281,7 @@ function frame(nowMs: number): void {
     jukebox.volume(mu && !g && !(room.id === 'stage' && kLive(STAGE_INFO.karaoke)) ? clamp(1 - Math.abs(me.x - mu.x) / 560, 0.12, 0.8) * (room.id === 'den' && pomodoro().focus ? 0.7 : 1) : 0); jukebox.tick();
     // the crypt: are all three plates down?
     if (room.id === 'crypt' && playing) {
-      const feet = [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)].map((av) => ({ x: av.x, y: av.y }));
+      const feet = everyone().map((av) => ({ x: av.x, y: av.y }));
       const down = platesDown(feet); setDown(down);
       const wall = Date.now() / 1000;
       if (down.every(Boolean) && !CRYPT_INFO.open) { setState({ k: 'crypt', v: { b: blockCenters(), open: wall } }); SFX.door(); SFX.score(); toast('The stone door grinds open!', 3500); }
@@ -2347,21 +2357,21 @@ async function boot(): Promise<void> {
       try {
         if (how === 'guest') await net.signInGuest(net.mode === 'supabase' ? captcha : undefined); else await net.loginWith(how); // LOCAL mode has no server to check a CAPTCHA
         acct = net.account();
-      } catch (e) { start.status(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { start.status(errText(e)); }
     }
     modeMsg = net.mode === 'supabase' ? 'ONLINE · connected' : 'LOCAL MODE · open a second tab to see multiplayer. Add Supabase keys to .env.local to go online.';
     const ticket = localStorage.getItem('labhangout.merge');
     if (ticket && acct.kind === 'account') {
       localStorage.removeItem('labhangout.merge');
       try { const got = await net.finishMerge(ticket); setTokens(got.tokens); mergedSave = got.save; toast('Your guest progress moved into this account!', 4500); }
-      catch (e) { toast('Could not bring your guest progress: ' + (e instanceof Error ? e.message : String(e)), 5000); }
+      catch (e) { toast('Could not bring your guest progress: ' + (errText(e)), 5000); }
     }
     if (await net.needsInvite()) { start.status('ONLINE · this world is invite-only'); await start.askInvite((code) => net.joinWorld(code)); }
   } catch (err) {
     console.error(err);
     net = new LocalTransport();
     await net.connect();
-    modeMsg = 'Could not reach Supabase (' + (err instanceof Error ? err.message : String(err)) + '). Playing in LOCAL mode.';
+    modeMsg = 'Could not reach Supabase (' + (errText(err)) + '). Playing in LOCAL mode.';
     isErr = true;
   }
   net.onSeatLost(onSeatLost);
@@ -2370,8 +2380,8 @@ async function boot(): Promise<void> {
   await save.attach(net.selfId, net);
   await refreshSeason();
   void quests.init(net, {
-    done: (text, tokens, bonus) => { setTokens(tokens); SFX.score(); toast('QUEST DONE: ' + text + ' · +' + (bonus ? '15 (all three!)' : '5') + ' tokens', 4500); floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: bonus ? '+15' : '+5' }); },
-    badge: (name) => { SFX.score(); lastEmoteAt = -9; emote('joy'); toast('NEW BADGE: ' + name + '! Everyone can see it on your card', 5000); },
+    done: (text, tokens, bonus) => { setTokens(tokens); SFX.score(); toast('QUEST DONE: ' + text + ' · +' + (bonus ? '15 (all three!)' : '5') + ' tokens', 4500); floatText(bonus ? '+15' : '+5', me.x, me.y - 60); },
+    badge: (name) => { SFX.score(); celebrate(); toast('NEW BADGE: ' + name + '! Everyone can see it on your card', 5000); },
     changed: syncQuestPill,
   });
   setInterval(() => { if (quests.resetIn() > 86340) void quests.refresh(); }, 60000);
@@ -2381,7 +2391,7 @@ async function boot(): Promise<void> {
   setInterval(() => void refreshSeason(), 600000);
   if (mergedSave) save.mergeIn(mergedSave);
   start.setAccount(net.account(), mine, {
-    link: (p) => { localStorage.setItem('labhangout.linking', p); start.status('Off to ' + p + '...'); void net.linkWith(p).then(() => location.reload(), (e) => start.status(e instanceof Error ? e.message : String(e))); },
+    link: (p) => { localStorage.setItem('labhangout.linking', p); start.status('Off to ' + p + '...'); void net.linkWith(p).then(() => location.reload(), (e) => start.status(errText(e))); },
     logout: () => { void net.logout().then(() => { const u = new URL(location.href); u.searchParams.set('signin', ''); location.href = net.mode === 'local' ? u.toString() : location.pathname; }); },
   });
   const saved = await net.loadProfile();

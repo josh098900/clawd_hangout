@@ -4,7 +4,7 @@
 // same primitives and palette.
 
 import { LK, K, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, txt, tw, alpha, lit, G, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, line, disc, oval, txt, tw, alpha, lit, G, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import type { Room, Prop, Spot } from './room';
 import { BOARD, BOARD_POS } from '../game/board';
@@ -29,8 +29,8 @@ const STAIRS = { x: 822, y: 326, w: 40, h: 104 };
 
 function build(this: Room): void {
   const ctx = this.bg.getContext('2d')!;
-  withCtx(ctx, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(ctx, () => {
+    
     // ceiling: beams, duct, pipe, sagging cables
     r(0, 0, W, 160, C.CEIL); for (let x = 18; x < W; x += 92) { r(x, 0, 8, 160, C.BEAM); r(x, 0, 1, 160, C.BEAM_HI); }
     r(0, 58, W, 30, C.DUCT); r(0, 58, W, 2, C.DUCT_HI); r(0, 86, W, 2, C.DUCT_DK); for (let x = 0; x < W; x += 64) { r(x, 58, 2, 30, C.DUCT_DK); r(x + 5, 62, 2, 2, C.DUCT_DK); r(x + 5, 82, 2, 2, C.DUCT_DK); }

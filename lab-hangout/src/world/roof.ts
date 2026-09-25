@@ -5,15 +5,16 @@
 // Past the garden, at the far right end, is the SPACEPORT: the launch pad where the rocket to the
 // Space Station stands between flights (world/space.ts runs its clock; you board by walking into its hatch).
 
+import { mmss } from '../engine/format';
 import { K, DK, RK, CONFETTI } from '../engine/palette';
-import { PX, mk, r, line, disc, txt, tw, alpha, lit, G, Gd, Gsoft, withCtx, M, shade, puff } from '../engine/pixel';
+import { mk, r, line, disc, txt, tw, alpha, lit, G, Gd, Gsoft, M, shade, puff, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import type { StateMsg } from '../net/transport';
 import type { Room, Prop, Spot } from './room';
 import { GARDEN, GARDEN_BLOCKERS, GARDEN_PROPS, GARDEN_SPOTS, gardenBack } from './garden';
 import { SK } from '../engine/palette';
-import { DEPART, LAND, PAD_BASE, PAD_X, clockText, drawRocket, flight, type Flight } from './space';
+import { DEPART, LAND, PAD_BASE, PAD_X, drawRocket, flight, type Flight } from './space';
 import type { Door } from './room';
 
 const W = 1860, H = 700, SKYLINE = 400, LEDGE = 440; // the community garden is the far right end (world/garden.ts)
@@ -34,8 +35,8 @@ const burstAt = (seed: number, k: number) => ({ x: 140 + h1(seed + k * 7.1) * 82
 
 // ---------- the set (two backdrops: night and day) ----------
 function paint(ctx: CanvasRenderingContext2D, day: boolean): void {
-  withCtx(ctx, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(ctx, () => {
+    
     const S0 = day ? DK.SKY0 : K.SKY0, S1 = day ? DK.SKY1 : K.SKY1, S2 = day ? DK.SKY2 : K.SKY2;
     for (let y = 0; y < LEDGE; y += 4) { const u = y / LEDGE; r(0, y, W, 4, u < 0.6 ? M(S0, S1, u / 0.6) : M(S1, S2, (u - 0.6) / 0.4)); }
     if (!day) { for (let i = 0; i < 160; i++) r(Math.floor(h1(i * 5.3) * W), Math.floor(h1(i * 2.9) * 300), 1, 1, h1(i) > 0.8 ? [210, 220, 255] : [120, 130, 180]); for (let dy = -10; dy <= 10; dy++) { const w = Math.floor(Math.sqrt(100 - dy * dy)); r(880 - w, 70 + dy, 2 * w + 1, 1, [236, 236, 214]); } }
@@ -188,7 +189,7 @@ const launchPad: Prop = {
 function padBoard(a: number): void {
   const f = flight();
   const l1 = f.phase === 'pad' ? (f.left < 11 ? 'LIFTOFF IN' : 'NEXT LAUNCH') : f.phase === 'up' ? (f.k < 10 ? 'LIFTOFF!' : 'TO SPACE') : f.phase === 'docked' ? 'IN ORBIT' : 'COMING HOME';
-  const l2 = f.phase === 'pad' ? (f.left < 11 ? String(Math.ceil(f.left)) : clockText(f.left)) : f.phase === 'up' ? 'GOOD LUCK' : f.phase === 'docked' ? 'BACK IN ' + clockText(f.left + (LAND - DEPART)) : 'LANDS ' + clockText(f.left);
+  const l2 = f.phase === 'pad' ? (f.left < 11 ? String(Math.ceil(f.left)) : mmss(f.left)) : f.phase === 'up' ? 'GOOD LUCK' : f.phase === 'docked' ? 'BACK IN ' + mmss(f.left + (LAND - DEPART)) : 'LANDS ' + mmss(f.left);
   const hot = (f.phase === 'pad' && f.left < 11) || (f.phase === 'up' && f.k < 10);
   lit(() => { txt(l1, 1805 - tw(l1) / 2, 351, [255, 180, 60]); txt(l2, 1805 - tw(l2, 2) / 2, 362, hot && (a % 1) < 0.5 ? SK.LED_RED : SK.LED, 2); });
   G(1763, 347, 84, 34, hot ? SK.LED_RED : SK.LED, 0.08);

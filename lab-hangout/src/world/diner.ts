@@ -7,8 +7,9 @@
 // the shift's shared state (DINER.g) and the clock. The camera shows ~210 px above your feet,
 // so the ticket rail and the station tops sit between y 290 and the floor (FL).
 
+import { mmss } from '../engine/format';
 import { CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, txt, tw, lit, alpha, G, Gd, withCtx, M, shade } from '../engine/pixel';
+import { mk, r, line, txt, tw, lit, alpha, G, Gd, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { DINER_TRACKS } from '../audio/music';
 import { SHIFT_S, ST, fryAt, score, shiftEnd, grillAt, live, openTickets, shakeAt, type DinerState, type Dish } from '../game/diner';
@@ -34,8 +35,8 @@ const CHROME: RGB = [206, 214, 224], CHROME_DK: RGB = [140, 150, 164], STEEL: RG
 const CREAM: RGB = [244, 232, 204], TEAL: RGB = [70, 170, 170];
 
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, W, 150, [34, 28, 38]); for (let x = 20; x < W; x += 120) r(x, 140, 70, 4, [70, 60, 70]);
     r(0, 146, W, 4, CHROME_DK);
     // ---- dining room wall: cream above, a red stripe, teal wainscot with a chrome rail ----
@@ -127,7 +128,7 @@ function drawBack(a: number): void {
     if (!open.length) lit(() => txt('NO ORDERS... YET', 850, 312, [150, 150, 160]));
   } else lit(() => { const d = DINER.g, m = d && Date.now() - shiftEnd(d) < 60000 ? 'SHIFT OVER: ' + score(d) + ' POINTS' : 'CLOCK IN TO START A SHIFT'; txt(m, 908 - tw(m) / 2, 312, [150, 150, 160]); });
   // the time clock's face: time left in the shift, or the hour
-  lit(() => { const s = on ? Math.max(0, Math.ceil((g.t0 + SHIFT_S * 1000 - now) / 1000)) : -1, m = s >= 0 ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : 'IN'; txt(m, CLOCK_X - tw(m) / 2, 380, s >= 0 && s < 20 ? [230, 60, 60] : [60, 60, 70]); });
+  lit(() => { const s = on ? Math.max(0, Math.ceil((g.t0 + SHIFT_S * 1000 - now) / 1000)) : -1, m = s >= 0 ? mmss(s) : 'IN'; txt(m, CLOCK_X - tw(m) / 2, 380, s >= 0 && s < 20 ? [230, 60, 60] : [60, 60, 70]); });
   // ---- what's cooking ----
   // the grill: two patties (raw pink -> brown -> charcoal) with sizzle and smoke
   if (g) for (let k = 0; k < 2; k++) {

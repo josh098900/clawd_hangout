@@ -4,7 +4,7 @@
 // once in a while... something else. The station's big screen shows where you're pointing.
 
 import { K } from '../engine/palette';
-import { PX, r, txt, tw, withCtx, lit } from '../engine/pixel';
+import { r, txt, tw, lit, bake } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
 import { SKY_H, SKY_W, skyThings, skyView, type SkyThing } from '../world/sky';
@@ -50,8 +50,7 @@ export function openMission(start: { x: number; y: number }, h: MissionHooks, on
     if (!under) lock = null; else if (!lock || lock.id !== under.name) lock = { id: under.name, t0: nowMs };
     const hold = lock ? (nowMs - lock.t0) / 1000 : 0;
     if (lock && under && hold >= HOLD && !done.has(under.name)) { done.add(under.name); SFX.score(); h.spotted(under); setStatus(); }
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    bake(g, () => {
       skyView(0, 0, W, H, x, y, now, true);
       // the eyepiece: dark corners, the crosshair, and a ring filling up while you hold on something
       const cx = W / 2, cy = H / 2, c = lock ? K.GOLD : [124, 242, 156] as [number, number, number];
@@ -61,7 +60,6 @@ export function openMission(start: { x: number; y: number }, h: MissionHooks, on
       for (let yy = 0; yy < H; yy++) { const e = Math.abs(yy - H / 2) / (H / 2), w0 = Math.max(0, Math.round((e * e * e) * 40)); if (w0) { r(0, yy, w0, 1, [0, 0, 0]); r(W - w0, yy, w0, 1, [0, 0, 0]); } }
       const ang = 'RA ' + Math.round(x / SKY_W * 360) + '  DEC ' + Math.round(90 - (y / SKY_H) * 180); lit(() => txt(ang, 4, H - 8, [80, 200, 120]));
     });
-    PX.dim = pd; PX.emit = pe;
     raf = requestAnimationFrame(draw);
   };
   raf = requestAnimationFrame(draw);

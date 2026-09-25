@@ -2,13 +2,13 @@
 // on the Stage while a song is on, and (if you're performing) your note lane: the notes coming
 // towards the line, labelled with the key (1-8) to press, with PERFECT / GOOD / OFF KEY / MISS.
 
+import { mmss } from '../engine/format';
 import { K } from '../engine/palette';
-import { PX, r, txt, tw, withCtx, lit } from '../engine/pixel';
+import { r, txt, tw, lit, bake } from '../engine/pixel';
 import { SONGS, songLen, stepS, lane, lineWords, kTime, kWhere, grade, type KaraokeState, type Performance } from '../game/karaoke';
 import { button, openModal, row } from './modal';
 
 const font = (px: number, color: string) => ({ fontFamily: "'VT323', monospace", fontSize: px + 'px', color });
-const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 
 /** Pick a song (or stop the one that's on). */
 export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | null; season: string | null }, onClose: () => void): void {
@@ -23,7 +23,7 @@ export function openSongs(on: { pick: (n: number) => void; stop: (() => void) | 
     if (g.season && g.season !== on.season) return;
     const line = document.createElement('div'); Object.assign(line.style, { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', background: 'rgba(255,255,255,.05)', borderLeft: '3px solid #FF5FD2' });
     const name = document.createElement('span'); name.textContent = g.name; Object.assign(name.style, { fontFamily: "'Press Start 2P', monospace", fontSize: '10px', color: '#FFF3D6', minWidth: '150px' });
-    const info = document.createElement('span'); info.textContent = g.style.toLowerCase() + ' · ' + mmss(songLen(g)); Object.assign(info.style, font(19, '#E8D8C0'), { flex: '1' });
+    const info = document.createElement('span'); info.textContent = g.style.toLowerCase() + ' · ' + mmss(songLen(g), 'near'); Object.assign(info.style, font(19, '#E8D8C0'), { flex: '1' });
     line.append(name, info, button('SING', () => { m.close(); on.pick(n); })); list.appendChild(line);
   });
   m.body.append(list, row(button('CLOSE', m.close, true)));
@@ -63,8 +63,7 @@ export class KaraokeHud {
     // your lane
     if (!perf || wh.done) { this.cv.style.display = 'none'; return; }
     this.cv.style.display = '';
-    const pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(this.g, () => {
+    bake(this.g, () => {
       const col = ([K.CYAN, K.GOLD, K.MAG, [124, 242, 156]] as [number, number, number][])[perf.inst], rows = perf.inst === 1 ? 2 : 8, rh = (HH - 12) / rows, ss = stepS(g);
       r(0, 0, HW, HH, [12, 8, 24]);
       for (let j = 0; j < rows; j++) r(0, 10 + Math.round(j * rh), HW, 1, [26, 20, 44]);
@@ -80,7 +79,6 @@ export class KaraokeHud {
       const who = ['KEYS', 'DRUMS', 'BASS', 'MIC'][perf.inst] + ' · YOU ' + perf.score(true) + (perf.combo > 2 ? ' · x' + perf.combo : '');
       txt(who, HW - tw(who) - 3, 1, col);
     });
-    PX.dim = pd; PX.emit = pe;
   }
 }
 /** The results line at the end of a song. */

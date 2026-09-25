@@ -2,7 +2,7 @@
 // everyone sees your setup on whichever desk you sit at, and it's saved with your profile.
 
 import { NK } from '../engine/palette';
-import { PX, r, withCtx } from '../engine/pixel';
+import { r, bake } from '../engine/pixel';
 import { DESK_ITEMS } from '../entities/critter';
 import { drawDecor } from '../world/den';
 import { SFX } from '../audio/sfx';
@@ -17,15 +17,14 @@ export function openDesk(bits: number, onChange: (bits: number) => void, onClose
   let raf = 0;
   const m = openModal('DESK SETUP', () => { cancelAnimationFrame(raf); onClose(); });
   const draw = () => {
-    const a = performance.now() / 1000, pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    const a = performance.now() / 1000;
+    bake(g, () => {
       r(0, 0, W, H, [40, 30, 26]); for (let y = 0; y < H; y += 8) r(0, y, W, 1, [46, 36, 30]);
       const dx = W / 2, dy = 54;
       r(dx - 30, dy - 22, 60, 4, NK.DESK_HI); r(dx - 30, dy - 18, 60, 14, NK.DESK); r(dx - 29, dy - 4, 3, 4, NK.WOOD_DK); r(dx + 26, dy - 4, 3, 4, NK.WOOD_DK);
       r(dx - 9, dy - 32, 18, 10, NK.LAPTOP); r(dx - 9, dy - 32, 18, 1, NK.LAPTOP_HI); r(dx - 11, dy - 23, 22, 1, NK.LAPTOP_HI);
       drawDecor(dx, dy, bits, a);
     });
-    PX.dim = pd; PX.emit = pe;
     raf = requestAnimationFrame(draw);
   };
   const grid = document.createElement('div'); Object.assign(grid.style, { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', maxWidth: 'min(460px, 84vw)' });

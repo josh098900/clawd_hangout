@@ -7,7 +7,7 @@
 // Shared state ('crypt'): where the two blocks are, and when the door opened (0 = shut).
 
 import { K, XK } from '../engine/palette';
-import { PX, mk, r, disc, oval, txt, tw, alpha, lit, Gd, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, disc, oval, txt, tw, alpha, lit, Gd, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import type { StateMsg } from '../net/transport';
 import type { Rect, Room, Prop, Spot } from './room';
@@ -37,8 +37,8 @@ export function setDown(d: boolean[]): void { lastDown = d; }
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // vaulted ceiling
     r(0, 0, W, 170, [18, 20, 26]); for (let x = 0; x < W; x += 110) { for (let k = 0; k < 40; k++) { const u = k / 39, yy = 160 - Math.sin(u * Math.PI) * 60; r(x + Math.round(u * 110), Math.round(yy), 2, 3, XK.STONE_DK); } r(x, 100, 6, 70, XK.STONE_DK); }
     // stone block walls with mortar

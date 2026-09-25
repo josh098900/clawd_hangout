@@ -28,7 +28,6 @@ export function flight(nowMs = Date.now()): Flight {
   return { phase: 'pad', k, u: (k - LAND) / (CYCLE - LAND), left: CYCLE - k, n: n + 1 };
 }
 /** m:ss */
-export const clockText = (s: number): string => { const t = Math.max(0, Math.ceil(s)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 /** Seconds of the descent so far (0..45), or -1. */
 const downT = (f: Flight): number => (f.phase === 'down' ? f.k - DEPART : -1);
 /** Weightless in the capsule: engines off on the way up, docked, and the first part of the way home. */

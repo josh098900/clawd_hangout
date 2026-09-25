@@ -6,7 +6,7 @@
 
 import { FURNITURE, FURN, FLOORS, WALLPAPERS, paintFloor, paintWall, type Furn } from '../world/furniture';
 import { FLAT, FLAT_KEY, FLAT_ROOMS, fits, furnCtx, pieceAt, placeAt, roomLayout, type FlatRoomId } from '../world/flat';
-import { PX, mk, withCtx } from '../engine/pixel';
+import { mk, bake } from '../engine/pixel';
 import type { DoorMode, FlatLayout } from '../net/transport';
 import { SFX } from '../audio/sfx';
 
@@ -32,7 +32,7 @@ export const decorating = (): boolean => !!open;
 /** A small picture of a piece of furniture (for the tiles). */
 function preview(f: Furn): HTMLCanvasElement {
   const c = mk(f.w + 8, f.h + 14), g = c.getContext('2d')!;
-  withCtx(g, () => { PX.dim = 0; PX.emit = false; f.draw(Math.round(c.width / 2), c.height - (f.layer === 'wall' ? 2 : 4), false, furnCtx(0)); });
+  bake(g, () => {f.draw(Math.round(c.width / 2), c.height - (f.layer === 'wall' ? 2 : 4), false, furnCtx(0)); });
   c.style.height = '40px'; c.style.imageRendering = 'pixelated'; return c;
 }
 const placed = (id: string): number => FLAT_ROOMS.reduce((n, r) => n + roomLayout(r).items.filter((it) => it[0] === id).length, 0);
@@ -81,7 +81,7 @@ export function openDecorate(h: DecoHooks): void {
       const list2 = tab === 'walls' ? WALLPAPERS : FLOORS, cur = roomLayout(rid)[tab === 'walls' ? 'w' : 'f'];
       for (const p of list2) {
         const have = p.price === 0 || (FLAT.owned[p.id] ?? 0) > 0, sw = mk(40, 24);
-        withCtx(sw.getContext('2d')!, () => { PX.dim = 0; PX.emit = false; if (tab === 'walls') paintWall(p.id, 0, 0, 40, 24); else paintFloor(p.id, 0, 0, 40, 24); });
+        bake(sw.getContext('2d')!, () => {if (tab === 'walls') paintWall(p.id, 0, 0, 40, 24); else paintFloor(p.id, 0, 0, 40, 24); });
         sw.style.height = '32px'; sw.style.imageRendering = 'pixelated';
         const apply = () => setRoom(rid, (rm) => { if (tab === 'walls') rm.w = p.id; else rm.f = p.id; });
         list.appendChild(tile(p.name, have ? (p.id === cur ? 'IN THIS ROOM' : 'USE') : p.price + ' TOKENS', sw, () => { if (have) { apply(); SFX.blip(); draw(); } else void buyThen(p.id, () => { apply(); h.toast('New ' + (tab === 'walls' ? 'wallpaper' : 'floor') + '!'); }); }, false, p.id === cur));

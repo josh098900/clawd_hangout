@@ -2,7 +2,7 @@
 // sandbox (room state 'sand', a string of 320 digits: 0 flat .. 3 a big heap, 4 a tower), so
 // what you build shows up for everyone in the Park.
 
-import { PX, r, withCtx, M, shade } from '../engine/pixel';
+import { r, M, shade, bake } from '../engine/pixel';
 import type { RGB } from '../engine/palette';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
@@ -30,8 +30,8 @@ export function openSandbox(get: () => string, set: (v: string) => void, onClose
   cv.addEventListener('pointermove', (e) => { if (!down) return; const c = cellAt(e); if (c >= 0 && c !== lastCell) { lastCell = c; apply(c); } });
   cv.addEventListener('pointerup', () => { down = false; lastCell = -1; flush(); });
   const draw = () => {
-    const v = pending ?? get(), sand: RGB = [232, 206, 150], pd = PX.dim, pe = PX.emit; PX.dim = 0; PX.emit = false;
-    withCtx(g, () => {
+    const v = pending ?? get(), sand: RGB = [232, 206, 150];
+    bake(g, () => {
       r(0, 0, W, H, [150, 100, 60]); r(0, 14, W, H - 14, sand);
       for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) {
         const h = Number(v[j * COLS + i]) || 0, x = i * C, y = 14 + j * C;
@@ -40,7 +40,6 @@ export function openSandbox(get: () => string, set: (v: string) => void, onClose
         else { r(x, y - h, C, C + h, M(sand, [255, 255, 255], 0.07 * h)); r(x, y - h, C, 1, M(sand, [255, 255, 255], 0.3)); r(x, y + C - 1, C, 1, shade(sand, 0.8)); }
       }
     });
-    PX.dim = pd; PX.emit = pe;
     raf = requestAnimationFrame(draw);
   };
   const tools = row(...(['pile', 'dig', 'tower'] as Tool[]).map((t) => { const b = button(t.toUpperCase(), () => { tool = t; sync(); SFX.blip(); }, t !== tool); b.dataset.t = t; return b; }), button('SMOOTH IT ALL', () => { if (confirm('Flatten the whole sandbox for everyone?')) { pending = '0'.repeat(COLS * ROWS); flush(); } }, true));

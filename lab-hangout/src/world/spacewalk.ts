@@ -6,7 +6,7 @@
 // and bring your haul back inside to be paid (0015_space.sql spacewalk_pay).
 
 import { K, SK, type RGB } from '../engine/palette';
-import { PX, mk, r, disc, line, txt, lit, G, Gd, Gsoft, withCtx, M, shade } from '../engine/pixel';
+import { PX, mk, r, disc, line, txt, lit, G, Gd, Gsoft, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { starfield, twinkles, vnoise } from './space';
 import type { Door, Prop, Room } from './room';
@@ -67,8 +67,8 @@ function extras(): Prop[] {
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, W, H, SK.VOID); starfield(0, 0, W, H, 520, 11);
     // Earth: the land and seas (drawn once; the clouds move over it live), foreshortened towards its edge
     const cv = PX.ctx.canvas, g2 = cv.getContext('2d')!, top0 = Math.floor(limbTop(W / 2) - 1), id = g2.getImageData(0, top0, W, H - top0), d = id.data;

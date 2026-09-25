@@ -8,7 +8,7 @@
 // crowd's emotes and dancing fill the HYPE bar (flames either side of the stage when it's high).
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, txt, tw, lit, G, Gd, Gline, withCtx, M } from '../engine/pixel';
+import { mk, r, line, disc, oval, txt, tw, lit, G, Gd, Gline, M, bake } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import { SONGS, kLive, kTime, kWhere, lineWords, stepS, songLen, grade, hypeBonus, type KaraokeState } from '../game/karaoke';
 import { BEATS } from '../audio/music';
@@ -40,8 +40,8 @@ export function stageNote(i: number, n: number): void {
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // ceiling + lighting truss
     r(0, 0, W, 150, [16, 12, 24]); r(0, 96, W, 6, [60, 64, 76]); r(0, 116, W, 6, [60, 64, 76]); for (let x = 0; x < W; x += 16) line(x, 102, x + 16, 116, [80, 84, 96]);
     // walls: dark velvet with acoustic foam squares

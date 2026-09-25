@@ -6,8 +6,9 @@
 // Shared time from the wall clock: the pomodoro (25 min focus / 5 min break) and lightning.
 // Shared choices come in as room state (build, deploy, notes, radio) via onState().
 
+import { mmss } from '../engine/format';
 import { K, NK, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, oval, txt, tw, alpha, lit, G, Gd, withCtx, M, shade, puff } from '../engine/pixel';
+import { PX, mk, r, line, oval, txt, tw, alpha, lit, G, Gd, M, shade, puff, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { LOFI } from '../audio/music';
 import type { BuildState, KanbanNote, StateMsg } from '../net/transport';
@@ -46,12 +47,11 @@ export function lightning(): number {
   const t = (Date.now() / 1000) % 97;
   return t < 0.12 ? 1 - t / 0.12 : t > 0.22 && t < 0.4 ? 0.7 * (1 - (t - 0.22) / 0.18) : 0;
 }
-const mmss = (s: number) => { const m = Math.floor(s / 60), q = Math.floor(s % 60); return String(m).padStart(2, '0') + ':' + String(q).padStart(2, '0'); };
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // ceiling beams + lamp cords
     r(0, 0, W, 150, NK.CEIL); for (let x = 30; x < W; x += 90) { r(x, 0, 10, 150, NK.BEAM); r(x, 0, 1, 150, [40, 50, 64]); }
     r(0, 146, W, 4, NK.TRIM);
@@ -144,7 +144,7 @@ function drawBack(a: number): void {
     const fail = !b.ok;
     txt(fail ? 'BUILD FAILING' : 'BUILD PASSING', X, Y, fail ? (Math.floor(a * 3) % 2 ? K.RED : [120, 30, 30]) : [124, 242, 156], 2);
     txt('COMMITS ' + b.n, X, Y + 18, [200, 210, 230]); txt('SHIPPED ' + b.dep, X + 84, Y + 18, [200, 210, 230]);
-    txt(pomo.focus ? 'FOCUS' : 'BREAK', X, Y + 34, pomo.focus ? K.GOLD : K.CYAN, 2); txt(mmss(pomo.left), X + 60, Y + 34, K.WHITE, 2);
+    txt(pomo.focus ? 'FOCUS' : 'BREAK', X, Y + 34, pomo.focus ? K.GOLD : K.CYAN, 2); txt(mmss(pomo.left, 'down', true), X + 60, Y + 34, K.WHITE, 2);
     const last = b.by ? b.by + ': ' + b.msg : 'NO COMMITS YET';
     const s = last.toUpperCase(), wpx = tw(s), off = wpx > SCREEN.w - 12 ? Math.floor((a * 20) % (wpx + 40)) : 0;
     const gg = PX.ctx; gg.save(); gg.beginPath(); gg.rect(X, Y + 54, SCREEN.w - 12, 8); gg.clip(); txt(s, X - off, Y + 56, [150, 160, 180]); if (off) txt(s, X - off + wpx + 40, Y + 56, [150, 160, 180]); gg.restore();

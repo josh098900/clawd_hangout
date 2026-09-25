@@ -9,7 +9,7 @@
 // placement rules (rows, overlaps, doors) live here so drawing and editing agree.
 
 import { CONFETTI, K, type RGB } from '../engine/palette';
-import { PX, mk, r, txt, txtOutlined, tw, lit, alpha, G, Gd, withCtx, M, line } from '../engine/pixel';
+import { PX, mk, r, txt, txtOutlined, tw, lit, alpha, G, Gd, M, line, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { CHIPTUNES, DINER_TRACKS, LOFI, PARK_TRACKS, type Track } from '../audio/music';
 import { FL, FURN, ROW_Y, WALL_Y, paintFloor, paintWall, type Furn, type FurnCtx } from './furniture';
@@ -66,8 +66,8 @@ export function fits(id: FlatRoomId, it: FlatItem, items: FlatItem[], skip = -1)
 function build(this: Room, id: FlatRoomId): void {
   const g = GEO[id], L = roomLayout(id);
   if (this.bg.width !== g.w) { this.bg.width = g.w; }
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     r(0, 0, g.w, 200, [34, 30, 38]); r(0, 196, g.w, 4, [220, 214, 200]);
     paintWall(L.w, 0, 200, g.w, FL - 212);
     r(0, FL - 12, g.w, 12, [236, 232, 220]); r(0, FL - 12, g.w, 2, K.WHITE); r(0, FL - 1, g.w, 1, [150, 146, 136]); // skirting board

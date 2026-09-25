@@ -3,7 +3,7 @@
 // Keys: ←/→ (A/D) move, Space/↑/W fire, Esc quits. Touch: hold the ◀ FIRE ▶ buttons.
 
 import { K, type RGB } from '../engine/palette';
-import { PX, r, txt, tw, withCtx, M } from '../engine/pixel';
+import { r, txt, tw, M, bake } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
 import { button, openModal, row } from './modal';
 
@@ -85,9 +85,7 @@ export function openArcade(hi: number, onEnd: (score: number) => void): void {
   }
 
   function draw(): void {
-    const pd = PX.dim, pe = PX.emit, pf = PX.fl;
-    PX.dim = 0; PX.emit = false; PX.fl = 0;
-    withCtx(g, () => {
+    bake(g, () => {
       r(0, 0, W, H, [8, 10, 30]);
       for (let k = 0; k < 18; k++) r((k * 37 + Math.floor(performance.now() / 90)) % W, (k * 53) % (H - 12), 1, 1, [70, 80, 130]);
       r(0, PY + 4, W, 1, [60, 40, 110]);
@@ -109,7 +107,6 @@ export function openArcade(hi: number, onEnd: (score: number) => void): void {
       if (state === 'ready') { const s = 'WAVE ' + wave; txt(s, (W - tw(s)) / 2, 44, K.GOLD); txt('GET READY', (W - tw('GET READY')) / 2, 54, K.WHITE); }
       if (state === 'over') { txt('GAME OVER', (W - tw('GAME OVER', 2)) / 2, 40, K.RED, 2); }
     });
-    PX.dim = pd; PX.emit = pe; PX.fl = pf;
   }
 
   const loop = (t: number) => { const dt = Math.min(0.05, (t - last) / 1000); last = t; step(dt); draw(); raf = requestAnimationFrame(loop); };

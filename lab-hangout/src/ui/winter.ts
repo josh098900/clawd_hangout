@@ -1,7 +1,7 @@
 // WINTER's panels: the advent calendar, THE TREE (hang an ornament, open your presents, send one),
 // wrapping a Secret Santa present, and opening one.
 
-import { PX, mk, r, txt, tw, withCtx } from '../engine/pixel';
+import { mk, r, txt, tw, bake } from '../engine/pixel';
 import { button, openModal, row } from './modal';
 import { ORN_NAMES, WINTER, drawTree, ornament, present, treeHW } from '../world/winter';
 import type { Ornament, TreeGift } from '../net/transport';
@@ -11,7 +11,7 @@ const note = (t: string, c = '#9FEFFF') => { const d = document.createElement('d
 export const NOTES = ['MERRY CHRISTMAS!', 'HAPPY HOLIDAYS!', 'YOU\'RE THE BEST!', 'HAPPY NEW YEAR!', 'THANKS FOR BEING AWESOME', 'HO HO HO!'];
 export const WRAP_NAMES = ['RED', 'GREEN', 'BLUE', 'GOLD', 'PURPLE', 'WHITE'];
 const pic = (w: number, h: number, scale: number, draw: () => void): HTMLCanvasElement => {
-  const c = mk(w, h); withCtx(c.getContext('2d')!, () => { PX.dim = 0; PX.emit = false; draw(); });
+  const c = mk(w, h); bake(c.getContext('2d')!, () => {draw(); });
   Object.assign(c.style, { width: w * scale + 'px', height: h * scale + 'px', imageRendering: 'pixelated' }); return c;
 };
 
@@ -44,7 +44,7 @@ export function openTree(h: TreeHooks, onClose: () => void): void {
   const S = Math.max(2, Math.min(3, Math.floor((innerHeight - 330) / 200)));
   let kind = 0, busy = false; const W = 160, H = 196, top = 14;
   const cv = pic(W, H, S, () => {}); cv.style.cursor = 'copy';
-  const redraw = () => withCtx(cv.getContext('2d')!, () => { PX.dim = 0; PX.emit = false; r(0, 0, W, H, [16, 20, 44]); for (let i = 0; i < 40; i++) r(Math.floor((i * 37) % W), Math.floor((i * 53) % 60), 1, 1, [200, 210, 255]); r(0, H - 12, W, 12, [236, 242, 250]); drawTree(W / 2, top, performance.now() / 1000, WINTER.ornaments); });
+  const redraw = () => bake(cv.getContext('2d')!, () => {r(0, 0, W, H, [16, 20, 44]); for (let i = 0; i < 40; i++) r(Math.floor((i * 37) % W), Math.floor((i * 53) % 60), 1, 1, [200, 210, 255]); r(0, H - 12, W, 12, [236, 242, 250]); drawTree(W / 2, top, performance.now() / 1000, WINTER.ornaments); });
   const loop = () => { redraw(); raf = requestAnimationFrame(loop); }; loop();
   const msg = note('Pick an ornament, then click on the tree to hang it. Everyone on your server sees it, all season. (5 a day)');
   cv.addEventListener('pointerdown', (e) => {

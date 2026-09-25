@@ -5,7 +5,7 @@
 // clock, so everyone watches the same frame at the same moment.
 
 import { K, CK, type RGB } from '../engine/palette';
-import { PX, mk, r, line, disc, oval, ring, txt, tw, alpha, lit, G, Gd, Gline, withCtx, M, shade, puff } from '../engine/pixel';
+import { PX, mk, r, line, disc, oval, ring, txt, tw, alpha, lit, G, Gd, Gline, M, shade, puff, bake } from '../engine/pixel';
 import { h1, seg, bump } from '../engine/math';
 import { basePose, composeCritter } from '../entities/critter';
 import type { Room, Prop, Spot } from './room';
@@ -30,8 +30,8 @@ export const filmPlaying = (): boolean => { const t = filmClock().t; return t > 
 
 // ---------- the set ----------
 function build(this: Room): void {
-  withCtx(this.bg.getContext('2d')!, () => {
-    PX.dim = 0; PX.fl = 0; PX.emit = false;
+  bake(this.bg.getContext('2d')!, () => {
+    
     // ceiling with a starry plaster finish and a gold cornice
     r(0, 0, W, 150, CK.CEIL);
     for (let i = 0; i < 120; i++) r(Math.floor(h1(i * 4.1) * W), Math.floor(h1(i * 2.3) * 130), 1, 1, [70, 50, 70]);
