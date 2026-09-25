@@ -26,6 +26,11 @@ The order puts the time-sensitive thing first (Halloween starts 1 October), then
 
 ---
 
+## Progress
+Steps 1-6 are done and live (Halloween, gardens, Subway, Park, quests + badges, fishing contest;
+migrations 0007-0010). **Next: step 7, group dances + shared weather** (no SQL needed: both come
+from the wall clock; weather lives in `src/world/weather.ts`, which already has the shared wind).
+
 ## 1. Halloween (1 October to 1 November)  ← next
 
 Everything switches on by date, from the shared clock (`season()` in a new `src/world/season.ts`). `?season=halloween` previews it any day while developing.

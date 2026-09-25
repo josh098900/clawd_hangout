@@ -206,6 +206,14 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 - Adding a look option means appending it to the list. Never reorder, because indexes are
   saved in the database.
 
+### Supabase Security Advisor warnings (expected, don't "fix")
+- "Signed-In Users Can Execute SECURITY DEFINER Function" on every `public.*` RPC: intentional. Players
+  never write tables directly; these functions ARE the API and each checks its own rules. `is_member()`
+  and `my_server()` must stay executable because the Realtime/table policies call them.
+- "Anonymous Access Policies": guests are anonymous users by design; every policy still requires
+  membership (`is_member()`) or your own row.
+- "Leaked Password Protection": there are no password logins (Discord / Google / guest only).
+
 ### Known limitations (good next tasks)
 - **Trust**: chat identity is server-verified, but moves/emotes/notes/room state are still
   sent by clients on `hangout:<room>` with a self-claimed `id`. Supabase evaluates channel RLS
