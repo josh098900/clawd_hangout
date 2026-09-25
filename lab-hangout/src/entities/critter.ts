@@ -15,14 +15,14 @@ export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT'] as
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
 export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET'] as const;
 export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK'] as const;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON'] as const;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
  * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
 export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
@@ -162,6 +162,16 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
       R(-2, -13, 1, 4, [236, 238, 250]); R(2, -13, 1, 3, [236, 238, 250]);
     } else if (look.fit === 5 || look.fit === 6) { // cape: collar + gold clasp (the vampire's is black with a red gem)
       R(-hwAt(-13), -13, hwAt(-13) * 2, 1, look.fit === 6 ? [34, 26, 44] : [200, 40, 60]); R(-2, -13, 4, 2, [255, 214, 90]); R(-1, -13, 1, 1, look.fit === 6 ? [230, 40, 60] : [255, 244, 190]);
+    } else if (look.fit === 8) { // rock star: a gold sequin jacket, open at the front, collar popped, a star on the chest
+      for (let y = -13; y <= -4; y++) {
+        const hw = hwAt(y) + 1, open = Math.max(0, 3 - Math.floor((y + 13) / 3));
+        R(-hw, y, hw * 2, 1, (y + hw) % 2 ? SEQ : M(SEQ, SEQ_HI, 0.35)); R(-hw, y, 1, 1, SEQ_HI); R(hw - 1, y, 1, 1, SEQ_DK);
+        if (open > 0) { R(-open, y, open * 2, 1, belly); R(-open - 1, y, 1, 1, SEQ_DK); R(open, y, 1, 1, SEQ_DK); }
+      }
+      R(-hwAt(-4) - 1, -4, hwAt(-4) * 2 + 2, 1, SEQ_DK);
+      for (const sx of [-1, 1]) { R(sx < 0 ? -11 : 7, -16, 4, 3, SEQ); R(sx < 0 ? -11 : 7, -16, 4, 1, SEQ_HI); } // the popped collar
+      lit(() => { R(6, -10, 3, 1, K.MAG); R(7, -11, 1, 3, K.MAG); }); // a little star
+      sequins(R, -11, 11, -12, -5, P);
     } else if (look.fit === 7) { // skeleton suit: black with white bones
       const sk: RGB = [30, 28, 40], bn: RGB = [236, 232, 220];
       for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, sk); }
@@ -232,7 +242,13 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 /** Hats that hide the critter's antenna. */
 const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
-const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]] };
+const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]] };
+/** The ROCK STAR jacket's gold sequins and the twinkles on them (they catch the light as you move). */
+const SEQ: RGB = [236, 190, 60], SEQ_DK: RGB = [184, 136, 30], SEQ_HI: RGB = [255, 236, 150];
+function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void, x0: number, x1: number, y0: number, y1: number, P: Pose): void {
+  const ph = Math.floor((P.ant + P.wave) * 2 + P.lift * 3);
+  lit(() => { for (let k = 0; k < 5; k++) { const x = x0 + ((k * 7 + ph * 3) % Math.max(1, x1 - x0)), y = y0 + ((k * 5 + ph) % Math.max(1, y1 - y0)); R(x, y, 1, 1, k % 2 ? K.WHITE : SEQ_HI); } });
+}
 /** How far each prize hat (6..10) rises above its brim row. */
 const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
@@ -377,6 +393,11 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       R(-6, -11, 12, 3, hd); R(-5, -11, 10, 1, shade(hc, 0.85)); R(-2, -15, 1, 4, [236, 238, 250]); R(2, -15, 1, 3, [236, 238, 250]);
     } else if (look.fit === 5 || look.fit === 6) { // cape collar + clasp
       R(-12, -16, 24, 1, look.fit === 6 ? [34, 26, 44] : [200, 40, 60]); R(-2, -16, 4, 2, [255, 214, 90]); R(-1, -16, 1, 1, look.fit === 6 ? [230, 40, 60] : [255, 244, 190]);
+    } else if (look.fit === 8) { // rock star jacket
+      for (let y = -15; y <= -5; y++) { const open = Math.max(0, 3 - Math.floor((y + 15) / 3)); R(-13, y, 26, 1, (y % 2) ? SEQ : M(SEQ, SEQ_HI, 0.35)); R(-13, y, 1, 1, SEQ_HI); R(12, y, 1, 1, SEQ_DK); if (open > 0) { R(-open, y, open * 2, 1, body); R(-open - 1, y, 1, 1, SEQ_DK); R(open, y, 1, 1, SEQ_DK); } }
+      R(-13, -5, 26, 1, SEQ_DK); for (const sx of [-1, 1]) { R(sx < 0 ? -13 : 9, -18, 4, 3, SEQ); R(sx < 0 ? -13 : 9, -18, 4, 1, SEQ_HI); }
+      lit(() => { R(6, -12, 3, 1, K.MAG); R(7, -13, 1, 3, K.MAG); });
+      sequins(R, -12, 12, -14, -6, P);
     } else if (look.fit === 7) { // skeleton suit
       const sk: RGB = [30, 28, 40], bn: RGB = [236, 232, 220];
       R(-13, -15, 26, 11, sk); R(0, -15, 1, 8, bn); for (const y of [-14, -12, -10]) { R(-7, y, 6, 1, bn); R(2, y, 6, 1, bn); } R(-3, -7, 7, 1, bn); R(-4, -6, 2, 1, bn); R(3, -6, 2, 1, bn);

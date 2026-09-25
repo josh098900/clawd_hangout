@@ -89,7 +89,8 @@ src/
     sky.ts             the telescope's sky panorama (planets, the Moon with the film's flag, a comet every 5 min, a rare UFO, the
                        Square seen from orbit), all from the clock; skyView draws any patch of it
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
-    stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights
+    stage.ts           THE STAGE (1000x700): instruments, DJ booth beats, dance floor, disco ball, spotlights; KARAOKE: the machine
+                       (spot 6), the big lyric screen over the stage, band score + HYPE bar, flames at high hype, end confetti
     pier.ts            THE PIER (1300x720): beach, pier + fishing, bonfire + marshmallows, lighthouse, day/night
     season.ts          which season it is ('halloween' / 'winter' / null): server's current_season(), else the date
     halloween.ts       October dressing over every room (pumpkins, webs, lights, bats, fog), the 8 trick-or-treat
@@ -130,6 +131,9 @@ src/
                        the `saves` table; merging is a union so nothing earned is ever lost
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
                        quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
+  game/karaoke.ts      KARAOKE: the 5 songs as charts (12 lines x 16 eighth-note steps; 'P:syl' = pad P on a syllable), the
+                       lanes for keys/drums/bass worked out from each song's chords/drums/bass, the backing Track, Performance
+                       (judging hits: PERFECT / GOOD / OFF KEY / MISS), hype bonus (up to +10)
   game/dance.ts        group dances: 3+ dancers close together form a crew, dance one routine on the wall-clock
                        beat (crewPose), and the floor lights up; worked out in every browser, nothing is sent
   game/diner.ts        the Diner's co-op kitchen game: tickets (from t0 + seed), cookAct() (pure: host applies, others predict),
@@ -174,6 +178,7 @@ src/
   ui/typing.ts         CODE: the Dev Den typing game (3 lines -> a commit)
   ui/kanban.ts         the Dev Den kanban board
   ui/stars.ts          the rooftop telescope's constellation game
+  ui/karaoke.ts        the song menu, the lyrics strip (only when the Stage's big screen is out of view) and your note lane
   ui/mission.ts        MISSION CONTROL: steer the station's telescope over the sky (world/sky.ts), hold on something to log it
   net/filter.ts        client-side word filter + per-sender token-bucket rate limits
 supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
@@ -191,7 +196,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        set_door/flat_party/let_in; public.can_enter_flat gates the flat.<owner> channels and chat) ·
                        0015 space (space_trays + space_plant/space_harvest/space_dig_up: STAR MELONS, 3 tokens, ripe in 30 min,
                        pay 5 + a COMET BLOOM seed; plant() takes any found seed; spacewalk_pay: 1 per 8 points, 4 a walk,
-                       one a minute, 12 a day; the launch / spacewalk / comet quests + ASTRONAUT badge)
+                       one a minute, 12 a day; the launch / spacewalk / comet quests + ASTRONAUT badge) ·
+                       0016 karaoke (karaoke_tip: nothing under 40, 1 + score/30, max 4 a song, one per 30 s, 12 a day)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -239,6 +245,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | kart race | room state `race` (host: t0 = GO, seed, ids/names/cols in grid order; others ask to join with a `kart` msg `j: 1`, the host adds them) + broadcast `kart` (your kart, 12 Hz racing, 6-8 with 3-4 racers, 2 Hz on the grid) + `kartbest` (fastest lap per circuit); CPU karts from `cpuAt` | `{ r, x, y, a, v, lap, g, c, fin, best, b, d, j? }` |
 | tank duel | broadcast `tank` ~15/s per side during a match (shells in flight, score, hits landed, P1's phase; vs CPU also the CPU tank) | `{ s, x, y, a, sh, sc, hit, inv, ph?, o?, osc? }` |
 | flats | RPCs `my_flat` (made with a starter kit), `get_flat(owner)` (refused if you may not go in), `flat_doors(ids)`, `buy_furniture(what)`, `save_flat(layout)` (only furniture you own), `set_door`, `flat_party(on)`, `let_in(who)`; channels `hangout:<server>:<room>.<owner>` (joinRoom's `inst`); room state `flat` { n: layout revision, party }; lobby broadcast `flat` { k: knock / in / no / party, to, nm, until } | layout `{ rooms: { liv, bed, kit: { w, f, items: [[id, x, row, flip]] } }, show }` |
+| karaoke | room state `karaoke` `{ song, t0 (wall ms of the first step, after a 4 s count-in), by }`; performers play their notes as usual (`note`) and broadcast `kscore` `{ r: the song's t0, i: instrument, s: score so far, c: combo, f: final }` about once a second; the HYPE bar is worked out in each browser from the emotes and dancers it sees; RPC `karaoke_tip(score)` at the end | see game/karaoke.ts |
 | space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |

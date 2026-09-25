@@ -6,7 +6,7 @@ import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
 import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { TRAY_SPEED } from '../world/station';
@@ -17,7 +17,7 @@ import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk'; p: Record<string, unknown> };
+type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk' | 'kscore'; p: Record<string, unknown> };
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
@@ -190,6 +190,16 @@ export class LocalTransport implements Transport {
     const k = 'labhangout.localWalks.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
     const paid = Math.max(0, Math.min(4, Math.floor(pts / 8), 12 - today));
     this.lastWalk = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
+    this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
+  }
+  /** Same rules as karaoke_tip() in 0016_karaoke.sql: nothing under 40, 1 + score/30 (max 4), 12 a day, one per 30 s. */
+  private lastSong = 0;
+  async karaokeTip(score: number): Promise<{ tokens: number; paid: number }> {
+    if (score <= 0) return { tokens: this.wallet(), paid: 0 };
+    if (Date.now() - this.lastSong < 30000) throw new Error('tips come once a song');
+    const k = 'labhangout.localSongs.' + new Date().toISOString().slice(0, 10); let today = 0; try { today = Number(localStorage.getItem(k)) || 0; } catch { /* ignore */ }
+    const sc = Math.min(100, Math.round(score)), paid = sc < 40 ? 0 : Math.max(0, Math.min(4, 1 + Math.floor(sc / 30), 12 - today));
+    this.lastSong = Date.now(); try { localStorage.setItem(k, String(today + paid)); } catch { /* ignore */ }
     this.wallet(this.wallet() + paid); return { tokens: this.wallet(), paid };
   }
   /** Same rules as diner_tip() in 0012_diner.sql: 1 + 1 per 40 points (max 5), 15 a day, one per 150 s. */
@@ -387,6 +397,7 @@ export class LocalTransport implements Transport {
   async flatParty(on: boolean): Promise<number | null> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].party = on ? Date.now() / 1000 + 1800 : null; this.flats(all); return all[this.selfId].party ?? null; }
   async letIn(who: string): Promise<void> { const all = this.flats(), f = all[this.selfId]; if (!f) throw new Error('move in first'); f.inv = { ...(f.inv ?? {}), [who]: Date.now() + 1800e3 }; this.flats(all); }
   sendTank(t: TankMsg): void { this.post('tank', { id: this.selfId, ...t }); }
+  sendKScore(k: KScore): void { this.post('kscore', { id: this.selfId, ...k }); }
   sendJunk(n: number): void { this.post('junk', { id: this.selfId, n }); }
   sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
   sendCook(st: number): void { this.post('cook', { id: this.selfId, st }); }
@@ -428,6 +439,7 @@ export class LocalTransport implements Transport {
       case 'state': { const v = parseState(w.p); if (v) this.on({ type: 'state', id: v.id, s: v.s }); break; }
       case 'note': { const v = parseNote(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); break; }
       case 'tank': { const v = parseTank(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'tank', id: v.id, t: v.t }); break; }
+      case 'kscore': { const v = parseKScore(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kscore', id: v.id, k: v.k }); break; }
       case 'junk': { const v = parseJunk(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'junk', id: v.id, n: v.n }); break; }
       case 'kart': { const v = parseKart(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kart', id: v.id, k: v.k }); break; }
       case 'cook': { const v = parseCook(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'cook', id: v.id, st: v.st }); break; }

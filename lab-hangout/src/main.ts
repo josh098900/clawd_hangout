@@ -20,7 +20,9 @@ import { makeSpacewalk, WALK, JUNK, floatersNow } from './world/spacewalk';
 import { CYCLE, DEPART, FLIGHT, LAND, MECO, PAD_X, UP_S, clockText, flight } from './world/space';
 import { skyThings, type SkyThing } from './world/sky';
 import { openMission } from './ui/mission';
-import { makeStage, stageNote, INST_COL } from './world/stage';
+import { makeStage, stageNote, INST_COL, STAGE_INFO, bandTotal } from './world/stage';
+import { COUNT_IN, SONGS, Performance, backing, hypeBonus, kLive, kTime, kWhere, lane, stepS, type KaraokeState } from './game/karaoke';
+import { KaraokeHud, openSongs, resultLine } from './ui/karaoke';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, ARCADE_INFO, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
@@ -76,7 +78,7 @@ import { Bots } from './game/bots';
 import { Npcs, type Npc } from './game/npcs';
 import { Ambient } from './game/ambient';
 import { BOARD } from './game/board';
-import { MusicPlayer, Rain, Rumble, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK } from './audio/music';
+import { MusicPlayer, Rain, Rumble, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK, type Track } from './audio/music';
 import { banner, hostStep, live, partyMusic, startChairs, startTag, tagTouch, winner, type HostView } from './game/party';
 import { SLOP_DUR, SLOP_N, blob, drawBlob, drawSplat, drawThrow, slopWave } from './game/slop';
 import type { BotGame } from './game/bots';
@@ -128,7 +130,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), rumble = new Rumble();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), rumble = new Rumble(), karaokeMusic = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -227,6 +229,7 @@ function onNet(e: NetEvent): void {
     case 'emote': {
       const av = others.get(e.id); if (!av || !allow(e.id, 'emote', 4, 6)) break;
       av.emote = { kind: e.kind, t0: t }; if (!muted.has(e.id)) SFX[e.kind]();
+      if (usingOf(av) !== 'instrument') crowdEmote(e.kind);
       if (e.kind === 'wave') highFive(av);
       if (e.kind === 'feed' && room.id === 'plaza') ambient.feed(av.x + av.dir * 30, av.y, t);
       if (e.kind === 'feed' && room.id === 'park') { const ex = av.x + av.dir * 40, k = 0.82 / Math.max(0.82, Math.sqrt(((ex - POND.x) / POND.rx) ** 2 + ((av.y - POND.y) / POND.ry) ** 2)); PARK_INFO.feed = { x: POND.x + (ex - POND.x) * k, y: POND.y + (av.y - POND.y) * k, t }; }
@@ -267,6 +270,7 @@ function onNet(e: NetEvent): void {
       KARTS.live.set(e.id, { k: e.k, t: now() }); raceUI?.recv(e.id, e.k);
       break;
     }
+    case 'kscore': { const k = STAGE_INFO.karaoke, av = others.get(e.id); if (room.id === 'stage' && av && k && e.k.r === k.t0 && allow(e.id, 'kscore', 3, 6)) STAGE_INFO.scores.set(e.id, { name: av.name, i: e.k.i, s: e.k.s, c: e.k.c, f: !!e.k.f }); break; }
     case 'junk': if (room.id === 'spacewalk' && others.has(e.id) && allow(e.id, 'junk', 6, 10)) WALK.got.set(e.n, Date.now() / 1000); break;
     case 'status': toast(e.text); break;
   }
@@ -450,6 +454,7 @@ function emote(kind: EmoteKind): boolean {
   SFX[kind]();
   net.sendEmote(kind);
   if (kind === 'wave') highFive(me);
+  if (usingOf(me) !== 'instrument') crowdEmote(kind);
   return true;
 }
 
@@ -577,6 +582,7 @@ function useSpot(i: number): void {
   if (s.kind === 'cook') { cook(s.n ?? 0); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'tray') { tendTray(s.n ?? 0); return; }
+  if (s.kind === 'karaoke') { openKaraoke(); return; }
   if (s.kind === 'boat') { if (me.pose === POSE_BOAT) land(); else { quests.bump('boat'); me.pose = POSE_BOAT; me.x = DOCK.launch.x; me.y = DOCK.launch.y; me.dir = 1; forceSend = true; SFX.pour(); toast(isTouch ? 'Tap the water to row. Row back to the dock to get out' : 'WASD to row. Row back to the dock and press E to get out', 4000); } return; }
   if (s.kind === 'kite') { if (me.hold === HOLD_KITE) { me.hold = 0; toast('Kite back on the stand'); } else { quests.bump('kite'); me.hold = HOLD_KITE; me.sips = 0; toast('Up it goes! It flies on the wind. Q to put it away', 3500); SFX.chime(); } forceSend = true; return; }
   if (s.kind === 'sand') { SFX.blip(); openSandbox(() => PARK_INFO.sand, (v) => setState({ k: 'sand', v }), () => input.clear()); return; }
@@ -624,7 +630,7 @@ function useSpot(i: number): void {
   else if (s.kind === 'scope') openStars(() => { input.clear(); if (me.use === i) leaveSpot(); });
   else if (s.kind === 'hammock') SFX.sit();
   else if (s.kind === 'fish') { fishing = { bite: t + (3 + Math.random() * 6) * biteK(), state: 'wait' }; SFX.zap(); toast((isTouch ? 'Wait for a bite, then tap REEL!' : 'Wait for a bite, then press E to REEL!') + (biteK() < 1 ? ' They bite fast in the rain!' : ''), 3000); }
-  else if (s.kind === 'instrument') toast(isTouch ? 'Tap the pads to play' : 'Keys 1-8 play notes. Walk away to stop', 3000);
+  else if (s.kind === 'instrument') toast(kLive(STAGE_INFO.karaoke) ? (isTouch ? 'Tap the pads as the notes reach the line!' : 'Hit the keys (1-8) as the notes reach the line!') : isTouch ? 'Tap the pads to play' : 'Keys 1-8 play notes. Walk away to stop', 3000);
   else if (s.kind === 'chest') {
     leaveSpot();
     const first = save.unlock('hat:5');
@@ -676,6 +682,62 @@ function tendBed(n: number): void {
   }
   if (plantState(p).wet) { toast(plantLine(p, false), 3500); return; }
   waterBed(n);
+}
+
+// ---------- KARAOKE on the Stage (game/karaoke.ts, world/stage.ts, ui/karaoke.ts) ----------
+/** Your performance in the song that's on (null = you're not at an instrument). */
+let perf: Performance | null = null, kSent = 0, kFinal = -1;
+const kTracks = new Map<number, Track>();
+const CHEERS = new Set<EmoteKind>(['joy', 'clap', 'wow', 'love', 'hop', 'wave', 'laugh', 'cool', 'idea']), BOOS = new Set<EmoteKind>(['sleep', 'angry', 'cry']);
+/** The crowd (anyone not playing) emoted while a song is on: cheers fill the hype bar, boos drain it. */
+function crowdEmote(kind: EmoteKind): void {
+  const k = STAGE_INFO.karaoke; if (room.id !== 'stage' || !k || !kLive(k) || kTime(k) < 0 || kWhere(k).done) return;
+  STAGE_INFO.hype = clamp(STAGE_INFO.hype + (CHEERS.has(kind) ? 0.07 : BOOS.has(kind) ? -0.05 : 0), 0, 1);
+}
+function openKaraoke(): void {
+  const k = STAGE_INFO.karaoke, on = kLive(k) && !!k && !kWhere(k).done;
+  SFX.blip();
+  openSongs({
+    pick: (n) => { setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }); SFX.chime(); toast(usingOf(me) === 'instrument' ? 'Here it comes!' : 'Get up to the MIC to sing, or grab an instrument! Everyone else: cheer to fill the HYPE bar', 4500); },
+    stop: on ? () => { setState({ k: 'karaoke', v: { song: -1, t0: Date.now(), by: me.name } }); toast('Song stopped'); } : null,
+  }, () => input.clear());
+}
+function karaokeStep(dt: number): void {
+  const k = STAGE_INFO.karaoke, live = room.id === 'stage' && playing && kLive(k) && !!k;
+  let tr: Track | null = null;
+  if (live) { tr = kTracks.get(k!.song) ?? null; if (!tr) { tr = backing(k!.song); kTracks.set(k!.song, tr); } }
+  karaokeMusic.set(tr, live ? k!.t0 / 1000 : 0); karaokeMusic.volume(live && !kWhere(k!).done ? 0.75 : 0); karaokeMusic.tick();
+  if (!live || !k) { khud.hide(); perf = null; return; }
+  const tt = kTime(k), wh = kWhere(k);
+  // the dancers keep the hype up; it cools off by itself
+  if (tt > 0 && !wh.done) { const dancers = [me, ...others.values(), ...npcs.inRoom('stage').map((n) => n.av)].filter((av) => av.pose === POSE_DANCE && usingOf(av) !== 'instrument').length; STAGE_INFO.hype = clamp(STAGE_INFO.hype + dt * (dancers * 0.02 - 0.02), 0, 1); }
+  // are you performing? (a new instrument mid-song starts a new performance)
+  const sp = me.use >= 0 ? room.spots[me.use] : undefined, inst = sp?.kind === 'instrument' ? sp.inst ?? -1 : -1;
+  if (!wh.done) { if (inst < 0) perf = null; else if (!perf || perf.t0 !== k.t0 || perf.inst !== inst) perf = new Performance(k.song, inst, k.t0); }
+  if (perf && tt > 0 && !wh.done) {
+    perf.sweep(tt);
+    if (now() - kSent > 1) { kSent = now(); const sc = perf.score(true); STAGE_INFO.scores.set(net.selfId, { name: me.name, i: perf.inst, s: sc, c: perf.combo, f: false }); net.sendKScore({ r: k.t0, i: perf.inst, s: sc, c: perf.combo, f: 0 }); }
+  }
+  if (wh.done && kFinal !== k.t0) { kFinal = k.t0; songOver(k); }
+  const [lx0, ly] = R.toScreen(410, 292), [lx1] = R.toScreen(690, 292), onScreen = ly > 56 && ly < R.cssH - 170 && lx0 > 0 && lx1 < R.cssW; // can you see the whole lyric line on the big screen?
+  khud.update(k, STAGE_INFO.hype, bandTotal(), perf && !wh.done ? perf : null, !onScreen);
+}
+/** The song's finished: your score (plus the crowd's hype), the band's, tips, and maybe the ROCK STAR jacket. */
+function songOver(k: KaraokeState): void {
+  const bonus = hypeBonus(STAGE_INFO.hype); let mine: number | null = null;
+  if (perf && perf.t0 === k.t0) {
+    perf.sweep(1e9); const raw = perf.score(); mine = Math.min(100, raw + bonus);
+    STAGE_INFO.scores.set(net.selfId, { name: me.name, i: perf.inst, s: raw, c: perf.best, f: true });
+    net.sendKScore({ r: k.t0, i: perf.inst, s: raw, c: perf.best, f: 1 });
+  }
+  const band = bandTotal(), top = [...STAGE_INFO.scores.values()].sort((p, q) => q.s - p.s)[0];
+  STAGE_INFO.result = { song: k.song, band, hype: STAGE_INFO.hype, at: Date.now() / 1000, top: top ? top.name + ' ' + top.s : '' };
+  if (STAGE_INFO.scores.size && band >= 80) SFX.joy(); else SFX.score();
+  perf = null;
+  if (mine === null) return;
+  const score = mine, line = resultLine(SONGS[k.song].name, score, band);
+  if (score >= 90 && save.unlock('fit:8')) setTimeout(() => { toast('ROCK STAR! You earned the ROCK STAR jacket. Wear it from Look', 5500); SFX.score(); }, 3000);
+  net.karaokeTip(score).then((r) => { setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) floaters.push({ x: me.x, y: me.y - 60, t0: now(), text: '+' + r.paid }); }).catch(() => toast(line, 5000));
 }
 
 // ---------- SPACE: the rocket (world/space.ts, rocket.ts), the station (station.ts), the spacewalk (spacewalk.ts) ----------
@@ -1061,6 +1123,7 @@ function playNote(n: number): void {
   const s = room.spots[me.use]; if (!s || s.kind !== 'instrument') return;
   const i = s.inst ?? 0;
   playPad(i, n); net.sendNote(i, n); me.noteT = now(); stageNote(i, n); noteSpark(me, i);
+  const k = STAGE_INFO.karaoke; if (perf && k && perf.t0 === k.t0 && room.id === 'stage') perf.hit(n, kTime(k));
 }
 const sparks: { x: number; y: number; t0: number; c: [number, number, number] }[] = [];
 function noteSpark(av: Avatar, i: number): void {
@@ -1215,6 +1278,7 @@ function syncActionBar(): void {
 const emoteBar = $('#emotes');
 emoteBar.append(actBtn, sipBtn);
 $('#bar').prepend(pad); pad.style.display = 'none';
+const khud = new KaraokeHud($('#bar'));
 for (const em of EMOTES) {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'pill emo';
@@ -1961,7 +2025,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); karaokeStep(dt);
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
     if (isHalloween() && (room.id === 'plaza' || room.id === 'pier' || room.id === 'roof') && dayness() < 0.4) { const k = Math.floor(Date.now() / 1000 / 71); if (k !== lastHowl) { if (lastHowl >= 0) SFX.howl(); lastHowl = k; } }
@@ -1974,7 +2038,7 @@ function frame(nowMs: number): void {
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
     const mu = room.music, cur = mu?.current();
     jukebox.set(mu && cur && cur.n >= 0 ? mu.tracks[cur.n] : null, cur?.t0 ?? 0);
-    jukebox.volume(mu && !g ? clamp(1 - Math.abs(me.x - mu.x) / 560, 0.12, 0.8) * (room.id === 'den' && pomodoro().focus ? 0.7 : 1) : 0); jukebox.tick();
+    jukebox.volume(mu && !g && !(room.id === 'stage' && kLive(STAGE_INFO.karaoke)) ? clamp(1 - Math.abs(me.x - mu.x) / 560, 0.12, 0.8) * (room.id === 'den' && pomodoro().focus ? 0.7 : 1) : 0); jukebox.tick();
     // the crypt: are all three plates down?
     if (room.id === 'crypt' && playing) {
       const feet = [...(playing ? [me] : []), ...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)].map((av) => ({ x: av.x, y: av.y }));
@@ -2123,6 +2187,9 @@ if (import.meta.env.DEV && params.has('debug')) {
     tour: () => (tour ? { step: tour.step, back: tour.back, bar: tourStepNow().bar } : null), tourDone: () => !!save.data.stats.dinerTour,
     race: () => KARTS.race, kartLive: () => [...KARTS.live.entries()].map(([id, v]) => [id, v.k.lap, v.k.g, v.k.fin]),
     flat: () => FLAT,
+    karaoke: () => ({ k: STAGE_INFO.karaoke, hype: STAGE_INFO.hype, scores: [...STAGE_INFO.scores.entries()], result: STAGE_INFO.result, perf: perf ? { inst: perf.inst, score: perf.score(true), combo: perf.combo, judged: perf.judged.size, final: perf.score() } : null, t: STAGE_INFO.karaoke ? kTime(STAGE_INFO.karaoke) : null }),
+    sing: (n: number) => setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }), note: (n: number) => playNote(n),
+    lane: () => (perf ? lane(perf.song, perf.inst).map((x) => [x.s, x.p]) : []), stepSec: () => (STAGE_INFO.karaoke ? stepS(SONGS[STAGE_INFO.karaoke.song]) : 0),
     peers: () => [...others.values()].map((o) => ({ id: o.id, name: o.name, pose: o.pose, use: o.use, x: Math.round(o.x), y: Math.round(o.y) })),
     flightAt: (k: number) => setFlight(k), skew: (s: number) => { FLIGHT.skew = s; }, flight: () => flight(), spaceKey: () => spaceKey(),
     space: () => ({ zv: { ...zv }, env: { ...ENV }, walk: { pts: WALK.pts, dust: WALK.dust, things: WALK.things, got: WALK.got.size }, trays: STATION.trays, scope: STATION.scope, sky: save.data.sky, pose: me.pose }),

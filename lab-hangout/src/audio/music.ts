@@ -7,7 +7,7 @@
 
 import { audio, soundOn } from './sfx';
 
-export interface Track { name: string; bpm: number; wave: OscillatorType; lead: string; bass: string; drums: string }
+export interface Track { name: string; bpm: number; wave: OscillatorType; lead: string; bass: string; drums: string; /** the lead's loudness (default 0.05): karaoke's guide melody is quieter */ leadVol?: number }
 
 export const TRACKS: Track[] = [
   {
@@ -174,7 +174,7 @@ export class MusicPlayer {
       const when = AC.currentTime + (this.t0 + this.next * step - wall);
       if (when < AC.currentTime) continue;
       const i = ((this.next % len) + len) % len;
-      this.voice(AC, this.parsed.lead, i, when, step, this.track.wave, 0.05);
+      this.voice(AC, this.parsed.lead, i, when, step, this.track.wave, this.track.leadVol ?? 0.05);
       this.voice(AC, this.parsed.bass, i, when, step, 'triangle', 0.08);
       this.drum(au.AC, au.NB, this.parsed.drums[i % this.parsed.drums.length], when);
     }

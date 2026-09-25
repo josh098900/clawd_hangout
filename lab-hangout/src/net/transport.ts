@@ -10,6 +10,7 @@ import { isEmote, type EmoteKind } from '../entities/avatar';
 import { ROOM_IDS, type RoomId } from '../world/room';
 import { scrub } from './filter';
 import { COOKS_MAX, type DinerState } from '../game/diner';
+import { SONGS, type KaraokeState } from '../game/karaoke';
 
 export interface PeerState { id: string; name: string; look: Look; x: number; y: number; dir: 1 | -1; moving: boolean }
 /**
@@ -56,7 +57,8 @@ export type StateVal =
   | { k: 'diner'; v: DinerState } | { k: 'dinerbest'; v: { name: string; score: number } }
   | { k: 'race'; v: RaceState } | { k: 'kartbest'; v: KartRecord[] }
   | { k: 'flat'; v: { n: number; party: number | null } }
-  | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } };
+  | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } }
+  | { k: 'karaoke'; v: KaraokeState };
 /**
  * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
  * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
@@ -87,6 +89,7 @@ export type NetEvent =
   | { type: 'flat'; id: string; f: FlatMsg }
   | { type: 'world'; id: string; w: HideSeek }
   | { type: 'junk'; id: string; n: number }
+  | { type: 'kscore'; id: string; k: KScore }
   | { type: 'status'; text: string };
 
 /** Flats: whose door is how open, and the layout (all from the database). */
@@ -178,6 +181,11 @@ export interface Account { kind: 'none' | 'guest' | 'account'; provider?: string
 export interface ServerInfo { id: string; name: string; players: number; cap: number; friends: string[] }
 /** A garden bed on the Rooftop with something growing in it. Times are ms since 1970, `grown` is seconds of growth credited up to `calcAt` (see world/garden.ts growth()). */
 export interface Plot { bed: number; owner: string; ownerName: string; seed: number; plantedAt: number; lastWater: number; grown: number; calcAt: number }
+/**
+ * Karaoke: a performer's running score for the song that started at `r` (wall ms), on instrument
+ * `i` (0 keys, 1 drums, 2 bass, 3 mic): score so far 0..100, current combo, `f` = 1 when it's final.
+ */
+export interface KScore { r: number; i: number; s: number; c: number; f: 0 | 1 }
 /** A hydroponic tray on the Space Station with a STAR MELON in it (0015_space.sql). `plantedAt` = ms since 1970. */
 export interface Tray { tray: number; owner: string; ownerName: string; plantedAt: number }
 /** The Pier's contest scoreboard (see 0010_fishing.sql). */
@@ -234,6 +242,8 @@ export interface Transport {
   spaceDigUp(tray: number): Promise<void>;
   /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
   spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
+  /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
+  karaokeTip(score: number): Promise<{ tokens: number; paid: number }>;
   /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
   dinerTip(score: number): Promise<{ tokens: number; paid: number }>;
   /** Today's 3 quests (the same for everyone) and which you've handed in. */
@@ -304,6 +314,8 @@ export interface Transport {
   sendTank(t: TankMsg): void;
   /** The spacewalk: you grabbed floating thing `n` (world/spacewalk.ts), so it vanishes for everyone. */
   sendJunk(n: number): void;
+  /** Karaoke: your running score (about once a second while you perform, and once at the end). */
+  sendKScore(k: KScore): void;
   /** Hide-and-seek state to everyone on this server (whatever room they're in). */
   sendWorld(w: HideSeek): void;
   /** Where server-wide messages (hide-and-seek) arrive. */
@@ -424,6 +436,11 @@ export function parseState(p: unknown): { id: string; s: StateMsg } | null {
     const x = num(v.x, 0, 1e4), y = num(v.y, 0, 1e4), at = num(v.at, 0, 1e11), saw = typeof v.saw === 'string' && /^[A-Z0-9 ?!]{0,24}$/.test(v.saw) ? v.saw : null;
     return x === null || y === null || at === null || saw === null ? null : { id: o.id, s: { k: 'scope', v: { x, y, by: cleanName(v.by), saw, at }, ts } };
   }
+  if (o.k === 'karaoke' && v && typeof v === 'object') {
+    const song = v.song, t0 = num(v.t0, 0, 1e14);
+    if (typeof song !== 'number' || !Number.isInteger(song) || song < -1 || song >= SONGS.length || t0 === null) return null;
+    return { id: o.id, s: { k: 'karaoke', v: { song, t0, by: cleanName(v.by) }, ts } };
+  }
   if (o.k === 'trays' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'trays', v: { n }, ts } }; }
   if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
   if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
@@ -484,6 +501,13 @@ function parseRace(v: Record<string, unknown>): RaceState | null {
   if (!isId(v.host) || t0 === null || typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 1e6) return null;
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(names) || names.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !cols.every((c) => Number.isInteger(c) && c >= 0 && c < 64)) return null;
   return { host: v.host as string, t0, seed, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), cols: cols as number[] };
+}
+export function parseKScore(p: unknown): { id: string; k: KScore } | null {
+  const o = p as Record<string, unknown> | null;
+  if (!o || !isId(o.id)) return null;
+  const r = num(o.r, 0, 1e14), i = o.i, s = num(o.s, 0, 110), c = num(o.c, 0, 9999);
+  if (r === null || s === null || c === null || typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i > 3) return null;
+  return { id: o.id, k: { r, i, s: Math.round(s), c: Math.round(c), f: o.f === 1 ? 1 : 0 } };
 }
 export function parseJunk(p: unknown): { id: string; n: number } | null {
   const o = p as Record<string, unknown> | null;

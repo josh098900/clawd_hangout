@@ -119,6 +119,7 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 13. `supabase/migrations/0013_karts.sql`: the Kart Track and TANK DUEL quests and badges
 14. `supabase/migrations/0014_apartments.sql`: THE LOFTS: furniture you buy, your flat's layout, doors (locked / friends / open), house parties, and private flat channels
 15. `supabase/migrations/0015_space.sql`: the Space Station: the hydroponic trays (STAR MELONS), the COMET BLOOM seed for the roof garden, spacewalk pay (capped), the space quests and the ASTRONAUT badge
+16. `supabase/migrations/0016_karaoke.sql`: karaoke tips on the Stage (capped per song and per day)
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

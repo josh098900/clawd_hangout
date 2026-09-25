@@ -93,6 +93,16 @@ body.decorating #emotes, body.decorating #gamebar, body.decorating #hud, body.de
 #tickets .ticket i { position: absolute; left: 0; bottom: 0; height: 3px; }
 #tickets .ticket.late { animation: tk .5s steps(2) infinite; }
 @keyframes tk { 50% { background: #FFE2D2; } }
+/* karaoke (ui/karaoke.ts): the lyrics strip for everyone on the Stage, and a performer's note lane over the pads */
+#lyrics { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 92px); transform: translateX(-50%); z-index: 3; pointer-events: none; text-align: center; background: rgba(12, 6, 26, .78); border-bottom: 3px solid #FF5FD2; padding: 6px 16px 8px; max-width: 92vw; }
+#lyrics .meta { font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 8px; color: #C8B8F0; margin-bottom: 4px; }
+#lyrics .l1 { font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 15px; line-height: 1.5; color: #9888C8; white-space: nowrap; }
+#lyrics .l1 .now { color: #FFFFFF; text-shadow: 0 0 10px #FF5FD2; }
+#lyrics .l1 .sung { color: #FFD65A; }
+#lyrics .l2 { font-family: 'Press Start 2P', ui-monospace, monospace; font-size: 9px; color: #6E6490; margin-top: 3px; white-space: nowrap; }
+#lane { width: 600px; max-width: calc(100vw - 24px); height: auto; image-rendering: pixelated; border: 2px solid #3A2A5A; background: #0C0818; }
+body.decorating #lyrics { display: none !important; }
+@media (max-width: 560px) { #lyrics { top: calc(env(safe-area-inset-top, 0px) + 130px); padding: 5px 8px 6px; } #lyrics .l1 { font-size: 10px; white-space: normal; } #lyrics .l2 { white-space: normal; } }
 @media (max-width: 560px) { #tickets { top: calc(env(safe-area-inset-top, 0px) + 136px); gap: 3px; } #tickets .ticket { min-width: 0; font-size: 7px; padding: 4px; } }
 .plate.pier { background: linear-gradient(90deg, rgba(10, 26, 58, .95), rgba(28, 58, 114, .9)); border-left: 5px solid #FFE08A; }
 .plate.pier .sub { color: #CFE6FF; } .plate.pier .big { color: #FFF6E0; text-shadow: 0 3px 0 #0B1A3A, 0 0 14px rgba(255, 224, 138, .6); }

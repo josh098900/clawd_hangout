@@ -32,7 +32,9 @@ weather + group dances, the Diner + COOKIE's tour, the Kart Track + tank duel, T
 migrations 0007-0014). **Step 11, the Space Station, is done and confirmed** (migration 0015). What was decided: launches every 20 min (:00/:20/:40) from a SPACEPORT added past the roof
 garden (the roof is now 1860 wide), drift-and-push-off zero g, all four extras (spacewalk, star melon
 hydroponics, mission control's telescope, the SPACE HELMET), free to fly. The station's NPC is COSMO,
-the critter from the Cinema's own film A CRITTER IN SPACE. **Next: step 12, karaoke.**
+the critter from the Cinema's own film A CRITTER IN SPACE. **Step 12, karaoke, is built** (migration 0016;
+waiting for Josh): a rhythm game at the mic plus band lanes on keys/drums/bass, 5 original songs, capped tips,
+the ROCK STAR jacket for a 90+, and a crowd HYPE bar (no quest or badge, by choice). **Next: step 13, the photo wall.**
 
 ## 1. Halloween (1 October to 1 November)  ← next
 
