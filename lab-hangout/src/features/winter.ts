@@ -95,7 +95,7 @@ export function throwSnowball(): void {
   const x1 = tg ? tg.x + (miss ? (Math.random() < 0.5 ? -22 : 22) : 0) : game.me.x + game.me.dir * 140, y1 = tg ? tg.y : game.me.y + 4;
   const b: SnowballMsg = { x0: game.me.x, y0: game.me.y, x1: Math.max(0, x1), y1, hit: tg && !miss && !tg.npc ? tg.id : '' };
   if (tg) game.me.dir = tg.x < game.me.x ? -1 : 1;
-  game.me.hold = 0; game.sendMe(); SFX.toss(); game.net.sendSnowball(b); flyBall(game.net.selfId, b);
+  game.me.hold = 0; game.sendMe(); SFX.toss(); game.net.send('snowball', b); flyBall(game.net.selfId, b);
   if (tg && !miss && tg.npc) setTimeout(() => { tg.splat = now(); }, 450);
 }
 /** A snowball in the air (yours or someone else's): lands 0.45 s later; a hit splats whoever it was for. */

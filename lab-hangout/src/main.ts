@@ -187,14 +187,14 @@ function applyState(s: StateMsg): boolean {
   return true;
 }
 /** Share a room value. Its ts is always newer than the last one (two changes in the same millisecond must not tie). */
-function setState(v: StateVal): void { const s = { ...v, ts: Math.max(Date.now(), (roomState[room.id].get(v.k)?.ts ?? 0) + 1) } as StateMsg; applyState(s); net.sendState(s); }
+function setState(v: StateVal): void { const s = { ...v, ts: Math.max(Date.now(), (roomState[room.id].get(v.k)?.ts ?? 0) + 1) } as StateMsg; applyState(s); net.send('state', s); }
 /** The "host" (lowest real id in the room) catches newcomers up. */
 function catchUp(newcomer: string): void {
   if (newcomer.startsWith('bot-') || switching) return;
   const ids = [net.selfId, ...others.keys()].filter((id) => id !== newcomer && !id.startsWith('bot-')).sort();
   if (ids[0] !== net.selfId) return;
-  for (const s of roomState[room.id].values()) net.sendState(s);
-  if (room.id === 'lab' && BOARD.ts > 0) net.sendState({ k: 'board', v: BOARD.snapshot(), ts: BOARD.ts });
+  for (const s of roomState[room.id].values()) net.send('state', s);
+  if (room.id === 'lab' && BOARD.ts > 0) net.send('state', { k: 'board', v: BOARD.snapshot(), ts: BOARD.ts });
 }
 const isTouch = matchMedia('(pointer: coarse)').matches;
 
@@ -478,7 +478,7 @@ function emote(kind: EmoteKind): boolean {
   lastEmoteAt = t;
   me.emote = { kind, t0: t };
   SFX[kind]();
-  net.sendEmote(kind);
+  net.send('emote', { kind });
   if (kind === 'wave') highFive(me);
   if (usingOf(me) !== 'instrument') crowdEmote(kind);
   return true;
@@ -554,7 +554,7 @@ function useSpot(i: number): void {
     const on = !partyOn();
     net.flatParty(on).then((u) => {
       FLAT.party = u; setState({ k: 'flat', v: { n: flatRev, party: u } });
-      if (on) { net.sendFlat({ k: 'party', nm: me.name, until: u ?? 0 }); quests.stat('parties'); SFX.score(); toast('HOUSE PARTY! Everyone on the server has been told. 30 minutes of fun!', 5000); }
+      if (on) { net.send('flat', { k: 'party', nm: me.name, until: u ?? 0 }); quests.stat('parties'); SFX.score(); toast('HOUSE PARTY! Everyone on the server has been told. 30 minutes of fun!', 5000); }
       else toast('Party over. Time to tidy up');
     }).catch((e) => toast(errText(e)));
     return;
@@ -607,7 +607,7 @@ function useSpot(i: number): void {
     openDesk(me.look.desk ?? 0, (bits) => { me.look = { ...me.look, desk: bits }; net.updateMe(peerState()); }, () => { applyProfile(me.name, me.look); input.clear(); if (me.use === i) leaveSpot(); });
   }
   else if (s.kind === 'prizes') { SFX.blip(); openPrizes(wearItem, closeSpot(i)); }
-  else if (s.kind === 'board') openBoard((d) => net.sendDraw(d), closeSpot(i));
+  else if (s.kind === 'board') openBoard((d) => net.send('draw', d), closeSpot(i));
   else if (s.kind === 'booth') { booth = { t0: t, next: 0, emoted: -1, frames: [] }; toast('Smile! 3 photos coming up'); }
   else if (s.kind === 'desk') { SFX.sit(); openCode(); }
   else if (s.kind === 'kart') useKart(i);
@@ -781,7 +781,7 @@ function throwAt(tg: { i: number; x: number; y: number }): void {
 function playNote(n: number): void {
   const s = room.spots[me.use]; if (!s || s.kind !== 'instrument') return;
   const i = s.inst ?? 0;
-  playPad(i, n); net.sendNote(i, n); me.noteT = now(); stageNote(i, n); noteSpark(me, i);
+  playPad(i, n); net.send('note', { i, n }); me.noteT = now(); stageNote(i, n); noteSpark(me, i);
   const k = STAGE_INFO.karaoke; if (perf && k && perf.t0 === k.t0 && room.id === 'stage') perf.hit(n, kTime(k));
 }
 const sparks: { x: number; y: number; t0: number; c: [number, number, number] }[] = [];

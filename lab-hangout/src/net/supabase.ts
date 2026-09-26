@@ -10,9 +10,8 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
-import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseSnowball, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type SnowballMsg, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
+import { cleanName, PROVIDERS, MESSAGES, MSG_TYPES, readMsg, parseLayout, parseDoor, parsePeer, parseLobby, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type MyFlat, type LobbyPerson, type MoveMsg, type NetEvent, type Outgoing, type PeerState, type Transport, type Account, type ClawResult, type ContestBoard, type Plot, type Tray, type Photo, type MyPhoto, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Reading what the database sent back (it's ours, but a field can still be missing or null):
@@ -298,23 +297,12 @@ export class SupabaseTransport implements Transport {
       }
       for (const key of [...this.known.keys()]) if (!seen.has(key)) { this.known.delete(key); this.on({ type: 'leave', id: key }); }
     });
-    ch.on('broadcast', { event: 'move' }, ({ payload }) => { const v = parseMove(payload); if (v && v.id !== this.selfId) this.on({ type: 'move', id: v.id, m: v.m }); });
-    ch.on('broadcast', { event: 'emote' }, ({ payload }) => { const v = parseEmote(payload); if (v && v.id !== this.selfId) this.on({ type: 'emote', id: v.id, kind: v.kind }); });
-    ch.on('broadcast', { event: 'state' }, ({ payload }) => { const v = parseState(payload); if (v && v.id !== this.selfId) this.on({ type: 'state', id: v.id, s: v.s }); });
-    ch.on('broadcast', { event: 'note' }, ({ payload }) => { const v = parseNote(payload); if (v && v.id !== this.selfId) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); });
-    ch.on('broadcast', { event: 'tank' }, ({ payload }) => { const v = parseTank(payload); if (v && v.id !== this.selfId) this.on({ type: 'tank', id: v.id, t: v.t }); });
-    ch.on('broadcast', { event: 'snowball' }, ({ payload }) => { const v = parseSnowball(payload); if (v && v.id !== this.selfId) this.on({ type: 'snowball', id: v.id, b: v.b }); });
-    ch.on('broadcast', { event: 'kscore' }, ({ payload }) => { const v = parseKScore(payload); if (v && v.id !== this.selfId) this.on({ type: 'kscore', id: v.id, k: v.k }); });
-    ch.on('broadcast', { event: 'junk' }, ({ payload }) => { const v = parseJunk(payload); if (v && v.id !== this.selfId) this.on({ type: 'junk', id: v.id, n: v.n }); });
-    ch.on('broadcast', { event: 'kart' }, ({ payload }) => { const v = parseKart(payload); if (v && v.id !== this.selfId) this.on({ type: 'kart', id: v.id, k: v.k }); });
-    ch.on('broadcast', { event: 'cook' }, ({ payload }) => { const v = parseCook(payload); if (v && v.id !== this.selfId) this.on({ type: 'cook', id: v.id, st: v.st }); });
-    ch.on('broadcast', { event: 'pong' }, ({ payload }) => { const v = parsePong(payload); if (v && v.id !== this.selfId) this.on({ type: 'pong', id: v.id, p: v.p }); });
-    ch.on('broadcast', { event: 'draw' }, ({ payload }) => { const v = parseDraw(payload); if (v && v.id !== this.selfId) this.on({ type: 'draw', id: v.id, d: v.d }); });
+    this.listen(ch, 'room');
 
     this.ch = ch;
     // the server channel: only the database sends here, so the sender id on chat is real
     const srv = this.sb.channel(this.topic('hangout-srv', key), { config: { private: true } });
-    srv.on('broadcast', { event: 'chat' }, ({ payload }) => { const v = parseChat(payload); if (v && v.id !== this.selfId) this.on({ type: 'chat', id: v.id, text: v.text }); });
+    this.listen(srv, 'srv');
     srv.subscribe();
     this.srv = srv;
     await new Promise<void>((resolve, reject) => {
@@ -342,8 +330,7 @@ export class SupabaseTransport implements Transport {
         for (const [key, metas] of Object.entries(state)) { if (key === this.selfId || !metas.length) continue; const p = parseLobby({ ...(metas[0] as object), id: key }); if (p) out.push(p); }
         this.lobbyOn(out);
       });
-      ch.on('broadcast', { event: 'world' }, ({ payload }) => { const v = parseWorld(payload); if (v && v.id !== this.selfId) this.worldOn({ type: 'world', id: v.id, w: v.w }); });
-      ch.on('broadcast', { event: 'flat' }, ({ payload }) => { const v = parseFlatMsg(payload); if (v && v.id !== this.selfId) this.worldOn({ type: 'flat', id: v.id, f: v.f }); });
+      this.listen(ch, 'lobby');
       ch.subscribe(async (status) => { if (status === 'SUBSCRIBED' && this.lobbyMe) await ch.track(this.lobbyMe); });
       this.lobbyCh = ch;
     } else void this.lobbyCh?.track(this.lobbyMe);
@@ -352,15 +339,16 @@ export class SupabaseTransport implements Transport {
   leaveLobby(): void { this.lobbyMe = null; if (this.lobbyCh) { const ch = this.lobbyCh; this.lobbyCh = null; void ch.untrack().finally(() => this.sb.removeChannel(ch)); } this.lobbyOn([]); }
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
-  sendWorld(w: HideSeek): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'world', payload: { id: this.selfId, ...w } }); }
-  sendFlat(f: FlatMsg): void { void this.lobbyCh?.send({ type: 'broadcast', event: 'flat', payload: { id: this.selfId, ...f } }); }
-  sendTank(t: TankMsg): void { void this.ch?.send({ type: 'broadcast', event: 'tank', payload: { id: this.selfId, ...t } }); }
-  sendSnowball(b: SnowballMsg): void { void this.ch?.send({ type: 'broadcast', event: 'snowball', payload: { id: this.selfId, ...b } }); }
-  sendKScore(k: KScore): void { void this.ch?.send({ type: 'broadcast', event: 'kscore', payload: { id: this.selfId, ...k } }); }
-  sendJunk(n: number): void { void this.ch?.send({ type: 'broadcast', event: 'junk', payload: { id: this.selfId, n } }); }
-  sendKart(k: KartMsg): void { void this.ch?.send({ type: 'broadcast', event: 'kart', payload: { id: this.selfId, ...k } }); }
-  sendCook(st: number): void { void this.ch?.send({ type: 'broadcast', event: 'cook', payload: { id: this.selfId, st } }); }
-  sendPong(p: PongMsg): void { void this.ch?.send({ type: 'broadcast', event: 'pong', payload: { id: this.selfId, ...p } }); }
+  /** Hear every message in MESSAGES that travels on this kind of channel (checked, and never our own). */
+  private listen(ch: RealtimeChannel, on: 'room' | 'srv' | 'lobby'): void {
+    for (const type of MSG_TYPES) if (MESSAGES[type].on === on) ch.on('broadcast', { event: type }, ({ payload }) => {
+      const e = readMsg(type, payload); if (!e || e.id === this.selfId) return;
+      if (on === 'lobby') this.worldOn(e); else this.on(e);
+    });
+  }
+  send<K extends keyof Outgoing>(type: K, data: Outgoing[K]): void {
+    void (MESSAGES[type].on === 'lobby' ? this.lobbyCh : this.ch)?.send({ type: 'broadcast', event: type, payload: { id: this.selfId, ...data } });
+  }
 
   async leaveRoom(): Promise<void> {
     if (this.srv) { const srv = this.srv; this.srv = null; void this.sb.removeChannel(srv); }
@@ -395,8 +383,4 @@ export class SupabaseTransport implements Transport {
   async tokens(): Promise<number> { return numOr(await this.rpc('my_tokens')) ?? 0; }
   async claimCoin(i: number): Promise<number | null> { return numOr(await this.rpc('claim_coin', { coin: i })); }
   async claimDaily(): Promise<number | null> { return numOr(await this.rpc('claim_daily')); }
-  sendEmote(kind: EmoteKind): void { void this.ch?.send({ type: 'broadcast', event: 'emote', payload: { id: this.selfId, kind } }); }
-  sendState(s: StateMsg): void { void this.ch?.send({ type: 'broadcast', event: 'state', payload: { id: this.selfId, ...s } }); }
-  sendNote(i: number, n: number): void { void this.ch?.send({ type: 'broadcast', event: 'note', payload: { id: this.selfId, i, n } }); }
-  sendDraw(d: DrawMsg): void { void this.ch?.send({ type: 'broadcast', event: 'draw', payload: { id: this.selfId, ...d } }); }
 }

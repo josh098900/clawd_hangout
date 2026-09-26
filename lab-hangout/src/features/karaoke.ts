@@ -54,7 +54,7 @@ export function karaokeStep(dt: number): void {
   if (!wh.done) { if (inst < 0) perf = null; else if (!perf || perf.t0 !== k.t0 || perf.inst !== inst) perf = new Performance(k.song, inst, k.t0); }
   if (perf && tt > 0 && !wh.done) {
     perf.sweep(tt);
-    if (now() - kSent > 1) { kSent = now(); const sc = perf.score(true); STAGE_INFO.scores.set(game.net.selfId, { name: game.me.name, i: perf.inst, s: sc, c: perf.combo, f: false }); game.net.sendKScore({ r: k.t0, i: perf.inst, s: sc, c: perf.combo, f: 0 }); }
+    if (now() - kSent > 1) { kSent = now(); const sc = perf.score(true); STAGE_INFO.scores.set(game.net.selfId, { name: game.me.name, i: perf.inst, s: sc, c: perf.combo, f: false }); game.net.send('kscore', { r: k.t0, i: perf.inst, s: sc, c: perf.combo, f: 0 }); }
   }
   if (wh.done && kFinal !== k.t0) { kFinal = k.t0; songOver(k); }
   const [lx0, ly] = game.R.toScreen(410, 292), [lx1] = game.R.toScreen(690, 292), onScreen = ly > 56 && ly < game.R.cssH - 170 && lx0 > 0 && lx1 < game.R.cssW; // can you see the whole lyric line on the big screen?
@@ -66,7 +66,7 @@ function songOver(k: KaraokeState): void {
   if (perf && perf.t0 === k.t0) {
     perf.sweep(1e9); const raw = perf.score(); mine = Math.min(100, raw + bonus);
     STAGE_INFO.scores.set(game.net.selfId, { name: game.me.name, i: perf.inst, s: raw, c: perf.best, f: true });
-    game.net.sendKScore({ r: k.t0, i: perf.inst, s: raw, c: perf.best, f: 1 });
+    game.net.send('kscore', { r: k.t0, i: perf.inst, s: raw, c: perf.best, f: 1 });
   }
   const band = bandTotal(), top = [...STAGE_INFO.scores.values()].sort((p, q) => q.s - p.s)[0];
   STAGE_INFO.result = { song: k.song, band, hype: STAGE_INFO.hype, at: Date.now() / 1000, top: top ? top.name + ' ' + top.s : '' };

@@ -4,9 +4,8 @@
 
 import type { Look } from '../entities/critter';
 import { sanitizeLook } from '../entities/critter';
-import type { EmoteKind } from '../entities/avatar';
 import type { RoomId } from '../world/room';
-import { cleanChat, cleanName, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseSnowball, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type SnowballMsg, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
+import { cleanChat, cleanName, MESSAGES, isMsgType, readMsg, parseLayout, parseDoor, parsePeer, parseLobby, type MsgType, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type MyFlat, type LobbyPerson, type MoveMsg, type NetEvent, type Outgoing, type PeerState, type Transport, type Account, type ClawResult, type ContestBoard, type Plot, type Tray, type Photo, type MyPhoto, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
 import { CLAW, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { TRAY_SPEED } from '../world/station';
@@ -17,7 +16,10 @@ import { rollFish } from '../game/fish';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
-type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'move' | 'chat' | 'emote' | 'state' | 'draw' | 'note' | 'lobby' | 'census' | 'who' | 'pong' | 'world' | 'cook' | 'kart' | 'tank' | 'flat' | 'junk' | 'kscore' | 'snowball'; p: Record<string, unknown> };
+/** One BroadcastChannel post: presence (hello / reply / beat / bye), the lobby and head counts, or a message from MESSAGES. */
+type Wire = { srv: string; room: string; kind: 'hello' | 'reply' | 'beat' | 'bye' | 'lobby' | 'census' | 'who' | MsgType; p: Record<string, unknown> };
+/** Messages taken even from a tab that hasn't said hello yet (the rest must come from someone we've seen arrive). */
+const FROM_ANYONE: MsgType[] = ['chat', 'emote', 'state'];
 /** LOCAL mode's pretend servers (online, they come from the database). `?cap=N` shrinks them to test FULL. */
 const SERVERS = [{ id: 'one', name: 'LAB 1' }, { id: 'two', name: 'LAB 2' }, { id: 'three', name: 'LAB 3' }];
 
@@ -417,10 +419,11 @@ export class LocalTransport implements Transport {
     try { if (localStorage.getItem('labhangout.localDaily') === day) return null; localStorage.setItem('labhangout.localDaily', day); } catch { return null; }
     return this.wallet(this.wallet() + 5);
   }
-  sendEmote(kind: EmoteKind): void { this.post('emote', { id: this.selfId, kind }); }
-  sendState(s: StateMsg): void { this.post('state', { id: this.selfId, ...s }); }
-  sendNote(i: number, n: number): void { this.post('note', { id: this.selfId, i, n }); }
-  sendDraw(d: DrawMsg): void { this.post('draw', { id: this.selfId, ...d }); }
+  send<K extends keyof Outgoing>(type: K, data: Outgoing[K]): void {
+    const p = { id: this.selfId, ...data } as Record<string, unknown>;
+    if (MESSAGES[type].on !== 'lobby') this.post(type, p);
+    else if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: type, p } satisfies Wire);
+  }
 
   private state(): Record<string, unknown> {
     const m = this.me!;
@@ -441,8 +444,6 @@ export class LocalTransport implements Transport {
   leaveLobby(): void { this.lobbyMe = null; clearInterval(this.lobbyTimer); this.lobbyTimer = 0; this.lobbySeen.clear(); this.lobbyOn([]); }
   private worldOn: (e: NetEvent) => void = () => {};
   watchWorld(on: (e: NetEvent) => void): void { this.worldOn = on; }
-  sendWorld(w: HideSeek): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'world', p: { id: this.selfId, ...w } } satisfies Wire); }
-  sendFlat(f: FlatMsg): void { if (this.bc && this.server) this.bc.postMessage({ srv: this.server, room: 'lobby', kind: 'flat', p: { id: this.selfId, ...f } } satisfies Wire); }
   // ---- LOCAL flats: a pretend database in localStorage (shared by every tab), with 0014's rules ----
   private flats(v?: Record<string, LocalFlat>): Record<string, LocalFlat> {
     return v ? db.set('labhangout.localFlats', v) : db.get('labhangout.localFlats', {});
@@ -485,13 +486,6 @@ export class LocalTransport implements Transport {
   async setDoor(door: DoorMode): Promise<void> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].door = door; this.flats(all); }
   async flatParty(on: boolean): Promise<number | null> { const all = this.flats(); if (!all[this.selfId]) throw new Error('move in first'); all[this.selfId].party = on ? Date.now() / 1000 + 1800 : null; this.flats(all); return all[this.selfId].party ?? null; }
   async letIn(who: string): Promise<void> { const all = this.flats(), f = all[this.selfId]; if (!f) throw new Error('move in first'); f.inv = { ...(f.inv ?? {}), [who]: Date.now() + 1800e3 }; this.flats(all); }
-  sendTank(t: TankMsg): void { this.post('tank', { id: this.selfId, ...t }); }
-  sendSnowball(b: SnowballMsg): void { this.post('snowball', { id: this.selfId, ...b }); }
-  sendKScore(k: KScore): void { this.post('kscore', { id: this.selfId, ...k }); }
-  sendJunk(n: number): void { this.post('junk', { id: this.selfId, n }); }
-  sendKart(k: KartMsg): void { this.post('kart', { id: this.selfId, ...k }); }
-  sendCook(st: number): void { this.post('cook', { id: this.selfId, st }); }
-  sendPong(p: PongMsg): void { this.post('pong', { id: this.selfId, ...p }); }
   private expireLobby(): void {
     const now = performance.now(); let changed = false;
     for (const [id, s] of this.lobbySeen) if (now - s.t > 6000) { this.lobbySeen.delete(id); changed = true; }
@@ -501,8 +495,7 @@ export class LocalTransport implements Transport {
     if (w && w.kind === 'who') { this.countMe(); return; }
     if (w && w.kind === 'census' && typeof w.p?.id === 'string' && typeof w.srv === 'string') { this.headcount.set(w.p.id, { srv: w.srv, t: performance.now() }); return; }
     if (!w || w.srv !== this.server) return;
-    if (w.room === 'lobby' && w.kind === 'flat') { const v = parseFlatMsg(w.p); if (v && v.id !== this.selfId && w.srv === this.server) this.worldOn({ type: 'flat', id: v.id, f: v.f }); return; }
-    if (w.room === 'lobby' && w.kind === 'world') { const v = parseWorld(w.p); if (v && v.id !== this.selfId) this.worldOn({ type: 'world', id: v.id, w: v.w }); return; }
+    if (w.room === 'lobby' && isMsgType(w.kind) && MESSAGES[w.kind].on === 'lobby') { const e = readMsg(w.kind, w.p); if (e && e.id !== this.selfId) this.worldOn(e); return; }
     if (w.room === 'lobby' && w.kind === 'lobby') {
       const p = parseLobby(w.p); if (!p || p.id === this.selfId) return;
       const prev = this.lobbySeen.get(p.id); this.lobbySeen.set(p.id, { t: performance.now(), p });
@@ -523,19 +516,11 @@ export class LocalTransport implements Transport {
         break;
       }
       case 'bye': if (typeof id === 'string' && this.seen.delete(id)) this.on({ type: 'leave', id }); break;
-      case 'move': { const v = parseMove(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'move', id: v.id, m: v.m }); break; }
-      case 'chat': { const v = parseChat(w.p); if (v) this.on({ type: 'chat', id: v.id, text: v.text }); break; }
-      case 'emote': { const v = parseEmote(w.p); if (v) this.on({ type: 'emote', id: v.id, kind: v.kind }); break; }
-      case 'state': { const v = parseState(w.p); if (v) this.on({ type: 'state', id: v.id, s: v.s }); break; }
-      case 'note': { const v = parseNote(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'note', id: v.id, i: v.i, n: v.n }); break; }
-      case 'tank': { const v = parseTank(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'tank', id: v.id, t: v.t }); break; }
-      case 'snowball': { const v = parseSnowball(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'snowball', id: v.id, b: v.b }); break; }
-      case 'kscore': { const v = parseKScore(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kscore', id: v.id, k: v.k }); break; }
-      case 'junk': { const v = parseJunk(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'junk', id: v.id, n: v.n }); break; }
-      case 'kart': { const v = parseKart(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'kart', id: v.id, k: v.k }); break; }
-      case 'cook': { const v = parseCook(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'cook', id: v.id, st: v.st }); break; }
-      case 'pong': { const v = parsePong(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'pong', id: v.id, p: v.p }); break; }
-      case 'draw': { const v = parseDraw(w.p); if (v && this.seen.has(v.id)) this.on({ type: 'draw', id: v.id, d: v.d }); break; }
+      default: {
+        if (!isMsgType(w.kind) || MESSAGES[w.kind].on === 'lobby') return;
+        const e = readMsg(w.kind, w.p);
+        if (e && (FROM_ANYONE.includes(w.kind) || this.seen.has(e.id))) this.on(e);
+      }
     }
   }
 }

@@ -43,7 +43,7 @@ export function startPong(i: number): void {
   pong = openPong({
     side, myName: game.me.name,
     opponent: () => seatedAt(other),
-    send: (p) => { game.net.sendPong(p); pongSeen(p); },
+    send: (p) => { game.net.send('pong', p); pongSeen(p); },
     over: (winner) => {
       const ch = ARCADE_INFO.champ;
       game.setState({ k: 'champ', v: { name: winner, wins: ch && ch.name === winner ? ch.wins + 1 : 1 } });
@@ -59,7 +59,7 @@ export function startTank(i: number): void {
   tank = openTanks({
     side, myName: game.me.name,
     opponent: () => seatedAt(other),
-    send: (m) => { game.net.sendTank(m); tankSeen(m); },
+    send: (m) => { game.net.send('tank', m); tankSeen(m); },
     won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); game.celebrate(); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
     onClose: () => { tank = null; game.input.clear(); if (game.me.use === i) game.leaveSpot(); },
   });

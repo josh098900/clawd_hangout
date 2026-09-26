@@ -43,7 +43,7 @@ function newRace(): void {
 function joinRace(rc: RaceState): void {
   if (rc.ids.includes(game.net.selfId) || rc.ids.length >= MAX_RACERS || Date.now() > rc.t0 - 500) return;
   if (runsRace(rc)) game.setState({ k: 'race', v: { ...rc, ids: [...rc.ids, game.net.selfId], names: [...rc.names, game.me.name], cols: [...rc.cols, game.me.look.c] } });
-  else game.net.sendKart({ r: rc.t0, x: 0, y: 0, a: 0, v: 0, lap: 0, g: 0, c: 0, fin: 0, best: 0, b: 0, d: 0, j: 1 });
+  else game.net.send('kart', { r: rc.t0, x: 0, y: 0, a: 0, v: 0, lap: 0, g: 0, c: 0, fin: 0, best: 0, b: 0, d: 0, j: 1 });
 }
 /** E at a kart in the pits: start a race, join the one about to start, or wait for the one on track. */
 export function useKart(i: number): void {
@@ -57,7 +57,7 @@ export function useKart(i: number): void {
   raceUI = openRace({
     selfId: game.net.selfId, myName: game.me.name, myCol: game.me.look.c,
     race: () => KARTS.race,
-    send: (k) => { game.net.sendKart(k); KARTS.live.set(game.net.selfId, { k, t: now() }); },
+    send: (k) => { game.net.send('kart', k); KARTS.live.set(game.net.selfId, { k, t: now() }); },
     join: joinRace,
     finished: (place, ms, best) => {
       const rc2 = KARTS.race; myRaceFin = { r: rc2?.t0 ?? 0, fin: ms };

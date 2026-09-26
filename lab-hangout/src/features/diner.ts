@@ -59,7 +59,7 @@ export function cook(st: number, quiet = false): void {
   const k = res.g.ids.indexOf(game.net.selfId);
   game.me.hold = res.g.hands[k] ?? 0; game.sendMe(); predictUntil = now() + 0.8;
   cookSound(st, !!res.ticket);
-  if (g.host === game.net.selfId) game.setState({ k: 'diner', v: res.g }); else game.net.sendCook(st);
+  if (g.host === game.net.selfId) game.setState({ k: 'diner', v: res.g }); else game.net.send('cook', { st });
 }
 export function dinerStep(dt: number, t: number): void {
   const g = DINER.g, inDiner = game.room.id === 'diner' && game.playing && !game.switching, on = inDiner && shiftLive(g); // (not while walking out: the tour mustn't start mid-fade and follow you)

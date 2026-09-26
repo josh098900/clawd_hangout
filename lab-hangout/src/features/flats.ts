@@ -53,14 +53,14 @@ export async function recheckFlat(): Promise<void> {
   catch { /* (the door may have been locked since: you can stay till you leave) */ }
 }
 export function knockOn(owner: string, name: string): void {
-  game.net.sendFlat({ k: 'knock', to: owner, nm: game.me.name }); SFX.dingdong();
+  game.net.send('flat', { k: 'knock', to: owner, nm: game.me.name }); SFX.dingdong();
   toast('You knocked on ' + name + "'s door. Wait for them to answer...", 4000);
 }
 export function onFlatMsg(from: string, f: FlatMsg): void {
   if (!allow(from, 'flat', 1, 3)) return;
   if (f.k === 'knock' && f.to === game.net.selfId) {
     SFX.dingdong();
-    knockPrompt(f.nm, () => { game.net.letIn(from).then(() => game.net.sendFlat({ k: 'in', to: from, nm: game.me.name })).catch((e) => toast(errText(e))); }, () => game.net.sendFlat({ k: 'no', to: from, nm: game.me.name }));
+    knockPrompt(f.nm, () => { game.net.letIn(from).then(() => game.net.send('flat', { k: 'in', to: from, nm: game.me.name })).catch((e) => toast(errText(e))); }, () => game.net.send('flat', { k: 'no', to: from, nm: game.me.name }));
   } else if (f.k === 'in' && f.to === game.net.selfId) { toast(f.nm + ' let you in!', 2500); void visitFlat(from); }
   else if (f.k === 'no' && f.to === game.net.selfId) toast(f.nm + " can't have visitors right now", 3000);
   else if (f.k === 'party' && (f.until ?? 0) > Date.now() / 1000) { SFX.join(); toast(f.nm + ' is throwing a HOUSE PARTY! Go to THE LOFTS (the right end of the Square) and take the elevator', 6500); dirAt = 0; }

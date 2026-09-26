@@ -12,7 +12,7 @@ import { SFX } from '../audio/sfx';
 // ---------- hide and seek (server-wide, see game/hideseek.ts) ----------
 export let hs: HideSeek | null = null;
 let hsSent = 0, hsKey = '';
-function setHS(h: HideSeek): void { const prev = hs; hs = h; hsSent = now(); game.net.sendWorld(h); onHS(prev, h); }
+function setHS(h: HideSeek): void { const prev = hs; hs = h; hsSent = now(); game.net.send('world', h); onHS(prev, h); }
 export function onWorld(e: NetEvent): void {
   if (e.type !== 'world' || !allow(e.id, 'world', 3, 6)) return;
   const w = e.w, live = hsLive(hs, game.net.selfId);

@@ -69,26 +69,23 @@ export interface DrawMsg { c: number; p: number[]; clear: boolean; ts: number }
 export const BOARD_W = 188, BOARD_H = 70, BOARD_COLS = 5;
 export const NOTES_MAX = 12, NOTE_LEN = 24;
 
+/**
+ * What the game hears: people arriving / changing / leaving, connection trouble, and every message in MESSAGES
+ * (its type, the sender's id, and the fields its validator returns, e.g. { type: 'move', id, m }).
+ */
 export type NetEvent =
   | { type: 'join'; peer: PeerState }
   | { type: 'update'; peer: PeerState }
   | { type: 'leave'; id: string }
-  | { type: 'move'; id: string; m: MoveMsg }
-  | { type: 'chat'; id: string; text: string }
-  | { type: 'emote'; id: string; kind: EmoteKind }
-  | { type: 'state'; id: string; s: StateMsg }
-  | { type: 'draw'; id: string; d: DrawMsg }
-  | { type: 'note'; id: string; i: number; n: number }
-  | { type: 'pong'; id: string; p: PongMsg }
-  | { type: 'cook'; id: string; st: number }
-  | { type: 'kart'; id: string; k: KartMsg }
-  | { type: 'tank'; id: string; t: TankMsg }
-  | { type: 'flat'; id: string; f: FlatMsg }
-  | { type: 'world'; id: string; w: HideSeek }
-  | { type: 'junk'; id: string; n: number }
-  | { type: 'kscore'; id: string; k: KScore }
-  | { type: 'snowball'; id: string; b: SnowballMsg }
-  | { type: 'status'; text: string };
+  | { type: 'status'; text: string }
+  | MsgEvent;
+/** A message from MESSAGES as the game gets it: e.g. { type: 'move', id, m }. */
+export type MsgEvent = { [K in MsgType]: { type: K } & NonNullable<ReturnType<(typeof MESSAGES)[K]['parse']>> }[MsgType];
+/** What the game sends with `net.send(type, data)` (the transport adds your id). Moves and chat have their own calls. */
+export interface Outgoing {
+  emote: { kind: EmoteKind }; state: StateMsg; draw: DrawMsg; note: { i: number; n: number }; pong: PongMsg; cook: { st: number };
+  kart: KartMsg; tank: TankMsg; junk: { n: number }; kscore: KScore; snowball: SnowballMsg; flat: FlatMsg; world: HideSeek;
+}
 
 /** Flats: whose door is how open, and the layout (all from the database). */
 export type DoorMode = 'locked' | 'friends' | 'open';
@@ -325,16 +322,8 @@ export interface Transport {
   sendMove(m: MoveMsg): void;
   /** Say something. Resolves with the text as the server cleaned it (null if nothing was sent); rejects with a message (e.g. 'slow down a little'). */
   sendChat(text: string): Promise<string | null>;
-  sendEmote(kind: EmoteKind): void;
-  sendState(s: StateMsg): void;
-  sendDraw(d: DrawMsg): void;
-  /** One note on a Stage instrument (i = instrument 0..3, n = pad 0..7). */
-  sendNote(i: number, n: number): void;
-  sendPong(p: PongMsg): void;
-  /** The Diner: "I pressed E at kitchen station st" (to the shift's host, see game/diner.ts). */
-  sendCook(st: number): void;
-  /** The Kart Track: your kart, ~12 times a second while racing (see ui/race.ts). */
-  sendKart(k: KartMsg): void;
+  /** Broadcast a message: to this room, or (the lobby ones in MESSAGES) to everyone on this server. */
+  send<K extends keyof Outgoing>(type: K, data: Outgoing[K]): void;
   // ---- flats (supabase/migrations/0014_apartments.sql) ----
   /** Your flat (made with a starter kit the first time) and the furniture you own. */
   myFlat(): Promise<MyFlat>;
@@ -349,19 +338,7 @@ export interface Transport {
   flatParty(on: boolean): Promise<number | null>;
   /** Let someone who knocked in (30 minutes). */
   letIn(who: string): Promise<void>;
-  /** A knock / an answer / a party announcement, on the server's lobby channel. */
-  sendFlat(f: FlatMsg): void;
-  /** The Arcade's TANK DUEL: your tank ~15 times a second during a match (see ui/tanks.ts). */
-  sendTank(t: TankMsg): void;
-  /** The spacewalk: you grabbed floating thing `n` (world/spacewalk.ts), so it vanishes for everyone. */
-  sendJunk(n: number): void;
-  /** Karaoke: your running score (about once a second while you perform, and once at the end). */
-  sendKScore(k: KScore): void;
-  /** Winter: you threw a snowball. */
-  sendSnowball(b: SnowballMsg): void;
-  /** Hide-and-seek state to everyone on this server (whatever room they're in). */
-  sendWorld(w: HideSeek): void;
-  /** Where server-wide messages (hide-and-seek) arrive. */
+  /** Where server-wide messages (the lobby ones in MESSAGES: hide and seek, flat knocks) arrive. */
   watchWorld(on: (e: NetEvent) => void): void;
   /** Announce yourself (name + current room) to everyone online, in any room. */
   setLobby(name: string, room: RoomId): void;
@@ -601,3 +578,50 @@ export function parseLobby(p: unknown): LobbyPerson | null {
   if (!o || !isId(o.id) || !room) return null;
   return { id: o.id, name: cleanName(o.name) || 'GUEST', room };
 }
+
+// ---------- messages ----------
+/**
+ * Every broadcast message, in one table: its validator, and the channel it travels on.
+ *   room:  the room's channel (players send and receive)
+ *   srv:   the room's server channel (only the database sends there, so the sender id is real: chat)
+ *   lobby: the server's lobby channel (everyone online on this server, whatever room)
+ * Both transports subscribe, check and deliver from this table. Adding a message: a validator that returns
+ * { id, ...fields } (those fields are what the game gets in its NetEvent), a line here, and what the game
+ * sends in Outgoing. The wire format of each message is `{ id, ...data }` under its type's name.
+ *   emote   { kind }                     a wave, a hop... (EmoteKind)
+ *   state   StateMsg                     a room value (newest ts wins; see StateVal)
+ *   draw    DrawMsg                      a whiteboard stroke, ~12/s while drawing
+ *   note    { i, n }                     a note on a Stage instrument (i 0..3, pad n 0..7)
+ *   pong    PongMsg                      Pong at the Arcade, only during a match
+ *   cook    { st }                       the Diner: "I pressed E at kitchen station st" (the shift's host applies it)
+ *   kart    KartMsg                      your kart, ~12/s while racing (see ui/race.ts)
+ *   tank    TankMsg                      TANK DUEL, ~15/s per side during a match (see ui/tanks.ts)
+ *   junk    { n }                        the spacewalk: you grabbed floating thing n, so it goes for everyone
+ *   kscore  KScore                       karaoke: your running score, ~1/s while you perform and once at the end
+ *   snowball SnowballMsg                 winter: a snowball you threw (you decide what it hit)
+ *   world   HideSeek                     hide and seek, to the whole server
+ *   flat    FlatMsg                      a knock, an answer, a HOUSE PARTY, to the whole server
+ */
+export const MESSAGES = {
+  move: { parse: parseMove, on: 'room' },
+  chat: { parse: parseChat, on: 'srv' },
+  emote: { parse: parseEmote, on: 'room' },
+  state: { parse: parseState, on: 'room' },
+  draw: { parse: parseDraw, on: 'room' },
+  note: { parse: parseNote, on: 'room' },
+  pong: { parse: parsePong, on: 'room' },
+  cook: { parse: parseCook, on: 'room' },
+  kart: { parse: parseKart, on: 'room' },
+  tank: { parse: parseTank, on: 'room' },
+  junk: { parse: parseJunk, on: 'room' },
+  kscore: { parse: parseKScore, on: 'room' },
+  snowball: { parse: parseSnowball, on: 'room' },
+  world: { parse: parseWorld, on: 'lobby' },
+  flat: { parse: parseFlatMsg, on: 'lobby' },
+} as const satisfies Record<string, { parse: (p: unknown) => { id: string } | null; on: 'room' | 'srv' | 'lobby' }>;
+export type MsgType = keyof typeof MESSAGES;
+export const MSG_TYPES = Object.keys(MESSAGES) as MsgType[];
+/** A message type named by someone else's payload (checked, since it could say anything, even 'toString'). */
+export const isMsgType = (v: unknown): v is MsgType => typeof v === 'string' && Object.hasOwn(MESSAGES, v);
+/** Check a message of this type from the wire; the NetEvent to deliver, or null. */
+export const readMsg = (type: MsgType, payload: unknown): MsgEvent | null => { const v = MESSAGES[type].parse(payload); return v ? ({ type, ...v } as MsgEvent) : null; };

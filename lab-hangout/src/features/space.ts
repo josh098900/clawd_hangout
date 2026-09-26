@@ -106,7 +106,7 @@ function grabStep(): void {
   for (const [id, at] of WALK.got) if (T - at > 150) WALK.got.delete(id);
   for (const fl of floatersNow()) {
     if (WALK.got.has(fl.id) || Math.abs(fl.x - game.me.x) > 14 || Math.abs(fl.y - game.me.y) > 12) continue;
-    WALK.got.set(fl.id, T); game.net.sendJunk(fl.id);
+    WALK.got.set(fl.id, T); game.net.send('junk', { n: fl.id });
     const j = JUNK[fl.kind]; WALK.pts += j.pts;
     if (fl.kind === 0) { WALK.dust++; quests.bump('spacewalk'); SFX.pop(); if (WALK.dust % 10 === 0) { SFX.chime(); toast(WALK.dust + ' stardust!', 1500); } }
     else { WALK.things++; SFX.chime(); toast('You caught ' + j.name + '! +' + j.pts, 2200); }
