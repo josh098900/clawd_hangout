@@ -141,10 +141,14 @@ src/
                        what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)
     avatar.ts          per-player state, walk/emote posing, remote interpolation, name tags, emote FX
   net/
-    transport.ts       Transport interface, message shapes, VALIDATORS (all inbound data is untrusted)
+    transport.ts       the contract: Transport (the connection) + Api (the server requests, grouped by feature), message
+                       shapes, VALIDATORS built from one small kit (all inbound data is untrusted), and MESSAGES: every
+                       broadcast message with its validator and channel (room / srv / lobby); NetEvent is derived from it
     supabase.ts        Supabase: guest (anonymous) + Discord/Google (OAuth, PKCE, linkIdentity) auth, saves,
-                       servers/seats, RPCs, private Realtime channels per server + room
+                       servers/seats, private Realtime channels per server + room (subscribed from MESSAGES)
+    supabaseapi.ts     net.api online: each request is a database function or table read (rpc / rpcJson / rows helpers)
     local.ts           BroadcastChannel transport for offline dev
+    localapi.ts        net.api in LOCAL mode: a pretend database in localStorage with the SQL functions' rules
   game/save.ts         your save (unlocks, friends, fish log, stars, hi score): cached per player id, synced to
                        the `saves` table; merging is a union so nothing earned is ever lost
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
@@ -306,10 +310,13 @@ derived from the clock; the lowest-id player in the room re-broadcasts it on eac
 Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 
 **Rules:**
-- Every inbound payload goes through `parseMove/parsePeer/parseChat/parseEmote` first.
+- Every inbound payload goes through its validator first (both transports do this from `MESSAGES`).
 - Render user text with `textContent` or the pixel font, **never `innerHTML`**.
-- Adding a message type means: add it to `NetEvent`, add a validator, and implement it in
-  **both** `supabase.ts` and `local.ts`.
+- Adding a broadcast message: a validator returning `{ id, ...fields }` (those fields are what the game gets),
+  one line in `MESSAGES` (which channel), and what the game sends in `Outgoing`. Send it with `net.send(type, data)`;
+  both transports pick it up. The wire format is `{ id, ...data }` under the type's name: never change a live one.
+- Adding a server request: a database function (new migration), a line in `Api` under its feature, and the call in
+  **both** `supabaseapi.ts` and `localapi.ts` (the pretend one copies the SQL's rules). Call it as `net.api.<feature>.<name>`.
 - Adding a look option means appending it to the list. Never reorder, because indexes are
   saved in the database.
 
@@ -361,7 +368,7 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 - Interactions: add a `Spot` to the room's spot list (append only), then handle its kind in
   `useSpot`/`updateMe` (main.ts) and `poseFor` (avatar.ts). E / the action pill picks it up automatically.
   Things you fill and carry (coffee/popcorn/soda) go in the `FILL` table in main.ts.
-- New shared room value: add a variant to `StateVal` + `parseState` (transport.ts), then keep a
+- New shared room value: add a variant to `StateVal` + its check in `STATE` (transport.ts; the compiler asks for it), then keep a
   display copy in that room's `onState` (like `DEN_INFO`/`LAB_INFO`). Catch-up for newcomers is automatic.
 - Room hooks worth knowing: `music` (a `juke` spot cycles its tracks), `talkers` (non-avatar
   things you TALK to, like the duck), `watch` (camera target while seated), `dimNow`/`bgAlt`/`glowMul`.

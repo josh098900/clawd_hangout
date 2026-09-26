@@ -73,7 +73,7 @@ a push, then Josh's live check.
     (measured: 39% to 41% busy).
   - Skipped on purpose: G6 and W12 (nowhere in the profile), and a cache for name-tag text (~3% of busy time; it
     would need to track the night tint and lightning to stay identical).
-- **Batch 4 (restructures): done apart from the network (N2-N5), which comes last as its own push.**
+- **Batch 4 (restructures): done.** The network part (N2-N5) went out as its own push, to be play-tested live.
   - E10: each room's title plate is one line of CSS colours; one rule draws them (every plate's computed style
     checked identical).
   - U2: `heldKeys()` in ui/modal.ts gives the kart, tank, slop invaders and mission control panels their key capture,
@@ -88,6 +88,16 @@ a push, then Josh's live check.
       karts, flats and hide and seek.
     - They read the game through one small context (`src/app/game.ts`) and never import main.ts.
     - Each move was checked by reversing the renames and diffing against the original section, then tested in the browser.
+  - The network (its own push, nothing on the wire changed):
+    - N5: the validators share one small kit, and parseState is a table with one check per kind. Old and new answered
+      ~160,000 good and broken payloads identically.
+    - N4: Supabase requests share `rpc` / `rpcJson` / `rows` and small readers. Old and new made the same database calls
+      and gave the same answers on a fake Supabase (70 calls x 155 answers).
+    - N2: one `MESSAGES` table: both transports subscribe, check and deliver from it, and `net.send(type, data)`
+      replaces 13 senders in each. Old and new made the same subscriptions, turned 2,620 payloads into the same events,
+      and sent byte-identical messages (Supabase with fake channels, and LOCAL).
+    - N3: the 54 server requests are `net.api.<feature>.<request>`, in their own files (supabaseapi.ts, localapi.ts).
+      The same fake-Supabase check, and LOCAL's pretend server stores byte-identical data.
   - Not done on purpose:
     - M3's `Feature` registry (useSpot as a lookup, per-room hooks). The order of useSpot's checks matters
       (busy seats, musical chairs, standing up first), so a table risks behaviour for little gain now that the
