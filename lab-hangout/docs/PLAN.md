@@ -41,8 +41,7 @@ waiting for Josh to test it live with `set_season('winter')`, then `set_season(n
 Josh picked: the tree + ornaments + hourly lighting, the present hunt, snowball fights, snowman + ice skating, advent
 calendar, Santa's sleigh, the winter wardrobe, festive music + cocoa + a SNOW DAY karaoke song, New Year's Eve, winter
 furniture, Secret Santa, and festive dressing everywhere. **That's the whole plan done**: next ideas are to be discussed.
-**Bonus step 15, THE MOON, is built** (overnight 26-27 Sep; migration 0019, waiting for Josh to run it, then the push and
-his live check). Josh picked it from four ideas (the others, for later: a Carnival on the Pier, a City Aquarium, Mini golf).
+**Bonus step 15, THE MOON, is done and confirmed** (built overnight 26-27 Sep; migration 0019). Josh picked it from four ideas (the others, for later: a Carnival on the Pier, a City Aquarium, Mini golf).
 
 ## 1. Halloween (1 October to 1 November)  ← next
 

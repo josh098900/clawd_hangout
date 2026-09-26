@@ -82,7 +82,7 @@ Guiding rules (from what already works):
 - [x] 12. Karaoke on the Stage
 - [x] 13. The photo wall (moderated)
 - [ ] 14. Winter (December)
-- [ ] 15. The Moon (bonus: the lander, the surface, the Moon Base, moon rocks, the buggy)
+- [x] 15. The Moon (bonus: the lander, the surface, the Moon Base, moon rocks, the buggy)
 
 ## Before any public launch
 - [x] Permission from Anthropic for Clawd
