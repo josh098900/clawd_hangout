@@ -1,14 +1,15 @@
 # CLAUDE.md — Lab Hangout
 
 A multiplayer 2D pixel hangout. Players are little "lab critters" (or Clawd) who walk around
-24 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
+27 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
 play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
 ```
   SPACE STATION ── rocket (every 20 min, from the pad) ── ROOF's SPACEPORT (far right)
     ├── airlock → SPACEWALK
-    └── escape pod → CITY PARK (the pond)
+    ├── escape pod → CITY PARK (the pond)
+    └── LANDER BAY ── the lander (every 10 min) ── THE MOON (the pad) ── airlock ── MOON BASE
                 ROOF (garden) ── ladder ── DEV DEN ── stairs ── THE LAB ── exit ── THE SQUARE
                                                                                   ├── red doors → CINEMA
                                                                                   ├── tower door → STAGE
@@ -52,6 +53,8 @@ Handy URLs while developing:
   path), `?cap=N` shrinks every server to N players (to see FULL)
 - `?flight=N` (LOCAL / dev) shifts this browser's rocket clock by N seconds (give every test window the same N so they
   agree); `__hangout.flightAt(k)` jumps the 20-minute loop to k s in (0 liftoff, 45 docked, 840 undock, 885 touchdown).
+  `__hangout.landerAt(k)` does the same for the Moon lander's 10-minute loop (0 docked, 150 undock, 210 on the Moon, 540 liftoff);
+  `__hangout.moon()` shows the Moon's state, `door(i)` goes through door i, `park()` parks the buggy.
   `?grow=N` also speeds up the station's STAR MELONS.
 - `?season=winter` (or `halloween`) previews a season in this browser; `?nye=N` (LOCAL/dev) = New Year in N seconds
 - `?weather=rain|storm|fog|snow|clear` pins the weather in this browser (any mode; the server still
@@ -70,7 +73,7 @@ src/
                        helpers ($, now, errText, cap). main.ts fills it in (setGame) with getters. Features never import main.ts
   features/            the playing side of the bigger features, moved out of main.ts: winter, space, photos, karaoke,
                        garden, halloween, arcade (claw, pong, tanks, hi score), diner (+ COOKIE's tour), karts, flats,
-                       hideseek. Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
+                       hideseek, moon (the lander's news, mining + assaying moon rocks, the buggy race). Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
     palette.ts         all colour tokens (K, LK, BODY, CONFETTI)
@@ -98,6 +101,13 @@ src/
                        the escape pod (to the Park's pond), COSMO (the critter from the Cinema's film)
     spacewalk.ts       THE SPACEWALK (1400x800, free float): the hull above, Earth's curve below; stardust and space junk drift by on
                        the clock (floatersNow); grab = a 'junk' broadcast; WALK is your haul, paid when you go back in
+    moon.ts            THE MOON (1800x760, moon gravity, no air): the lander's timetable (lander(): a 10 min loop from the clock) and
+                       the LUNA 1 lander; the surface: the pad, COSMO's flag, the MOON BASE domes + airlock, the buggy garage + lap course
+                       (GATES), the crystal field (ROCKS grow back on the clock: rockThere/rockKey), craters the buggy bounces over (bumpAt)
+    lander.ts          THE LANDER (700x600): 4 seats, the trip in the window, zero g on the coast; its hatch opens onto the station's
+                       LANDER BAY while docked and onto the Moon while landed
+    moonbase.ts        THE MOON BASE (1300x680, moon gravity, air): greenhouse, canteen + snack printer, earthrise window, the ASSAY
+                       machine (BASE.assay), your crystal case, the base radio (a talker); LUNA the botanist lives here
     sky.ts             the telescope's sky panorama (planets, the Moon with the film's flag, a comet every 5 min, a rare UFO, the
                        Square seen from orbit), all from the clock; skyView draws any patch of it
     crypt.ts           THE CRYPT (1000x680): pressure plates, pushable blocks, rune door, crown chest, lanterns
@@ -229,7 +239,9 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        feature_photo, flat_photo; the 'pframe' furniture) ·
                        0018 winter (the season is now 1 Dec - 6 Jan; winter claw prizes; find_present / presents_today (12 a day, all 12 =
                        a winter prize); open_advent / advent_doors; ornaments table + hang_ornament (5 a day); catch_sleigh(pass, n)
-                       (3 a pass); gifts table + send_gift (3/5/10 tokens, preset messages) / tree_gifts / open_gift; winter furniture)
+                       (3 a pass); gifts table + send_gift (3/5/10 tokens, preset messages) / tree_gifts / open_gift; winter furniture) ·
+                       0019 moon (moon_assay: the server decides, 1 in 6 a MOON CRYSTAL, 1 or 3 tokens, 15 a day, one per 20 s; the 5th crystal
+                       = the MOON ROVER pet 'pet:8'; moon_crystals; the moonwalk / moonrock / buggy quests + MOONWALKER badge)
 docs/ART_STYLE.md      the style bible
 ```
 
@@ -281,6 +293,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | photo wall | RPCs `pin_photo(png)`, `wall_photos(n, before)` (+ the photo of the week), `photo_by_id`, `heart_photo`, `my_photos` (so the pinner hears when it's approved), `feature_photo` / `flat_photo(owner)` (the flat's PHOTO FRAME), `delete_photo`; owners (`is_admin()`): `pending_photos`, `review_photo(id, ok)`. Nothing realtime: the Lab refetches every 60 s | `{ id, owner, owner_name, png, at, hearts, mine }` |
 | karaoke | room state `karaoke` `{ song, t0 (wall ms of the first step, after a 4 s count-in), by }`; performers play their notes as usual (`note`) and broadcast `kscore` `{ r: the song's t0, i: instrument, s: score so far, c: combo, f: final }` about once a second; the HYPE bar is worked out in each browser from the emotes and dancers it sees; RPC `karaoke_tip(score)` at the end | see game/karaoke.ts |
 | space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
+| moon | none for the lander: `lander()` from the clock; broadcast `junk` `{ id, n }` on the Moon = you mined rock slot n (`rockKey`); room state `moonbest` `{ name, ms }` (the fastest buggy lap); RPCs `moon_assay()` (hand in a rock: the server rolls it), `moon_crystals()` | `{ tokens, paid, crystal, crystals, prize }` |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
@@ -297,10 +310,12 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
-8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
+8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 cocoa, 18 a moon rock); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
 4 rowing a boat (moves only where `room.water()` is true), 5 floating up high (weightless: SPACE pushed you off the floor; walking
-doesn't clear it, it ends after FLOAT_S). Weightless rooms (`room.zeroG()`) move you with momentum (`drift` in main.ts) and
+doesn't clear it, it ends after FLOAT_S; in moon gravity it's a big slow jump, JUMP_S), 6 driving a moon buggy. Weightless rooms (`room.zeroG()`) move you with momentum (`drift` in main.ts) and
 avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) puts helmets on and SPACE fires a jetpack.
+`room.lowG()` (the Moon) makes walking a bounding stride and SPACE a jump; `room.airless` puts helmets on and leaves pets inside
+(except the MOON ROVER).
 Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the

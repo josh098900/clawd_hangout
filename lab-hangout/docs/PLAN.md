@@ -41,6 +41,8 @@ waiting for Josh to test it live with `set_season('winter')`, then `set_season(n
 Josh picked: the tree + ornaments + hourly lighting, the present hunt, snowball fights, snowman + ice skating, advent
 calendar, Santa's sleigh, the winter wardrobe, festive music + cocoa + a SNOW DAY karaoke song, New Year's Eve, winter
 furniture, Secret Santa, and festive dressing everywhere. **That's the whole plan done**: next ideas are to be discussed.
+**Bonus step 15, THE MOON, is built** (overnight 26-27 Sep; migration 0019, waiting for Josh to run it, then the push and
+his live check). Josh picked it from four ideas (the others, for later: a Carnival on the Pier, a City Aquarium, Mini golf).
 
 ## 1. Halloween (1 October to 1 November)  ← next
 
@@ -174,6 +176,16 @@ Everything switches on by date, from the shared clock (`season()` in a new `src/
 
 - The same season system as Halloween: snow on the outdoor rooms, a snowman to build in the Park, a lit tree in the Square, scarves and hats as costume items, and a present hunt instead of trick-or-treat.
 - Build it in late November.
+
+## 15. The Moon (bonus)
+
+- A lunar lander from the Space Station's new LANDER BAY, on the clock (a 10 minute loop: 2.5 min boarding at the station,
+  a minute down, 5.5 min on the Moon, a minute back up). Zero g on the coast, the burns, the trip in the window.
+- The Moon's surface: moon gravity (you bound, SPACE is a big slow jump), helmets on, COSMO's flag (from the film),
+  the MOON BASE (greenhouse, canteen, earthrise window, LUNA the botanist, the base radio), a MOON BUGGY lap course
+  with a record board, and a crystal field: mine a glowing rock, carry it to the base's ASSAY machine.
+- **Database:** `0019_moon.sql`: `moon_assay` (the server decides: 1 in 6 is a MOON CRYSTAL; 1 or 3 tokens, 15 a day,
+  one rock per 20 s; the 5th crystal is the MOON ROVER pet), `moon_crystals`, 3 quests, the MOONWALKER badge.
 
 ---
 

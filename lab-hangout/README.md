@@ -125,6 +125,8 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 18. `supabase/migrations/0018_winter.sql`: WINTER (on by itself 1 Dec - 6 Jan): the present hunt, advent calendar, tree ornaments,
     Santa's sleigh presents, Secret Santa gifts, winter claw prizes and furniture. Try it early with
     `select public.set_season('winter');` and switch back to the date with `select public.set_season(null);`
+19. `supabase/migrations/0019_moon.sql`: THE MOON: the Moon Base's ASSAY machine (moon rocks pay 1, MOON CRYSTALS 3, capped;
+    the 5th crystal brings the MOON ROVER pet), the Moon quests and the MOONWALKER badge
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

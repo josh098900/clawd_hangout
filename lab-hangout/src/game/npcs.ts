@@ -199,7 +199,7 @@ const DEFS: NpcDef[] = [
       { x: 1260, y: 510, wait: 8, say: ['suit up, the airlock is right here', 'grab some stardust for me'] },
       { x: 700, y: 600, wait: 8, pose: 1, say: ['zero-g dance break!', 'boing'] },
     ],
-    chat: ['hi! yes, i am THE critter from A CRITTER IN SPACE', 'press SPACE to push off the floor. wheee', 'grow a STAR MELON in the trays: 3 tokens, ripe in half an hour', 'the melon has a COMET BLOOM seed in it, for the roof garden', 'the airlock takes you on a spacewalk: grab stardust, bring it in, get tokens', 'mission control: find a comet with the telescope', 'the rocket home leaves every 20 minutes', 'the escape pod lands you in the park pond. splash!'],
+    chat: ['hi! yes, i am THE critter from A CRITTER IN SPACE', 'press SPACE to push off the floor. wheee', 'grow a STAR MELON in the trays: 3 tokens, ripe in half an hour', 'the melon has a COMET BLOOM seed in it, for the roof garden', 'the airlock takes you on a spacewalk: grab stardust, bring it in, get tokens', 'mission control: find a comet with the telescope', 'the rocket home leaves every 20 minutes', 'the escape pod lands you in the park pond. splash!', 'the LANDER BAY at the far end goes down to the Moon. say hi to LUNA for me!'],
   },
   {
     // the Moon Base's botanist: grows MOON TATERS in the greenhouse, and knows everything about moon rocks
