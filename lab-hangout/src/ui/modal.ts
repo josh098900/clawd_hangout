@@ -35,6 +35,26 @@ export function button(label: string, onClick: () => void, ghost = false): HTMLB
 }
 export function row(...kids: HTMLElement[]): HTMLElement { const d = document.createElement('div'); d.className = 'mrow'; d.append(...kids); return d; }
 
+/**
+ * Keys held down in a game panel. The keys in `accept` (KeyboardEvent.key; one-letter keys in lower case) are
+ * caught before the game underneath sees them and kept in `held`, and all let go if you switch windows.
+ * `hold(label, key)` makes a touch button that holds a key while pressed. Call `stop()` when the panel closes.
+ */
+export function heldKeys(accept: string[]): { held: Set<string>; hold(label: string, key: string): HTMLButtonElement; stop(): void } {
+  const held = new Set<string>(), norm = (k: string) => (k.length === 1 ? k.toLowerCase() : k);
+  const kd = (e: KeyboardEvent) => { const k = norm(e.key); if (accept.includes(k)) { e.preventDefault(); e.stopPropagation(); held.add(k); } };
+  const ku = (e: KeyboardEvent) => { held.delete(norm(e.key)); };
+  const unstick = (): void => held.clear(); // (switching windows mid-game)
+  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick);
+  const hold = (label: string, k: string): HTMLButtonElement => {
+    const b = button(label, () => {}); b.classList.add('hold');
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); held.add(k); });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => held.delete(k));
+    return b;
+  };
+  return { held, hold, stop: () => { removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); } };
+}
+
 /** Camera flash over the whole screen. */
 export function flash(): void {
   const f = document.querySelector('#flash') as HTMLElement;

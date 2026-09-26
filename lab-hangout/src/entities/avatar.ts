@@ -37,14 +37,27 @@ export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12,
 /** Winter: a snowball ready to throw, a mug of hot cocoa (the Lab's coffee machine in the season). */
 export const HOLD_SNOWBALL = 16, HOLD_COCOA = 17;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
-export const USES: Record<number, number> = { 1: 5, 2: 8, 3: 6, 4: 1, 5: 1, 6: 1, 8: 4, 17: 5 };
-/** What the log says when it's all gone (every hold in USES has one). */
-export const USED_UP: Record<number, string> = {
-  1: 'Mug empty. Refill it at the coffee machine', 2: 'All the popcorn is gone', 3: 'Slurp! Soda finished',
-  4: 'Raw marshmallow. Bold choice.', 5: 'Perfect golden marshmallow!', 6: 'Crunchy... and a bit sad',
-  8: 'Hot dog gone. Delicious!', 17: 'Cocoa all gone. There\'s more at the coffee machine',
+/**
+ * Everything you can hold (MoveMsg.hold): how many sips / bites it has, what the Q button says for it (Q sips it,
+ * eats it, drops it, puts it away or throws it), and what the log says when it's all gone.
+ */
+export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 'PUT AWAY' | 'THROW'; done?: string }> = {
+  [HOLD_MUG]: { uses: 5, q: 'SIP', done: 'Mug empty. Refill it at the coffee machine' },
+  [HOLD_POPCORN]: { uses: 8, q: 'EAT', done: 'All the popcorn is gone' },
+  [HOLD_SODA]: { uses: 6, q: 'SIP', done: 'Slurp! Soda finished' },
+  [HOLD_MARSH]: { uses: 1, q: 'EAT', done: 'Raw marshmallow. Bold choice.' },
+  [HOLD_TOAST]: { uses: 1, q: 'EAT', done: 'Perfect golden marshmallow!' },
+  [HOLD_BURNT]: { uses: 1, q: 'EAT', done: 'Crunchy... and a bit sad' },
+  [HOLD_KITE]: { q: 'PUT AWAY' },
+  [HOLD_HOTDOG]: { uses: 4, q: 'EAT', done: 'Hot dog gone. Delicious!' },
+  [HOLD_PATTY]: { q: 'DROP' }, [HOLD_COOKED]: { q: 'DROP' }, [HOLD_CHAR]: { q: 'DROP' }, [HOLD_BURGER]: { q: 'DROP' }, [HOLD_FROZEN]: { q: 'DROP' }, [HOLD_FRIES]: { q: 'DROP' }, [HOLD_SHAKE]: { q: 'DROP' },
+  [HOLD_SNOWBALL]: { q: 'THROW' },
+  [HOLD_COCOA]: { uses: 5, q: 'SIP', done: "Cocoa all gone. There's more at the coffee machine" },
 };
-export const useEmote = (hold: number): EmoteKind => (hold === HOLD_SODA || hold === HOLD_MUG || hold === HOLD_COCOA ? 'sip' : 'eat');
+/** Sips / bites in each thing you can finish. */
+export const USES: Record<number, number> = Object.fromEntries(Object.entries(HOLDS).filter(([, h]) => h.uses).map(([k, h]) => [k, h.uses!]));
+/** The emote for having some: a sip of a drink, else a bite. */
+export const useEmote = (hold: number): EmoteKind => (HOLDS[hold]?.q === 'SIP' ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
 export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4,
   /** weightless and pushed off the floor (SPACE in zero g): up high for FLOAT_S, walking doesn't clear it */ POSE_FLOAT = 5;

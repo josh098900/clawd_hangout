@@ -6,7 +6,7 @@
 import { K } from '../engine/palette';
 import { r, txt, tw, lit, bake } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
-import { button, openModal, row } from './modal';
+import { button, heldKeys, openModal, row } from './modal';
 import { SKY_H, SKY_W, skyThings, skyView, type SkyThing } from '../world/sky';
 
 const W = 240, H = 150, HOLD = 1.2;
@@ -27,12 +27,9 @@ export function openMission(start: { x: number; y: number }, h: MissionHooks, on
   const g = cv.getContext('2d')!;
   const status = document.createElement('div'); Object.assign(status.style, { fontFamily: "'VT323', monospace", fontSize: '20px', color: '#9FEFFF', maxWidth: W * S + 'px', textAlign: 'center' });
   let x = start.x, y = start.y, raf = 0, drag: { px: number; py: number; x: number; y: number } | null = null, lock: { id: string; t0: number } | null = null, last = performance.now();
-  const keys = new Set<string>(), done = new Set<string>();
-  const m = openModal('MISSION CONTROL', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); onClose(); });
-  const kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(k)) { keys.add(k); e.preventDefault(); e.stopPropagation(); } };
-  const ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
-  const unstick = (): void => keys.clear();
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
+  const done = new Set<string>();
+  const m = openModal('MISSION CONTROL', () => { cancelAnimationFrame(raf); input.stop(); onClose(); });
+  const input = heldKeys(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's']), keys = input.held;
   cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); drag = { px: e.clientX, py: e.clientY, x, y }; cv.style.cursor = 'grabbing'; });
   cv.addEventListener('pointermove', (e) => { if (!drag) return; const k = W / cv.getBoundingClientRect().width; x = drag.x - (e.clientX - drag.px) * k; y = drag.y - (e.clientY - drag.py) * k; });
   const up = () => { drag = null; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -41,8 +38,8 @@ export function openMission(start: { x: number; y: number }, h: MissionHooks, on
   const draw = (nowMs: number) => {
     const dt = Math.min(0.1, (nowMs - last) / 1000); last = nowMs;
     const sp = 140 * dt;
-    if (keys.has('arrowleft') || keys.has('a')) x -= sp; if (keys.has('arrowright') || keys.has('d')) x += sp;
-    if (keys.has('arrowup') || keys.has('w')) y -= sp; if (keys.has('arrowdown') || keys.has('s')) y += sp;
+    if (keys.has('ArrowLeft') || keys.has('a')) x -= sp; if (keys.has('ArrowRight') || keys.has('d')) x += sp;
+    if (keys.has('ArrowUp') || keys.has('w')) y -= sp; if (keys.has('ArrowDown') || keys.has('s')) y += sp;
     x = ((x % SKY_W) + SKY_W) % SKY_W; y = Math.max(H / 2, Math.min(SKY_H - H / 2, y));
     h.aim(x, y);
     // what's under the crosshair?

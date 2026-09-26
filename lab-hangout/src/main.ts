@@ -70,7 +70,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, USED_UP, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, HOLDS, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -1512,7 +1512,7 @@ function syncActionBar(): void {
     actShown = label; actBtn.style.display = label ? '' : 'none';
     keyLabel(actBtn, 'E', label);
   }
-  const s = me.hold && playing ? (me.hold === HOLD_KITE ? 'PUT AWAY' : isKitchen(me.hold) ? 'DROP' : useEmote(me.hold) === 'eat' ? 'EAT' : 'SIP') : '';
+  const s = me.hold && playing ? HOLDS[me.hold]?.q ?? 'EAT' : '';
   if (s !== sipShown) {
     sipShown = s; sipBtn.style.display = s ? '' : 'none';
     keyLabel(sipBtn, 'Q', s);
@@ -1646,7 +1646,7 @@ function updateMe(dt: number): void {
   }
   // finished what's in your hand?
   if (me.hold && me.sips >= (USES[me.hold] ?? 5) && !me.emote) {
-    logLine(null, USED_UP[me.hold] ?? 'All gone');
+    logLine(null, HOLDS[me.hold]?.done ?? 'All gone');
     me.hold = 0; me.sips = 0; forceSend = true;
   }
   const ax = input.axis();
@@ -1655,7 +1655,7 @@ function updateMe(dt: number): void {
     const k = usingOf(me), fill = FILL[k ?? ''];
     if (fill && t >= fillEnd) {
       me.hold = fill.hold; me.sips = 0; leaveSpot(); SFX.chime();
-      if (!told.has(fill.hold)) { told.add(fill.hold); const verb = fill.hold === HOLD_POPCORN ? 'eat' : 'sip'; logLine(null, fill.msg + (isTouch ? ' Tap ' + verb.toUpperCase() + ' to ' + verb : ' Press Q to ' + verb)); }
+      if (!told.has(fill.hold)) { told.add(fill.hold); const verb = useEmote(fill.hold); logLine(null, fill.msg + (isTouch ? ' Tap ' + verb.toUpperCase() + ' to ' + verb : ' Press Q to ' + verb)); }
     } else if (k === 'booth' && booth) runBooth(t);
     else if (k === 'rack' && t >= fixEnd) {
       const b = DEN_INFO.build;

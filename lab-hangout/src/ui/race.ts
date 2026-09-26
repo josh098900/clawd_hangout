@@ -14,7 +14,7 @@ import { SFX } from '../audio/sfx';
 import { Engine } from '../audio/music';
 
 const engine = new Engine();
-import { button, openModal, row } from './modal';
+import { button, heldKeys, openModal, row } from './modal';
 
 const VW = 320, VH = 180;
 export interface RaceHooks {
@@ -113,14 +113,9 @@ export function openRace(h: RaceHooks): RaceHandle {
   const info = document.createElement('div'); Object.assign(info.style, { fontFamily: "'VT323', monospace", fontSize: '19px', color: '#9FEFFF', minHeight: '22px', textAlign: 'center' });
   const touch = matchMedia('(pointer: coarse)').matches;
   info.textContent = touch ? 'Gas is automatic · ◀ ▶ steer · DRIFT through turns, let go for a turbo' : '↑/W gas · ↓/S brake · ←→ steer · hold SPACE through a turn to drift, let go for a turbo';
-  const keys = new Set<string>();
-  const kd = (e: KeyboardEvent) => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'Shift'].includes(k)) { e.preventDefault(); e.stopPropagation(); keys.add(k); } };
-  const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
-  const unstick = (): void => keys.clear();
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
+  const pad = heldKeys(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'Shift']), keys = pad.held, hold = pad.hold;
   let raf = 0;
-  const m = openModal('KART RACE', () => { engine.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); h.onClose(); });
-  const hold = (label: string, k: string) => { const b = button(label, () => {}); b.classList.add('hold'); b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => keys.delete(k)); return b; };
+  const m = openModal('KART RACE', () => { engine.stop(); cancelAnimationFrame(raf); pad.stop(); h.onClose(); });
   const againBtn = button('RACE AGAIN', () => h.again()); againBtn.style.display = 'none';
   m.body.append(cv, info, ...(touch ? [row(hold('◀', 'ArrowLeft'), hold('DRIFT', ' '), hold('▶', 'ArrowRight'), hold('BRAKE', 'ArrowDown'))] : []), row(againBtn, button('LEAVE', m.close, true)));
 

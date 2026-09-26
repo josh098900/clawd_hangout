@@ -25,9 +25,13 @@ export function setSound(on: boolean): void {
   if (on && AC?.state === 'suspended') void AC.resume();
 }
 
-function genv(t0: number, at: number, pk: number, dur: number): GainNode {
-  const g = AC!.createGain();
+/** Shape gain node g: silent at t0, up to pk after `at` seconds, then fading away over `dur` more. The shape of every blip. */
+export function envelope(g: GainNode, t0: number, at: number, pk: number, dur: number): GainNode {
   g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(pk, t0 + at); g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+  return g;
+}
+function genv(t0: number, at: number, pk: number, dur: number): GainNode {
+  const g = envelope(AC!.createGain(), t0, at, pk, dur);
   g.connect(master!); return g;
 }
 function tone(type: OscillatorType, f0: number, f1: number, dur: number, vol: number, delay = 0): void {

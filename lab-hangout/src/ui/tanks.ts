@@ -12,7 +12,7 @@ import { K, type RGB } from '../engine/palette';
 import { r, txt, tw, disc, M, bake } from '../engine/pixel';
 import type { TankMsg } from '../net/transport';
 import { SFX } from '../audio/sfx';
-import { button, openModal, row } from './modal';
+import { button, heldKeys, openModal, row } from './modal';
 
 export const TW = 160, TH = 100, TANK_WIN = 5;
 /** The arena's cover blocks [x0, y0, x1, y1] (walls round the edge too). */
@@ -68,14 +68,9 @@ export function openTanks(h: TankHooks): TankHandle {
   const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; cv.style.width = (innerWidth < 560 ? innerWidth - 24 : Math.min(TW * S, innerWidth - 24)) + 'px'; cv.style.imageRendering = 'pixelated'; cv.style.touchAction = 'none';
   const g = cv.getContext('2d')!;
   const info = document.createElement('div'); Object.assign(info.style, { fontFamily: "'VT323', monospace", fontSize: '20px', color: '#9FEFFF', minHeight: '22px', textAlign: 'center' });
-  const keys = new Set<string>();
-  const kd = (e: KeyboardEvent) => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'f'].includes(k)) { e.preventDefault(); e.stopPropagation(); keys.add(k); } };
-  const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
-  const unstick = (): void => keys.clear();
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
+  const input = heldKeys(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'f']), keys = input.held, hold = input.hold;
   let raf = 0;
-  const m = openModal('TANK DUEL', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); h.onClose(); });
-  const hold = (label: string, k: string) => { const b = button(label, () => {}); b.classList.add('hold'); b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => keys.delete(k)); return b; };
+  const m = openModal('TANK DUEL', () => { cancelAnimationFrame(raf); input.stop(); h.onClose(); });
   const cpuBtn = button('PLAY THE CPU', () => { cpu = { x: SPAWN[1 - h.side].x, y: SPAWN[1 - h.side].y, a: SPAWN[1 - h.side].a, inv: 0, dead: 0 }; cpuSc = 0; cpuShells = []; setPh(1); cpuBtn.style.display = 'none'; });
   const touch = matchMedia('(pointer: coarse)').matches;
   m.body.append(cv, info, ...(touch ? [row(hold('◀', 'ArrowLeft'), hold('▲', 'ArrowUp'), hold('▼', 'ArrowDown'), hold('▶', 'ArrowRight'), hold('FIRE', ' '))] : []), row(cpuBtn, button('LEAVE', m.close, true)));

@@ -5,7 +5,7 @@
 import { K, type RGB } from '../engine/palette';
 import { r, txt, tw, M, bake } from '../engine/pixel';
 import { SFX } from '../audio/sfx';
-import { button, openModal, row } from './modal';
+import { button, heldKeys, openModal, row } from './modal';
 
 const W = 120, H = 100, PY = 90;
 interface Inv { x: number; y: number; row: number; alive: boolean }
@@ -20,28 +20,15 @@ export function openArcade(hi: number, onEnd: (score: number) => void): void {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   cv.style.width = W * S + 'px'; cv.style.height = H * S + 'px';
   const g = cv.getContext('2d')!;
-  const keys = new Set<string>();
   let px = W / 2, lives = 3, score = 0, wave = 1, dirX = 1, cool = 0, bombIn = 1.5, state: 'ready' | 'play' | 'over' = 'ready', st = 0;
   let invs: Inv[] = [], shots: Shot[] = [], bombs: Shot[] = [], booms: Boom[] = [], hurtT = -9, raf = 0, last = performance.now(), ended = false;
 
   const spawn = () => { invs = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 6; i++) invs.push({ x: 12 + i * 15, y: 14 + j * 11, row: j, alive: true }); dirX = 1; };
   spawn();
   const finish = () => { if (ended) return; ended = true; onEnd(score); };
-  const m = openModal('SLOP INVADERS', () => { cancelAnimationFrame(raf); removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true); removeEventListener('blur', unstick); finish(); });
+  const m = openModal('SLOP INVADERS', () => { cancelAnimationFrame(raf); input.stop(); finish(); });
 
-  const kd = (e: KeyboardEvent) => {
-    const k = e.key;
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' ', 'a', 'A', 'd', 'D', 'w', 'W'].includes(k)) { e.preventDefault(); e.stopPropagation(); keys.add(k.length === 1 ? k.toLowerCase() : k); }
-  };
-  const ku = (e: KeyboardEvent) => { keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); };
-  const unstick = (): void => keys.clear();
-  addEventListener('keydown', kd, true); addEventListener('keyup', ku, true); addEventListener('blur', unstick); // (switching windows mid-game: let go of every key)
-  const hold = (label: string, k: string) => {
-    const b = button(label, () => {}); b.classList.add('hold');
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(k); });
-    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => keys.delete(k));
-    return b;
-  };
+  const input = heldKeys(['ArrowLeft', 'ArrowRight', 'ArrowUp', ' ', 'a', 'd', 'w']), keys = input.held, hold = input.hold;
   m.body.append(cv, row(hold('◀', 'ArrowLeft'), hold('FIRE', ' '), hold('▶', 'ArrowRight'), button('QUIT', m.close, true)));
 
   const left = () => keys.has('ArrowLeft') || keys.has('a'), right = () => keys.has('ArrowRight') || keys.has('d');

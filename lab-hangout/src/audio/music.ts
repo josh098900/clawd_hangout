@@ -5,7 +5,7 @@
 // Notation: 'C4' plays a note, '-' holds the previous one, '.' is a rest.
 // Drums: 'k' kick, 's' snare, 'h' hi-hat, '.' rest. Every channel in a track has the same length.
 
-import { audio, soundOn } from './sfx';
+import { audio, envelope, soundOn } from './sfx';
 
 export interface Track { name: string; bpm: number; wave: OscillatorType; lead: string; bass: string; drums: string; /** the lead's loudness (default 0.05): karaoke's guide melody is quieter */ leadVol?: number }
 
@@ -277,9 +277,9 @@ export const INSTRUMENTS = ['KEYS', 'DRUMS', 'BASS', 'MIC'] as const;
 export function playPad(i: number, n: number, vol = 1): void {
   const au = audio(); if (!au || !soundOn) return;
   const { AC, master, NB } = au, t = AC.currentTime, out = AC.createGain(); out.gain.value = vol; out.connect(master);
-  const env = (g: GainNode, pk: number, a: number, d: number) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(pk, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  const env = (g: GainNode, pk: number, a: number, d: number, t0 = t) => envelope(g, t0, a, pk, d);
   const osc = (type: OscillatorType, f: number, pk: number, d: number, f1?: number) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + d); env(g, pk, 0.005, d); o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.05); return o; };
-  const hiss = (type: BiquadFilterType, f: number, q: number, pk: number, d: number) => { const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; s.loop = true; b.type = type; b.frequency.value = f; b.Q.value = q; env(g, pk, 0.002, d); s.connect(b); b.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05); };
+  const hiss = (type: BiquadFilterType, f: number, q: number, pk: number, d: number, t0 = t) => { const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NB; s.loop = true; b.type = type; b.frequency.value = f; b.Q.value = q; env(g, pk, 0.002, d, t0); s.connect(b); b.connect(g); g.connect(out); s.start(t0, Math.random() * 0.5); s.stop(t0 + d + 0.05); };
   if (i === 0) { osc('square', freq(PENTA[n]), 0.05, 0.35); osc('triangle', freq(PENTA[n]) * 2, 0.02, 0.25); }
   else if (i === 2) { const f = freq(PENTA[n]) / 4; osc('triangle', f, 0.14, 0.45); osc('square', f, 0.03, 0.2); }
   else if (i === 3) { // a little "la": sine with vibrato plus a soft buzzy formant
@@ -292,7 +292,7 @@ export function playPad(i: number, n: number, vol = 1): void {
     case 3: hiss('highpass', 6000, 0.7, 0.08, 0.3); break;
     case 4: osc('sine', 260, 0.18, 0.2, 180); break;
     case 5: osc('sine', 150, 0.2, 0.25, 100); break;
-    case 6: for (let k = 0; k < 3; k++) { const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain(), tt = t + k * 0.012; s.buffer = NB; b.type = 'bandpass'; b.frequency.value = 1200; b.Q.value = 1.5; g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.15, tt + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.1); s.connect(b); b.connect(g); g.connect(out); s.start(tt, Math.random() * 0.5); s.stop(tt + 0.12); } break;
+    case 6: for (let k = 0; k < 3; k++) hiss('bandpass', 1200, 1.5, 0.15, 0.098, t + k * 0.012); break; // a clap: three quick bursts
     case 7: hiss('highpass', 4000, 0.5, 0.12, 1.1); break;
   }
 }
