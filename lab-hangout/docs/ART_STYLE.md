@@ -119,9 +119,13 @@ so every room is as polished as it can be. Each step goes:
 4. **Make it alive.** Something moving in every screen width, and props that react to players
    (doors slide, puddles ripple, screens wake up when you walk past).
 5. **Everything that looks usable does something**, or at least says a line when clicked.
-6. **Nothing spills.** Text fits its sign at the longest value it can show, and art stays inside
+6. **Keep it where the camera looks.** The camera shows only about 150 px above a player's feet, so signs, posters,
+   screens and door tops belong within ~150 px of the wall's base (door ~105 px tall, its sign just above). Take a
+   screenshot at the player's height before detailing a wall (step 17 had to be rebuilt lower). A big screen that
+   matters (the reactor's board) can be framed with `room.watch` while you're at its station.
+7. **Nothing spills.** Text fits its sign at the longest value it can show, and art stays inside
    its frame (see the Den window and the roof launch board, fixed in 99085f8). Doors are tested by
    *walking* into them, never only by `door(i)`.
-7. **The close-up review.** Screenshots of every part of the room at 3× zoom, day and night if
+8. **The close-up review.** Screenshots of every part of the room at 3× zoom, day and night if
    it's outdoors, checked against this list. Then a second pass purely for polish before it's
    called done, and still 60 fps with 12 bots.
