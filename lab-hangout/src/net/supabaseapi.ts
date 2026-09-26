@@ -165,6 +165,12 @@ export class SupabaseApi implements Api {
     },
   };
 
+  /** The Moon (0019_moon.sql). */
+  readonly moon: Api['moon'] = {
+    assay: async () => { const o = await rpcJson(this.sb, 'moon_assay', {}); return { tokens: n0(o.tokens), paid: n0(o.paid), crystal: o.crystal === true, crystals: n0(o.crystals), prize: strOr(o.prize) }; },
+    crystals: async () => n0(await rpc(this.sb, 'moon_crystals')),
+  };
+
   /** Tips paid for a performance (the server caps them). */
   readonly tips: Api['tips'] = {
     karaoke: async (score) => { const o = await rpcJson(this.sb, 'karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },

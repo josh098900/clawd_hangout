@@ -5,7 +5,8 @@
 //   HYDROPONICS (6 trays per server: grow a STAR MELON, 0015_space.sql; its seed goes in the roof garden),
 //   the big WINDOW (Earth turning, the Moon going by; a bench to gaze from),
 //   MISSION CONTROL (the telescope: ui/mission.ts; the big screen shows where it's pointing),
-//   the AIRLOCK out to the spacewalk, and an ESCAPE POD (splashdown in the Park's pond).
+//   the AIRLOCK out to the spacewalk, an ESCAPE POD (splashdown in the Park's pond),
+//   and the LANDER BAY, where the lander to the Moon docks (world/moon.ts runs its timetable).
 // COSMO (from the Cinema's film, A CRITTER IN SPACE) floats about showing people round.
 
 import { mmss } from '../engine/format';
@@ -13,15 +14,16 @@ import { K, SK, type RGB } from '../engine/palette';
 import { PX, mk, r, disc, ring, line, txt, tw, lit, G, Gd, M, shade, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { CAPSULE_ARRIVE, DEPART, UP_S, drawEarth, drawMoon, flight, starfield, twinkles } from './space';
+import { LANDER_CABIN_ARRIVE, L_TRIP, lander } from './moon';
 import { skyThings, skyView } from './sky';
 import type { ScopeState, StateMsg, Tray } from '../net/transport';
 import type { Door, Prop, Room, Spot } from './room';
 
-const W = 1500, H = 700, WALL = 280, FL = 470;
+const W = 1720, H = 700, WALL = 280, FL = 470;
 export const TRAY_X = [240, 302, 364, 426, 488, 550];
 const WIN = { x0: 630, y0: 296, x1: 990, y1: 452 };
 const SCR = { x0: 1042, y0: 300, x1: 1218, y1: 392 };
-const DOCK_X = 104, AIR_X = 1325, POD_X = 1455;
+const DOCK_X = 104, AIR_X = 1325, POD_X = 1455, BAY_X = 1624;
 /** The trays on this server (fetched while you're here), the telescope, and a LOCAL test speed-up for the melons (?grow=N). */
 export const STATION = { trays: [] as Tray[], fetchedAt: 0, dirty: true, scope: null as ScopeState | null };
 export const TRAY_SPEED = { k: 1 };
@@ -80,6 +82,11 @@ function build(this: Room): void {
     // ---- the ESCAPE POD ----
     disc(POD_X, 428, 28, SK.TRIM); disc(POD_X, 428, 24, [236, 120, 60]); disc(POD_X, 424, 8, SK.TRIM); disc(POD_X, 424, 6, SK.WINDOW);
     r(POD_X - 28, 358, 56, 22, SK.TRIM); txt('ESCAPE', POD_X - tw('ESCAPE') / 2, 361, [236, 120, 60]); txt('POD', POD_X - tw('POD') / 2, 369, [236, 120, 60]);
+    // ---- the LANDER BAY: a square docking hatch ringed in gold foil, the board saying when the lander goes ----
+    r(BAY_X - 50, 352, 100, 118, SK.GOLD_FOIL); for (let k = 0; k < 30; k++) r(BAY_X - 48 + Math.floor(h1(k * 3.3) * 94), 354 + Math.floor(h1(k * 7.1) * 112), 3, 1, h1(k) > 0.5 ? SK.GOLD_FOIL_HI : shade(SK.GOLD_FOIL, 0.8));
+    r(BAY_X - 40, 362, 80, 108, SK.TRIM); r(BAY_X - 36, 366, 72, 104, SK.HULL_DK);
+    r(BAY_X - 62, 290, 124, 38, SK.TRIM); r(BAY_X - 59, 293, 118, 32, SK.SCREEN); // the departures board
+    r(BAY_X - 50, 334, 100, 12, [40, 46, 70]); txt('TO THE MOON', BAY_X - tw('TO THE MOON') / 2, 337, [200, 200, 212]);
   });
 }
 /** A spacesuit hanging on the wall (the spacewalk's), helmet on a hook above it. */
@@ -153,6 +160,15 @@ function dockBits(a: number): void {
   const l1 = 'ROCKET HOME', l2 = here ? (f.left < 30 ? 'LAST CALL! ' : 'BOARD NOW · ') + mmss(f.left) : f.phase === 'up' ? 'ARRIVING...' : f.phase === 'down' ? 'IN FLIGHT' : 'NEXT ONE ' + mmss(f.left + UP_S);
   lit(() => { txt(l1, DOCK_X - tw(l1) / 2, 298, [255, 180, 60]); txt(l2, DOCK_X - tw(l2) / 2, 310, here && (f.left > 30 || (a % 1) < 0.6) ? SK.LED : SK.LED_RED); });
 }
+function bayBits(a: number): void {
+  const f = lander(), here = f.phase === 'docked' && f.left > 4;
+  if (here) { lit(() => { r(BAY_X - 36, 366, 72, 104, [240, 226, 196]); r(BAY_X - 36, 452, 72, 18, [214, 196, 160]); }); Gd(BAY_X, 418, 40, [255, 220, 160], 0.3); lit(() => txt('LANDER', BAY_X - tw('LANDER') / 2, 404, SK.TRIM)); }
+  else { r(BAY_X - 36, 366, 72, 104, SK.PANEL); r(BAY_X - 36, 366, 72, 2, SK.HULL_HI); r(BAY_X + 32, 366, 4, 104, SK.HULL_SH); r(BAY_X - 2, 366, 4, 104, SK.SEAM); for (const s of [-1, 1]) r(BAY_X + s * 14 - 2, 410, 4, 14, SK.TRIM); }
+  lit(() => r(BAY_X - 4, 356, 8, 4, here ? SK.LED : (a % 1) < 0.5 ? SK.LED_RED : shade(SK.LED_RED, 0.4)));
+  const back = f.phase === 'landed' ? f.left + L_TRIP : 0; // (seconds until it's back here)
+  const l1 = 'LANDER TO THE MOON', l2 = here ? (f.left < 30 ? 'LAST CALL! ' : 'BOARD NOW · ') + mmss(f.left) : f.phase === 'down' ? 'DESCENDING...' : f.phase === 'landed' ? 'ON THE MOON · BACK ' + mmss(back) : f.phase === 'up' ? 'ARRIVING ' + mmss(f.left) : 'DEPARTING';
+  lit(() => { txt(l1, BAY_X - tw(l1) / 2, 298, [255, 180, 60]); txt(l2, BAY_X - tw(l2) / 2, 310, here && (f.left > 30 || (a % 1) < 0.6) ? SK.LED : f.phase === 'up' ? K.GOLD : SK.LED_RED); });
+}
 function growLights(a: number): void {
   lit(() => { for (let x = 216; x < 584; x += 12) r(x, 340, 8, 2, (Math.floor(x / 12) % 2) ? SK.GROW : SK.GROW2); });
   for (let k = 0; k < 8; k++) G(214, 342 + k * 12, 372, 12, SK.GROW, 0.03 + 0.005 * Math.sin(a * 2));
@@ -190,7 +206,7 @@ function drifters(): void {
 }
 function drawBack(a: number): void {
   for (let x = 60; x < W; x += 180) G(x, WALL - 12, 90, 30, [230, 240, 255], 0.06);
-  windowView(a); dockBits(a); growLights(a); missionScreen(a); airlockBits(a); drifters();
+  windowView(a); dockBits(a); growLights(a); missionScreen(a); airlockBits(a); bayBits(a); drifters();
 }
 
 // ---------- props ----------
@@ -213,6 +229,7 @@ const dockDoor: Door = { trigger: { x0: DOCK_X - 20, y0: 480, x1: DOCK_X + 20, y
 export const SPACEWALK_ARRIVE = { x: 200, y: 420 };
 const airlock: Door = { trigger: { x0: AIR_X - 20, y0: 480, x1: AIR_X + 20, y1: 488 }, to: 'spacewalk', arrive: SPACEWALK_ARRIVE, label: 'SPACEWALK', area: { x0: AIR_X - 46, y0: 358, x1: AIR_X + 46, y1: 480 } };
 const pod: Door = { trigger: { x0: POD_X - 16, y0: 480, x1: POD_X + 16, y1: 488 }, to: 'park', arrive: { x: 776, y: 620 }, label: 'ESCAPE POD', area: { x0: POD_X - 30, y0: 396, x1: POD_X + 30, y1: 480 } };
+const bay: Door = { trigger: { x0: BAY_X - 20, y0: 480, x1: BAY_X + 20, y1: 488 }, to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER', area: { x0: BAY_X - 46, y0: 352, x1: BAY_X + 46, y1: 480 }, route: () => { const f = lander(); return f.phase === 'docked' && f.left > 4 ? { to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER TO THE MOON' } : null; } };
 
 export function makeSpaceStation(): Room {
   const room: Room = {
@@ -220,7 +237,7 @@ export function makeSpaceStation(): Room {
     w: W, h: H,
     floor: { x0: 16, y0: 480, x1: W - 16, y1: 606 },
     blockers: [{ x0: 734, y0: 560, x1: 886, y1: 570 }],
-    doors: [dockDoor, airlock, pod],
+    doors: [dockDoor, airlock, pod, bay],
     spots: STATION_SPOTS, inUse: new Map(),
     onState(s: StateMsg) { if (s.k === 'scope') STATION.scope = s.v; else if (s.k === 'trays') STATION.dirty = true; },
     spawn: { x: DOCK_X, y: 500 },

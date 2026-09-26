@@ -202,6 +202,21 @@ const DEFS: NpcDef[] = [
     chat: ['hi! yes, i am THE critter from A CRITTER IN SPACE', 'press SPACE to push off the floor. wheee', 'grow a STAR MELON in the trays: 3 tokens, ripe in half an hour', 'the melon has a COMET BLOOM seed in it, for the roof garden', 'the airlock takes you on a spacewalk: grab stardust, bring it in, get tokens', 'mission control: find a comet with the telescope', 'the rocket home leaves every 20 minutes', 'the escape pod lands you in the park pond. splash!'],
   },
   {
+    // the Moon Base's botanist: grows MOON TATERS in the greenhouse, and knows everything about moon rocks
+    id: 'npc-luna', name: 'LUNA', room: 'moonbase', speed: 26,
+    look: { c: 6, hat: 4, face: 0, fit: 1, sp: 0 },
+    stops: [
+      { x: 300, y: 500, wait: 16, say: ['grow, little taters', 'moon soil is 90% dust, 10% hope', 'a tomato! on the MOON!'] },
+      { x: 460, y: 506, wait: 12, say: ['basil loves the pink light', 'these peas are space peas. obviously'] },
+      { use: 6, wait: 3, holdAfter: 8, say: ['snack break', 'the printer only does hot dogs. i have made my peace with it'] },
+      { use: 2, wait: 20, holdAfter: 0, say: ['mmm. printed.', 'you get used to the taste'] },
+      { x: 1110, y: 500, wait: 12, say: ['let us see what the rocks say', 'purple ones glow brighter at night. or is it day? hard to tell up here'] },
+      { use: 4, wait: 24, say: ['there is home', 'earthrise never gets old', 'i can see the Square from here. probably'] },
+      { x: 180, y: 520, wait: 8, say: ['suits are on the rack', 'mind the dust on your way in'] },
+    ],
+    chat: ['welcome to the MOON BASE! i am LUNA, i grow things', 'mine a glowing rock outside, then bring it to the ASSAY machine', 'one in six rocks is a MOON CRYSTAL. five crystals and you get a robot friend', 'the buggy garage is past the big dome. try the course!', 'SPACE for a moon jump. boing, but slowly', 'the lander goes home every 10 minutes. do not get stranded. well, you can always wait'],
+  },
+  {
     id: 'npc-sage', name: 'SAGE', room: 'den', speed: 38, cycle: 1800, // one pomodoro: code for the focus, break for the break
     look: { c: 1, hat: 3, face: 1, fit: 0, sp: 0 },
     stops: [

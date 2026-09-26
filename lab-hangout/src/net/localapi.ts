@@ -364,6 +364,19 @@ export class LocalApi implements Api {
     },
   };
 
+  /** The Moon, kept in this browser (same rules as moon_assay() in 0019_moon.sql). */
+  readonly moon: Api['moon'] = {
+    assay: async () => {
+      if (Date.now() - (this.lastPay.Moon ?? 0) < 20000) throw new Error('the machine is still warm: one rock every 20 seconds');
+      const crystal = Math.random() < 1 / 6, k = 'labhangout.localMoon.' + this.day(), today = Number(db.get(k, 0)) || 0, paid = Math.max(0, Math.min(crystal ? 3 : 1, 15 - today));
+      this.lastPay.Moon = Date.now(); db.set(k, today + paid); this.wallet(this.wallet() + paid);
+      const n = db.get('labhangout.localCrystals', 0) + (crystal ? 1 : 0); db.set('labhangout.localCrystals', n);
+      const prize = crystal && n >= 5 && !this.inv().includes('pet:8') ? (this.inv('pet:8'), 'pet:8') : null;
+      return { tokens: this.wallet(), paid, crystal, crystals: n, prize };
+    },
+    crystals: async () => db.get('labhangout.localCrystals', 0),
+  };
+
   /** Tips paid for a performance (the server caps them). */
   readonly tips: Api['tips'] = {
     /** Same rules as karaoke_tip() in 0016_karaoke.sql: nothing under 40, 1 + score/30 (max 4), 12 a day, one per 30 s. */

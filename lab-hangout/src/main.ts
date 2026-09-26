@@ -18,11 +18,14 @@ import { makeRoof, rocketTop, showStart } from './world/roof';
 import { makeRocket } from './world/rocket';
 import { makeSpaceStation, STATION, TRAY_SPEED } from './world/station';
 import { makeSpacewalk, WALK, floatersNow } from './world/spacewalk';
+import { makeLander } from './world/lander';
+import { lander, makeMoon } from './world/moon';
+import { makeMoonBase } from './world/moonbase';
 import { FLIGHT, PAD_X, flight } from './world/space';
 import { skyThings } from './world/sky';
 import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
 import { COUNT_IN, SONGS, kLive, kTime, lane, stepS } from './game/karaoke';
-import { playPad, INSTRUMENTS } from './audio/music';
+import { playPad, INSTRUMENTS, MOON_TRACK } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
 import { makeStation, makeTrain, STATIONS, train } from './world/subway';
@@ -61,7 +64,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, HOLDS, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, HOLDS, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, type Avatar, type EmoteKind, type Using, POSE_BUGGY, HOLD_MOONROCK, JUMP_S } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -93,6 +96,7 @@ import { refreshGarden, tendBed } from './features/garden';
 import { crowdEmote, initKaraokeHud, karaokeStep, openKaraoke, perf } from './features/karaoke';
 import { albumHooks, checkMyPhotos, checkQueue, loadFlatPhoto, photosAt, photosStale, refreshPhotos, setAdmin } from './features/photos';
 import { drawTethers, jets, openScope, payWalk, setFlight, shakeNow, spaceArrive, spaceKey, spaceLine, spaceStep, spotted, tendTray } from './features/space';
+import { assayRock, dropRock, mineRock, moonArrive, moonDebug, moonKey, moonLine, moonStep, parkBuggy, rockGone, setLander, useBuggy } from './features/moon';
 import { adventMenu, drawBalls, fightHits, flyBall, openPresent, refreshWinter, rollSnowman, scoopSnow, sendGiftTo, snowTarget, startSnowfight, throwSnowball, treeMenu, winterLine, winterStep } from './features/winter';
 
 
@@ -106,7 +110,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -135,7 +139,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -159,7 +163,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -282,7 +286,7 @@ function onNet(e: NetEvent): void {
     }
     case 'snowball': { if (!others.has(e.id) || !allow(e.id, 'snowball', 3, 5)) break; flyBall(e.id, e.b); break; }
     case 'kscore': { const k = STAGE_INFO.karaoke, av = others.get(e.id); if (room.id === 'stage' && av && k && e.k.r === k.t0 && allow(e.id, 'kscore', 3, 6)) STAGE_INFO.scores.set(e.id, { name: av.name, i: e.k.i, s: e.k.s, c: e.k.c, f: !!e.k.f }); break; }
-    case 'junk': if (room.id === 'spacewalk' && others.has(e.id) && allow(e.id, 'junk', 6, 10)) WALK.got.set(e.n, Date.now() / 1000); break;
+    case 'junk': if (room.id === 'spacewalk' && others.has(e.id) && allow(e.id, 'junk', 6, 10)) WALK.got.set(e.n, Date.now() / 1000); else if (room.id === 'moon' && others.has(e.id) && allow(e.id, 'junk', 6, 10)) rockGone(e.n); break;
     case 'status': toast(e.text); break;
   }
 }
@@ -443,11 +447,12 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   await fade(false);
   switching = false;
   if (id === 'diner' && !shiftLive(DINER.g)) toast('Want to cook? CLOCK IN at the time clock by the kitchen', 4000);
-  spaceArrive(from, id);
+  spaceArrive(from, id); moonArrive(from, id);
 }
 function goThrough(d: Door): void {
   const dest = doorDest(d);
   if (switching || doorCooldown > 0 || !dest) return;
+  if (me.pose === POSE_BUGGY) parkBuggy(); // (it drives itself back to the garage)
   SFX.door();
   void enterRoom(dest.to, dest.arrive);
 }
@@ -560,6 +565,9 @@ function useSpot(i: number): void {
     return;
   }
   if (s.kind === 'cook') { cook(s.n ?? 0); return; }
+  if (s.kind === 'buggy') { useBuggy(); return; }
+  if (s.kind === 'rock') { mineRock(i, s.n ?? 0); return; }
+  if (s.kind === 'assay') { assayRock(); return; }
   if (s.kind === 'bed') { tendBed(s.n ?? 0); return; }
   if (s.kind === 'tray') { tendTray(s.n ?? 0); return; }
   if (s.kind === 'karaoke') { openKaraoke(); return; }
@@ -676,6 +684,7 @@ function leaveSpot(): void {
 /** Sip / eat whatever's in your hand. */
 function useItem(): void {
   if (me.hold === HOLD_SNOWBALL) { throwSnowball(); return; }
+  if (me.hold === HOLD_MOONROCK) { dropRock(); return; }
   if (isKitchen(me.hold)) { cook(ST.BIN); return; }
   if (me.hold === HOLD_KITE) { me.hold = 0; forceSend = true; toast('Kite back on the stand'); return; }
   if (!me.hold || me.emote) return;
@@ -896,6 +905,7 @@ interface Action { label: string; run: () => void; at: [number, number] | null }
 function currentAction(): Action | null {
   if (!playing || editing || switching) return null;
   if (me.pose === POSE_BOAT) return Math.hypot(me.x - DOCK.launch.x, me.y - DOCK.launch.y) < 44 ? { label: 'GET OUT', run: land, at: null } : null;
+  if (me.pose === POSE_BUGGY) return { label: 'PARK', run: parkBuggy, at: null };
   if (me.use >= 0) {
     const k = usingOf(me);
     if (k === 'fish') return fishing?.state === 'bite' ? { label: 'REEL!', run: reel, at: null } : { label: 'STOP FISHING', run: () => { fishing = null; leaveSpot(); }, at: null };
@@ -940,7 +950,7 @@ function syncActionBar(): void {
     keyLabel(sipBtn, 'Q', s);
   }
   for (const [p, b] of poseBtns) b.setAttribute('aria-pressed', String(me.pose === p));
-  const fl = playing && room.zeroG?.() ? (room.freeFloat ? 'JETPACK' : 'FLOAT') : '';
+  const fl = playing && room.zeroG?.() ? (room.freeFloat ? 'JETPACK' : 'FLOAT') : playing && room.lowG?.() && me.pose !== POSE_BUGGY ? 'JUMP' : '';
   if (fl !== floatShown) { floatShown = fl; floatBtn.style.display = fl ? '' : 'none'; keyLabel(floatBtn, 'SPACE', fl); }
 }
 const emoteBar = $('#emotes');
@@ -978,7 +988,7 @@ const poseBtns: [number, HTMLButtonElement][] = ([[POSE_DANCE, '6', 'DANCE'], [P
   return [p, b];
 });
 const floatBtn = document.createElement('button'); floatBtn.type = 'button'; floatBtn.className = 'pill float'; floatBtn.style.display = 'none';
-floatBtn.addEventListener('click', () => spaceKey()); emoteBar.appendChild(floatBtn);
+floatBtn.addEventListener('click', () => (room.zeroG?.() ? spaceKey() : moonKey())); emoteBar.appendChild(floatBtn);
 let floatShown = '';
 { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill more'; const k = document.createElement('kbd'); k.textContent = 'R'; const l = document.createElement('span'); l.className = 'lbl-more'; b.append(k, l); b.addEventListener('click', openWheel); emoteBar.appendChild(b); }
 input.onKey = (e) => {
@@ -986,6 +996,7 @@ input.onKey = (e) => {
   if (wheel.classList.contains('on')) { if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') closeWheel(); else if (e.key >= '1' && e.key <= '8') { closeWheel(); emote(WHEEL[Number(e.key) - 1]); } return; }
   if (e.key === 'r' || e.key === 'R') { openWheel(); return; }
   if (e.key === ' ' && room.zeroG?.()) { e.preventDefault(); spaceKey(); return; }
+  if (e.key === ' ' && room.lowG?.()) { e.preventDefault(); moonKey(); return; }
   if (e.key === 'Enter') { e.preventDefault(); chatEl.focus(); return; }
   if (e.key === 'e' || e.key === 'E') { if (actNow) actNow.run(); else useItem(); return; }
   if (e.key === 'q' || e.key === 'Q') { useItem(); return; }
@@ -1119,7 +1130,7 @@ function updateMe(dt: number): void {
   if ((room.zeroG?.() || skating) && me.pose !== POSE_BOAT) moved = drift(dt, vx, vy, skating); // weightless (or skating on the ice): momentum
   else {
     zv.x = zv.y = 0;
-    const rowing = me.pose === POSE_BOAT, sp = rowing ? 0.7 : 1; // boats go where it's wet, a bit slower
+    const rowing = me.pose === POSE_BOAT, sp = rowing ? 0.7 : me.pose === POSE_BUGGY ? 1.9 : 1; // boats go where it's wet, a bit slower; the moon buggy's quick
     const ok = (x: number, y: number) => (rowing ? !!room.water?.(x, y) : walkable(room, x, y));
     const nx = me.x + vx * SPEED_X * sp * dt, ny = me.y + vy * SPEED_Y * sp * dt;
     if (vx && (ok(nx, me.y) || (!rowing && push(nx - me.x, 0)))) { moved += Math.abs(nx - me.x); me.x = nx; }
@@ -1138,8 +1149,8 @@ function updateMe(dt: number): void {
   for (const d of room.doors) if (inside(d.trigger, me.x, me.y) && (d.edge || vy < -0.3) && doorDest(d)) goThrough(d);
   const was = me.moving;
   me.moving = moved > 0.01;
-  if (me.moving && me.pose && me.pose !== POSE_GHOST && me.pose !== POSE_BOAT && me.pose !== POSE_FLOAT) { me.pose = 0; forceSend = true; }
-  if (me.pose === POSE_FLOAT && (now() - me.poseT0 > FLOAT_S || !room.zeroG?.())) { me.pose = 0; forceSend = true; }
+  if (me.moving && me.pose && me.pose !== POSE_GHOST && me.pose !== POSE_BOAT && me.pose !== POSE_FLOAT && me.pose !== POSE_BUGGY) { me.pose = 0; forceSend = true; }
+  if (me.pose === POSE_FLOAT && now() - me.poseT0 > (room.zeroG?.() ? FLOAT_S : room.lowG?.() ? JUMP_S : 0)) { me.pose = 0; forceSend = true; }
   if (me.pose === POSE_GHOST && now() > ghostUntil) { me.pose = 0; forceSend = true; toast('You are yourself again'); }
   if (Math.abs(vx) > 0.15) me.dir = vx > 0 ? 1 : -1; else if (room.zeroG?.() && Math.abs(zv.x) > 8) me.dir = zv.x > 0 ? 1 : -1;
   if (was && !me.moving) me.stopT = t;
@@ -1388,7 +1399,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); karaokeStep(dt); winterStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -1396,7 +1407,7 @@ function frame(nowMs: number): void {
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || winterLine());
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || moonLine() || winterLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = (g && partyMusic(g)) || (isFlat(room.id) && partyOn());
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -1427,8 +1438,10 @@ function frame(nowMs: number): void {
     const fc = filmClock();
     filmScore.set(room.id === 'cinema' ? FILM_TRACK : null, fc.start + 5);
     filmScore.volume(room.id === 'cinema' && filmPlaying() && !g ? (me.x > 400 ? 0.8 : 0.35) : 0); filmScore.tick();
-    const orbit = room.id === 'station' || room.id === 'spacewalk' || (room.id === 'rocket' && flight().phase === 'docked');
+    const orbit = room.id === 'station' || room.id === 'spacewalk' || (room.id === 'rocket' && flight().phase === 'docked') || (room.id === 'lander' && lander().phase === 'docked');
     spaceScore.set(orbit ? ORBIT_TRACK : null, 0); spaceScore.volume(orbit && !g ? 0.5 : 0); spaceScore.tick();
+    const lunar = room.id === 'moon' || room.id === 'moonbase' || (room.id === 'lander' && lander().phase !== 'docked');
+    moonScore.set(lunar ? MOON_TRACK : null, 0); moonScore.volume(lunar && !g ? 0.5 : 0); moonScore.tick();
     // seated somewhere with a view (the cinema), the camera pans up to frame it
     const view = room.watch && usingOf(me) === 'sit' ? room.watch : null;
     // decorating: zoom out so the whole flat (wall pieces down to the front row: y 320-590) fits between the panel and the chat box
@@ -1559,7 +1572,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     sing: (n: number) => setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }), note: (n: number) => playNote(n),
     lane: () => (perf ? lane(perf.song, perf.inst).map((x) => [x.s, x.p]) : []), stepSec: () => (STAGE_INFO.karaoke ? stepS(SONGS[STAGE_INFO.karaoke.song]) : 0),
     peers: () => [...others.values()].map((o) => ({ id: o.id, name: o.name, pose: o.pose, use: o.use, x: Math.round(o.x), y: Math.round(o.y) })),
-    flightAt: (k: number) => setFlight(k), skew: (s: number) => { FLIGHT.skew = s; }, flight: () => flight(), spaceKey: () => spaceKey(),
+    flightAt: (k: number) => setFlight(k), landerAt: (k: number) => setLander(k), moon: () => moonDebug(), moonKey: () => moonKey(), park: () => parkBuggy(), door: (i: number) => goThrough(room.doors[i]), tokens: () => myTokens, skew: (s: number) => { FLIGHT.skew = s; }, flight: () => flight(), spaceKey: () => spaceKey(),
     space: () => ({ zv: { ...zv }, env: { ...ENV }, walk: { pts: WALK.pts, dust: WALK.dust, things: WALK.things, got: WALK.got.size }, trays: STATION.trays, scope: STATION.scope, sky: save.data.sky, pose: me.pose }),
     floaters: () => floatersNow().filter((f) => !WALK.got.has(f.id)), sky: () => skyThings(), spotted: (name: string) => { const th = skyThings().find((q) => q.name === name || q.id === name); if (th) spotted(th); },
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),

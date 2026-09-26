@@ -40,6 +40,9 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   launch: { text: 'Ride the rocket up to the Space Station', goal: 1 },
   spacewalk: { text: 'Collect 10 stardust on a spacewalk', goal: 10 },
   comet: { text: 'Spot a comet from Mission Control', goal: 1 },
+  moonwalk: { text: 'Take the lander down to the Moon', goal: 1 },
+  moonrock: { text: 'Assay 3 moon rocks at the Moon Base', goal: 3 },
+  buggy: { text: 'Drive a full lap in a moon buggy', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -63,6 +66,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'host', name: 'PARTY HOST', hint: 'Throw a house party', earned: () => stat('parties') >= 1 },
   { id: 'storm', name: 'STORM CHASER', hint: 'Catch a fish in a thunderstorm', earned: () => stat('stormFish') >= 1 },
   { id: 'astronaut', name: 'ASTRONAUT', hint: 'Fly to the Space Station 5 times', earned: () => stat('flights') >= 5 },
+  { id: 'moonwalker', name: 'MOONWALKER', hint: 'Assay 20 moon rocks', earned: () => stat('moonrocks') >= 20 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

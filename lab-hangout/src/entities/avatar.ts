@@ -3,10 +3,10 @@
 
 import { basePose, stampCritter, PETS, PET_SAY, type Look, type Pose } from './critter';
 import type { SpotKind } from '../world/room';
-import { BODY, CONFETTI, K, type RGB } from '../engine/palette';
+import { BODY, CONFETTI, K, MN, SK, type RGB } from '../engine/palette';
 
 const OUTLINE = K.OUTLINE;
-import { alpha, oval, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX } from '../engine/pixel';
+import { alpha, oval, disc, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX, shade } from '../engine/pixel';
 import { bump, eOB, eOut, eIO, h1, seg, lerp } from '../engine/math';
 import { drawUmbrella, wind } from '../world/weather';
 import { crewPose } from '../game/dance';
@@ -36,6 +36,8 @@ export const HOLD_NONE = 0, HOLD_MUG = 1, HOLD_POPCORN = 2, HOLD_SODA = 3, HOLD_
 export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12, HOLD_FROZEN = 13, HOLD_FRIES = 14, HOLD_SHAKE = 15;
 /** Winter: a snowball ready to throw, a mug of hot cocoa (the Lab's coffee machine in the season). */
 export const HOLD_SNOWBALL = 16, HOLD_COCOA = 17;
+/** The Moon: a glowing moon rock from the crystal field, to carry to the Moon Base's ASSAY machine. */
+export const HOLD_MOONROCK = 18;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 /**
  * Everything you can hold (MoveMsg.hold): how many sips / bites it has, what the Q button says for it (Q sips it,
@@ -52,6 +54,7 @@ export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 
   [HOLD_HOTDOG]: { uses: 4, q: 'EAT', done: 'Hot dog gone. Delicious!' },
   [HOLD_PATTY]: { q: 'DROP' }, [HOLD_COOKED]: { q: 'DROP' }, [HOLD_CHAR]: { q: 'DROP' }, [HOLD_BURGER]: { q: 'DROP' }, [HOLD_FROZEN]: { q: 'DROP' }, [HOLD_FRIES]: { q: 'DROP' }, [HOLD_SHAKE]: { q: 'DROP' },
   [HOLD_SNOWBALL]: { q: 'THROW' },
+  [HOLD_MOONROCK]: { q: 'DROP' },
   [HOLD_COCOA]: { uses: 5, q: 'SIP', done: "Cocoa all gone. There's more at the coffee machine" },
 };
 /** Sips / bites in each thing you can finish. */
@@ -60,15 +63,24 @@ export const USES: Record<number, number> = Object.fromEntries(Object.entries(HO
 export const useEmote = (hold: number): EmoteKind => (HOLDS[hold]?.q === 'SIP' ? 'sip' : 'eat');
 /** Floor poses (MoveMsg.pose). They last until you move. */
 export const POSE_NONE = 0, POSE_DANCE = 1, POSE_FLOOR = 2, /** tricked on Halloween: a sheet ghost for a minute (walking doesn't clear it) */ POSE_GHOST = 3, /** rowing a boat on the Park pond (walking = rowing) */ POSE_BOAT = 4,
-  /** weightless and pushed off the floor (SPACE in zero g): up high for FLOAT_S, walking doesn't clear it */ POSE_FLOAT = 5;
-export const FLOAT_S = 6;
+  /** weightless and pushed off the floor (SPACE in zero g): up high for FLOAT_S, walking doesn't clear it; on the Moon: a big slow jump (JUMP_S) */ POSE_FLOAT = 5,
+  /** driving a moon buggy (the Moon's surface) */ POSE_BUGGY = 6;
+export const FLOAT_S = 6, JUMP_S = 2.2;
+/** How high a moon jump is, `ps` seconds after take-off: a slow parabola (a little crouch first). */
+export const jumpH = (ps: number): number => (ps < 0.12 || ps > JUMP_S ? 0 : 60 * (4 * ((ps - 0.12) / (JUMP_S - 0.12)) * (1 - (ps - 0.12) / (JUMP_S - 0.12))));
+/** The MOON ROVER pet (a robot: it's fine without air). */
+export const PET_ROVER = 8;
 /** How high a POSE_FLOAT avatar is, `ps` seconds after pushing off: up, hang there, drift back down. */
 export const floatH = (ps: number): number => (ps < 0 ? 0 : ps < 1.2 ? 46 * eOut(ps / 1.2) : ps < FLOAT_S - 1.6 ? 46 + 4 * Math.sin((ps - 1.2) * 1.8) : ps < FLOAT_S ? (46 + 4 * Math.sin((FLOAT_S - 2.8) * 1.8)) * (1 - eIO((ps - (FLOAT_S - 1.6)) / 1.6)) : 0);
 /**
  * The room everyone's being drawn in, set by main.ts each frame: weightless (everyone bobs and
  * swims), out in open space (no shadows, helmets on, no pets), and the G-force squashing everyone.
  */
-export const ENV = { zeroG: false, free: false, g: 0, /** winter: is (x, y) on ice (the Park's frozen pond)? then walking is skating */ ice: null as ((x: number, y: number) => boolean) | null };
+export const ENV = {
+  zeroG: false, free: false, g: 0, /** winter: is (x, y) on ice (the Park's frozen pond)? then walking is skating */ ice: null as ((x: number, y: number) => boolean) | null,
+  /** moon gravity (walking bounds, jumps are big and slow), no air (helmets on), and how high the buggy bounces at (x, y) */
+  lowG: false, airless: false, bump: null as ((x: number, y: number) => number) | null,
+};
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -213,7 +225,7 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     P.sy = 0.86 + 0.02 * Math.sin(a * 1.2); P.lean = Math.sin(a * 1.2 + av.seed) * 2.5; P.eyes = (a * 0.2 + av.seed) % 1 < 0.7 ? 'b' : 'n'; P.lift = 0;
   } else if (using === 'scope') {
     P.eyes = 'w'; P.lean = 2; P.ant = Math.sin(a * 2) * 0.6;
-  } else if (using === 'rack' || using === 'kanban') {
+  } else if (using === 'rack' || using === 'kanban' || using === 'rock') {
     P.arm = 'wave'; P.wave = Math.sin(a * 11) * 1.5; P.eyes = using === 'rack' ? 'w' : 'n'; P.lean = Math.sin(a * 4);
   } else if (using === 'board') {
     P.arm = 'wave'; P.wave = Math.sin(a * 9) * 1.5; P.eyes = Math.sin(a * 2) > 0.8 ? 'b' : 'n'; P.lean = Math.sin(a * 3) * 1;
@@ -230,6 +242,18 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     hopY += bob; P.ant = Math.sin(a * 1.3 + av.seed * 5) * 2.2;
     if (ENV.free) { P.lean += Math.sin(a * 0.7 + av.seed * 9) * 2; if (!av.moving) P.lift = Math.sin(a * 1.2 + av.seed * 3) > 0 ? 1 : 2; }
     if (av.pose === POSE_FLOAT) { hopY += floatH(ps); if (ps < 1.2) { P.arm = 'up'; P.eyes = 's'; P.mouth = 'O'; } else { P.eyes = 'h'; P.lean += Math.sin(ps * 1.4) * 2.5; } }
+  }
+  // moon gravity: long bounding strides, and SPACE's jump is a big slow arc (arms up, then feet first)
+  if (ENV.lowG && !ENV.zeroG && av.use < 0 && av.pose !== POSE_BUGGY) {
+    if (av.moving) { const ph = av.walkDist / 26; hopY = Math.abs(Math.sin(ph * Math.PI)) * 9; P.lift = Math.floor(ph) % 2 ? 1 : 2; P.lean = av.dir * 3; P.sy = 1 + 0.05 * Math.abs(Math.sin(ph * Math.PI)); P.ant = -av.dir * 3; }
+    if (av.pose === POSE_FLOAT) {
+      if (ps < 0.12) P.sy -= 0.12; else if (ps < JUMP_S) { hopY += jumpH(ps); const u = ps / JUMP_S; P.arm = u < 0.6 ? 'up' : 'wave'; P.eyes = u < 0.5 ? 's' : 'w'; P.mouth = 'O'; P.ant = Math.sin(ps * 3) * 3; P.lift = u > 0.6 ? 0 : 1; }
+      else if (ps < JUMP_S + 0.4) P.sy -= 0.14 * Math.exp(-(ps - JUMP_S) * 9) * Math.cos((ps - JUMP_S) * 22);
+    }
+  }
+  if (av.pose === POSE_BUGGY) { // at the wheel: sat down, leaning into it, bouncing over the crater rims
+    P.sy = 0.94; P.lift = 0; P.lean = av.moving ? av.dir * 2 : 0; P.arm = 'wave'; P.wave = av.moving ? Math.sin(a * 9) * 0.6 : 0; P.eyes = av.moving ? 'h' : P.eyes; P.ant = av.moving ? -av.dir * 3 : P.ant;
+    hopY = ENV.bump ? ENV.bump(av.x, av.y) : 0;
   }
   if (ENV.ice && av.moving && av.use < 0 && ENV.ice(av.x, av.y)) { // skating: gliding, arms out, leaning into it
     hopY = 0; P.lift = Math.floor(av.walkDist / 26) % 2 ? 1 : 0; P.lean = av.dir * 3; P.arm = 'up'; P.sy = 0.97; P.eyes = 'h'; P.ant = -av.dir * 3;
@@ -363,6 +387,13 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
     const bk: RGB = [30, 32, 44], wh: RGB = [240, 242, 248], or: RGB = [255, 150, 40], wd = step ? (Math.floor(a * 10) % 2 ? 1 : -1) : 0;
     R(-3 + wd, -11, 7, 10, bk); R(-2 + wd, -12, 5, 1, bk); R(-1 + wd, -9, 4, 7, wh); R(1 + wd, -10, 1, 1, K.EYE); R(3 + wd, -9, 2, 1, or);
     R(-4 + wd, -8 - (step ? 1 : 0), 1, 4, bk); R(4 + wd, -8 - (step ? 1 : 0), 1, 4, bk); R(-2, -1, 2, 1, or); R(1, -1, 2, 1, or);
+  } else if (kind === PET_ROVER) { // the MOON ROVER: a little six-wheeled robot, camera head on a mast, solar wing, beeping light
+    const body: RGB = [226, 230, 238], wh: RGB = MN.TYRE, roll = d > 4 ? Math.floor(a * 14) % 2 : 0, look2 = still ? Math.round(Math.sin(a * 1.3 + av.seed * 7)) : 0;
+    R(-6, -7, 12, 4, body); R(-6, -7, 12, 1, [255, 255, 255]); R(3, -7, 3, 4, [184, 190, 202]); R(-5, -8, 7, 1, SK.GOLD_FOIL);
+    R(-9, -9, 4, 1, SK.SOLAR); R(-9, -10, 4, 1, SK.SOLAR_HI);
+    R(2, -13, 1, 5, [132, 140, 156]); R(1 + look2, -15, 4, 3, [96, 104, 122]); lit(() => { R(3 + look2, -14, 1, 1, MN.CRYSTAL); R(4 + look2, -14, 1, 1, MN.CRYSTAL); });
+    for (const wx of [-5, -1, 3]) { R(wx, -3, 3, 3, wh); R(wx + (roll ? 1 : 0), -3, 1, 1, MN.TYRE_HI); }
+    lit(() => R(-5, -11, 1, 2, (a * 1.5 + av.seed) % 1 < 0.2 ? [255, 90, 90] : [110, 50, 50]));
   } else if (kind === 6) { // bat: always flapping, red eyes
     const c: RGB = [62, 44, 84], up = Math.floor(a * 14 + av.seed * 5) % 2;
     R(-2, -8, 5, 4, c); R(-1, -9, 1, 1, c); R(2, -9, 1, 1, c);
@@ -432,6 +463,27 @@ function drawBoat(x: number, y: number, a: number, front: boolean, moving: boole
   alpha(0.35, () => { r(X - 24, Y + 1, 48, 1, [220, 240, 255]); if (moving) { r(X - 30 - Math.round((a * 20) % 8), Y + 2, 6, 1, [220, 240, 255]); r(X + 26 + Math.round((a * 20) % 8), Y + 2, 6, 1, [220, 240, 255]); } });
 }
 
+/** The moon buggy under its driver (the back half before them, the front half after, like the boat). `hop` = its bounce. */
+export function drawBuggy(x: number, y: number, a: number, dir: 1 | -1, front: boolean, moving: boolean, hop: number): void {
+  const X = Math.round(x), Y = Math.round(y - hop), R = (dx: number, dy: number, w: number, h: number, c: RGB) => r(dir > 0 ? X + dx : X - dx - w + 1, Y + dy, w, h, c);
+  if (!front) {
+    if (hop < 1) alpha(0.3, () => oval(X, Math.round(y), 26, 3, [10, 10, 24]));
+    R(-22, -18, 44, 3, MN.BUGGY_SH); R(-24, -26, 3, 10, SK.HULL_DK); // the seat, and its back
+    R(-23, -42, 1, 16, SK.HULL_DK); lit(() => R(-24, -44, 3, 2, (a % 1) < 0.5 ? SK.LED_RED : shade(SK.LED_RED, 0.4))); // the whip aerial
+    return;
+  }
+  R(-24, -14, 48, 5, MN.BUGGY); R(-24, -14, 48, 1, K.WHITE); R(-24, -10, 48, 1, MN.BUGGY_SH);
+  R(-20, -18, 12, 4, SK.GOLD_FOIL); R(-20, -18, 12, 1, SK.GOLD_FOIL_HI); R(10, -19, 10, 5, MN.ORANGE); R(10, -19, 10, 1, M(MN.ORANGE, K.WHITE, 0.3));
+  R(20, -26, 1, 12, SK.HULL_DK); R(17, -30, 8, 3, SK.HULL_SH); R(17, -30, 8, 1, K.WHITE); // the dish on the front
+  const spin = moving ? Math.floor(a * 16) % 3 : 0;
+  for (const wx of [-17, 15]) {
+    const cx = dir > 0 ? X + wx : X - wx; disc(cx, Y - 5, 5, MN.TYRE); disc(cx, Y - 5, 3, MN.TYRE_HI);
+    for (let k = 0; k < 3; k++) { const an = (k + spin / 3) * Math.PI * 2 / 3; r(Math.round(cx + Math.cos(an) * 3), Math.round(Y - 5 + Math.sin(an) * 3), 1, 1, MN.TYRE); }
+    R(wx - 6, -12, 13, 2, MN.ORANGE);
+  }
+  if (moving && hop < 1) for (let k = 0; k < 3; k++) puff(dir > 0 ? X - 28 - k * 5 : X + 28 + k * 5, Y - 2, (a * 3 + k * 0.33) % 1, 1, 4, MN.REG_HI, 0.5);
+}
+
 /** Halloween's "trick": a bedsheet ghost over the character, bobbing, hem waving. */
 function drawSheet(x: number, y: number, a: number, seed: number): void {
   const bob = Math.round(Math.sin(a * 3 + seed * 7) * 1.5), X = Math.round(x), Y = Math.round(y) - 2 + bob, c: RGB = [238, 240, 252], sh: RGB = [190, 196, 226], wv = Math.floor(a * 5 + seed * 3) % 2;
@@ -444,16 +496,18 @@ function drawSheet(x: number, y: number, a: number, seed: number): void {
 
 /** `brolly`: out in the rain, so hold an umbrella (world/weather.ts). */
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0, brolly = false): { headX: number; headY: number } {
-  if (av.look.pet && !ENV.free) drawPet(av, a, now, av.look.pet); // (pets wait inside during a spacewalk)
+  if (av.look.pet && !ENV.free && (!ENV.airless || av.look.pet === PET_ROVER)) drawPet(av, a, now, av.look.pet); // (pets wait inside during a spacewalk, and on the Moon: except the robot)
   const { P, hopY } = poseFor(av, a, now, using);
-  const look = ENV.free && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside
+  const look = (ENV.free || ENV.airless) && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside
   // contact shadow shrinks while airborne (none when seated: the seat is the ground; none out in space)
   const sk = Math.max(0.4, 1 - hopY / 30);
   if (!lift && !ENV.free) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
-  const boat = av.pose === POSE_BOAT;
+  const boat = av.pose === POSE_BOAT, buggy = av.pose === POSE_BUGGY;
   if (boat) drawBoat(av.x, av.y, a, false, av.moving, av.seed);
-  const { TX, c } = stampCritter(look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0), dim);
+  if (buggy) drawBuggy(av.x, av.y, a, av.dir, false, av.moving, hopY);
+  const { TX, c } = stampCritter(look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0) - (buggy ? 12 : 0), dim);
   if (boat) drawBoat(av.x, av.y, a, true, av.moving, av.seed);
+  if (buggy) drawBuggy(av.x, av.y, a, av.dir, true, av.moving, hopY);
   if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
   if (av.hold) {
     let [lx, ly] = c.hand;
@@ -466,6 +520,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_SODA) drawSoda(mx, my);
     else if (av.hold === HOLD_HOTDOG) drawHotdog(mx, my, P.dir > 0 ? 1 : -1);
     else if (av.hold === HOLD_COCOA) { drawMug(mx, my, [236, 236, 244], P.dir > 0 ? 1 : -1, a, av.seed); r(Math.round(mx) - 1, Math.round(my) - 2, 3, 1, [120, 76, 50]); r(Math.round(mx) - 1, Math.round(my) - 3, 1, 1, K.WHITE); r(Math.round(mx) + 1, Math.round(my) - 3, 1, 1, K.WHITE); }
+    else if (av.hold === HOLD_MOONROCK) { const x = Math.round(mx), y = Math.round(my); r(x - 3, y - 1, 7, 3, OUTLINE); r(x - 2, y - 1, 5, 2, MN.REG_DK); lit(() => { r(x - 2, y - 5, 2, 4, MN.CRYSTAL); r(x, y - 7, 2, 6, MN.CRYSTAL); r(x + 2, y - 4, 1, 3, MN.CRYSTAL); r(x, y - 7, 1, 1, MN.CRYSTAL_HI); }); Gd(x, y - 4, 7, MN.CRYSTAL, 0.25); }
     else if (av.hold === HOLD_SNOWBALL) { const x = Math.round(mx), y = Math.round(my); r(x - 2, y - 3, 5, 5, OUTLINE); r(x - 1, y - 2, 3, 3, [240, 244, 250]); r(x - 1, y - 2, 1, 1, K.WHITE); r(x + 1, y, 1, 1, [200, 212, 230]); }
     else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
     else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);

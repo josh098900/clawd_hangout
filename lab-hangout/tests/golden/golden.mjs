@@ -33,7 +33,7 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
@@ -113,6 +113,10 @@ Object.assign(res, await p2.evaluate(async () => {
   av.ENV.zeroG = true; await grid('zerog', L(6).map((i) => [{}, (a) => { a.moving = i % 2 === 1; a.pose = i < 2 ? 5 : 0; }])); av.ENV.free = true; await grid('free', L(4).map(() => [{}])); av.ENV.zeroG = false; av.ENV.free = false;
   av.ENV.ice = () => true; await grid('ice', L(4).map((i) => [{}, (a) => { a.moving = true; a.walkDist = i * 13; }])); av.ENV.ice = null;
   av.ENV.g = 0.6; await grid('gforce', L(3).map(() => [{}])); av.ENV.g = 0;
+  // the Moon: a rock in hand, the buggy (bouncing), a moon jump, bounding, the rover (and a pet that waits inside), mining
+  av.ENV.lowG = true; av.ENV.airless = true; av.ENV.bump = () => 3;
+  await grid('moon', [[{}, (a) => { a.hold = 18; }], [{}, (a) => { a.pose = 6; a.moving = true; }], [{}, (a) => { a.pose = 5; }], [{}, (a) => { a.moving = true; a.walkDist = 13; }], [{ pet: 8 }], [{ pet: 2 }], [{}, (a) => { a.use = 0; }, 'rock']]);
+  av.ENV.lowG = false; av.ENV.airless = false; av.ENV.bump = null;
   // sound: every effect, every instrument pad and a bar of music, rendered offline together
   const sfx = await import('/src/audio/sfx.ts'), mu = await import('/src/audio/music.ts');
   sfx.setSound(true);

@@ -249,6 +249,13 @@ export const ORBIT_TRACK: Track = {
   bass: 'E2 . . . B2 . . . A2 . . . E2 . . . D2 . . . A2 . . . G2 . . . D2 . . .',
   drums: 'k . . . h . . . s . . . h . . . k . . . h . . . s . . . h . h .',
 };
+/** The Moon's music: slow, sparse and a bit wistful (the lander, the surface and the Moon Base). */
+export const MOON_TRACK: Track = {
+  name: 'MARE', bpm: 66, wave: 'square', leadVol: 0.035,
+  lead: 'A4 - - . C5 - E5 - G5 - - . E5 - - . D5 - - . C5 - D5 - E5 - - . A4 - - .',
+  bass: 'A2 . . . E2 . . . C2 . . . G2 . . . F2 . . . C2 . . . E2 . . . A2 . . .',
+  drums: 'k . . . . . h . s . . . . . h . k . . . . . h . s . . . h . . .',
+};
 /** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
 class NoiseLoop {
   private g: GainNode | null = null;

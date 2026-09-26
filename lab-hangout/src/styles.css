@@ -57,6 +57,9 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.rocket { --pa: rgba(40, 46, 66, .95); --pb: rgba(160, 40, 50, .9); --edge: #F2F4F8; --sub: #FFD8D8; --big: #FFFFFF; --glow: 0 3px 0 #300808, 0 0 14px rgba(255, 120, 90, .6); }
 .plate.station { --pa: rgba(8, 12, 36, .95); --pb: rgba(40, 60, 120, .9); --edge: #8FD8FF; --sub: #C8F0FF; --big: #FFFFFF; --glow: 0 3px 0 #040818, 0 0 14px rgba(143, 216, 255, .7); }
 .plate.spacewalk { --pa: rgba(3, 4, 12, .95); --pb: rgba(30, 90, 170, .85); --edge: #F2C230; --sub: #FFE9A8; --big: #FFFFFF; --glow: 0 3px 0 #02040C, 0 0 14px rgba(255, 214, 90, .6); }
+.plate.lander { --pa: rgba(40, 46, 66, .95); --pb: rgba(160, 120, 40, .9); --edge: #F2D27A; --sub: #FFF0C8; --big: #FFFFFF; --glow: 0 3px 0 #201808, 0 0 14px rgba(242, 210, 122, .6); }
+.plate.moon { --pa: rgba(3, 4, 12, .95); --pb: rgba(110, 110, 124, .9); --edge: #5FE7FF; --sub: #E6FFFF; --big: #FFFFFF; --glow: 0 3px 0 #02040C, 0 0 14px rgba(95, 231, 255, .6); }
+.plate.moonbase { --pa: rgba(60, 50, 40, .95); --pb: rgba(232, 120, 60, .9); --edge: #FFFBF2; --sub: #FFE0C8; --big: #FFFFFF; --glow: 0 3px 0 #301808, 0 0 14px rgba(232, 120, 60, .6); }
 
 #deco { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 6px); transform: translateX(-50%); width: min(960px, 96vw); background: rgba(20, 16, 28, .94); border-top: 3px solid #FFD65A; padding: 6px 8px 8px; z-index: 5; display: none; flex-direction: column; gap: 6px; font-family: 'Press Start 2P', ui-monospace, monospace; }
 #deco.on { display: flex; }

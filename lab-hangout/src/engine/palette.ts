@@ -91,6 +91,16 @@ export const SK = table({
   FLAME: '#FFB040', FLAME_HI: '#FFF0A0', SMOKE: '#D8DCE4', SMOKE_DK: '#A8AEBA', SCREEN: '#0A1A1E', LED: '#7CF29C', LED_RED: '#FF5A5A',
 });
 
+/** The Moon (world/moon.ts, lander.ts, moonbase.ts): grey regolith lit hard from the top-left, glowing crystals, the base's warm panels. */
+export const MN = table({
+  REG: '#9C9CA6', REG2: '#8E8E9A', REG_HI: '#BCBCC6', REG_DK: '#74747F', REG_DK2: '#5A5A68', REG_SH: '#46465A',
+  HILL: '#80808E', HILL2: '#686878', HILL3: '#52526A',
+  CRYSTAL: '#5FE7FF', CRYSTAL2: '#B48CFF', CRYSTAL_HI: '#E6FFFF', CRYSTAL_DK: '#2A8FB0',
+  BASE: '#EAE4D8', BASE2: '#DCD5C6', BASE_HI: '#FFFBF2', BASE_SH: '#B8B0A0', BASE_DK: '#8C8474', ORANGE: '#E8783C', ORANGE_DK: '#B45428',
+  DOME: '#8FD8C8', DOME_HI: '#D8FFF4', DOME_DK: '#4E8C84', LEAF: '#5FC878', LEAF_DK: '#2F8A52', TATER: '#C8965A',
+  BUGGY: '#F2F0EA', BUGGY_SH: '#C0BCB2', TYRE: '#3A3A46', TYRE_HI: '#5A5A6A',
+});
+
 /** The lab's own palette (pale tile, teal wainscot, steel). */
 export const LK = table({
   CEIL: '#27333A', BEAM: '#1C252A', BEAM_HI: '#33424A', DUCT: '#5C6C73', DUCT_HI: '#77888F', DUCT_DK: '#44525A', PIPEB: '#4A5B63', CABLE: '#141B1F', SOFFIT: '#3C4A51',

@@ -16,11 +16,11 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
 /**
  * `use` = index into room.spots you're using (-1 = none). `hold` = what's in your hand
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite, 8 hot dog, 9-15 the Diner's kitchen:
- * patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 hot cocoa). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
- * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor).
+ * patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 hot cocoa, 18 a moon rock). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
+ * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor; on the Moon: a big slow jump), 6 driving a moon buggy.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 17, POSE_MAX = 5;
+export const SPOTS_MAX = 40, HOLD_MAX = 18, POSE_MAX = 6;
 
 /** The Dev Den's build: passing?, commit + deploy counts, and the last commit (who + message). */
 export interface BuildState { ok: boolean; n: number; dep: number; by: string; id: string; msg: string }
@@ -55,7 +55,8 @@ export type StateVal =
   | { k: 'flat'; v: { n: number; party: number | null } }
   | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } }
   | { k: 'karaoke'; v: KaraokeState }
-  | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } };
+  | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } }
+  | { k: 'moonbest'; v: { name: string; ms: number } };
 /**
  * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
  * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
@@ -320,6 +321,14 @@ export interface Api {
     /** Spend tokens on the claw machine; the server picks the prize. */
     playClaw(): Promise<ClawResult>;
   };
+  /** The Moon (0019_moon.sql). */
+  moon: {
+    /** Hand in the moon rock you're carrying at the Moon Base's ASSAY machine: the server decides what it is (a MOON CRYSTAL now and then)
+     *  and pays (capped); `crystals` = how many you've found ever; `prize` = 'pet:8' (the MOON ROVER) with the fifth. */
+    assay(): Promise<{ tokens: number; paid: number; crystal: boolean; crystals: number; prize: string | null }>;
+    /** How many moon crystals you've found (the case in the Moon Base). */
+    crystals(): Promise<number>;
+  };
   /** Tips paid for a performance (the server caps them). */
   tips: {
     /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
@@ -502,6 +511,7 @@ const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>
   },
   dinerbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 99999); return name && score !== null ? { name, score } : null; },
   board: (x) => (typeof x === 'string' && x.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(x) ? x : null),
+  moonbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), ms = num(v.ms, 1000, 1e6); return name && ms !== null ? { name, ms } : null; },
 };
 export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   const o = obj(p);
