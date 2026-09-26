@@ -65,7 +65,12 @@ Handy URLs while developing:
 
 ```
 src/
-  main.ts              boot, game loop, local movement, net glue, HUD wiring
+  main.ts              boot, game loop, local movement, net glue, rooms + spots (useSpot), render, HUD wiring
+  app/game.ts          the game context features use: `game.me`, `game.room`, `game.net`, `game.others`... plus
+                       helpers ($, now, errText, cap). main.ts fills it in (setGame) with getters. Features never import main.ts
+  features/            the playing side of the bigger features, moved out of main.ts: winter, space, photos, karaoke,
+                       garden, halloween, arcade (claw, pong, tanks, hi score), diner (+ COOKIE's tour), karts, flats,
+                       hideseek. Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
     palette.ts         all colour tokens (K, LK, BODY, CONFETTI)
@@ -350,6 +355,9 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 - Colours: tokens only (see palette.ts). Use `shade()` / `M()` to vary them.
 - Randomness in sets: `h1()` only. `Math.random()` is fine for audio and ids.
 - Keep glow on the glow layer and solid pixels on the crisp layer (see ART_STYLE §2).
+- Feature code: a feature big enough to have its own state goes in `src/features/<name>.ts` and reads the game
+  through `game` (app/game.ts). A value main.ts must change goes through a small exported setter, not an assignment
+  to an imported `let`.
 - Interactions: add a `Spot` to the room's spot list (append only), then handle its kind in
   `useSpot`/`updateMe` (main.ts) and `poseFor` (avatar.ts). E / the action pill picks it up automatically.
   Things you fill and carry (coffee/popcorn/soda) go in the `FILL` table in main.ts.

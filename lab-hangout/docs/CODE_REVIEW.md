@@ -73,7 +73,28 @@ a push, then Josh's live check.
     (measured: 39% to 41% busy).
   - Skipped on purpose: G6 and W12 (nowhere in the profile), and a cache for name-tag text (~3% of busy time; it
     would need to track the night tint and lightning to stay identical).
-- Batch 4 (restructures): next.
+- **Batch 4 (restructures): done apart from the network (N2-N5), which comes last as its own push.**
+  - E10: each room's title plate is one line of CSS colours; one rule draws them (every plate's computed style
+    checked identical).
+  - U2: `heldKeys()` in ui/modal.ts gives the kart, tank, slop invaders and mission control panels their key capture,
+    touch buttons and clean-up (old and new tested the same).
+  - G3: one `HOLDS` table in avatar.ts. It also fixes the Q button saying EAT for a snowball, and "Press Q to sip" for a hot dog.
+  - E6 (part): one `envelope()` for the sound effects and the Stage's pads. The music player's voices were left
+    alone, because its notes are timed differently.
+  - W2 (part, from batch 1): the shared string lights and door dressing in world/dressing.ts. Each season keeps its
+    own props and hooks, because they draw different things.
+  - M3: main.ts went from 2,426 to 1,578 lines.
+    - Eleven features moved to `src/features/`: winter, space, photos, karaoke, garden, halloween, arcade, diner (+ tour),
+      karts, flats and hide and seek.
+    - They read the game through one small context (`src/app/game.ts`) and never import main.ts.
+    - Each move was checked by reversing the renames and diffing against the original section, then tested in the browser.
+  - Not done on purpose:
+    - M3's `Feature` registry (useSpot as a lookup, per-room hooks). The order of useSpot's checks matters
+      (busy seats, musical chairs, standing up first), so a table risks behaviour for little gain now that the
+      code is split.
+    - Fishing, the contest, the photo booth and the slop throw stay in main.ts: their state is set from main's
+      spot and movement code, so moving them would mean rewriting that code rather than moving it. They now have
+      clear section headers.
 
 ## Findings
 **Summary (Phase 1 done, 25 September 2026).** 78 findings across the 8 areas.
