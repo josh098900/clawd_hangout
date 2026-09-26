@@ -4,8 +4,8 @@
 //
 // Local sprite space: (0,0) is the point between the feet on the floor. x right, y up is negative.
 
-import { BODY, K, type RGB } from '../engine/palette';
-import { PX, mk, r, M, shade, outline, withCtx, lit } from '../engine/pixel';
+import { BODY, CH, K, type RGB } from '../engine/palette';
+import { PX, mk, r, M, shade, outline, withCtx, lit, alpha } from '../engine/pixel';
 
 export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** index into PETS (0 none) */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
 /** Things you can put on your desk in the Dev Den (bit i = item i). */
@@ -16,7 +16,9 @@ export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
 export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT'] as const;
-export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE'] as const;
+export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE', 'LAB GOGGLES'] as const;
+/** The chem lab's safety goggles (free from its dispenser). */
+export const FACE_LAB_GOGGLES = 9;
 export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
@@ -24,7 +26,7 @@ export type Slot = 'hat' | 'face' | 'fit' | 'pet';
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS', 'fit:10': 'GRID 80%+ IN A REACTOR SHIFT' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS', 'fit:10': 'GRID 80%+ IN A REACTOR SHIFT', 'face:9': 'THE CHEM LAB\'S GOGGLES DISPENSER' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
 export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
@@ -365,6 +367,15 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
 
 /** The prize face items: 4 mustache, 5 monocle (around the second eye), 6 fangs, 7 skull mask. */
 function extraFace(R: Rect, face: number, ex: number[], ey: number, mx: number, my: number): void {
+  if (face === FACE_LAB_GOGGLES) { // LAB GOGGLES: big clear wraparound safety goggles, a lime frame with vents on top, the strap round the back, a glint
+    const x0 = ex[0] - 4, x1 = ex[1] + 7, fr = CH.SLIME, fd = M(CH.SLIME, [20, 60, 30], 0.45), fh = M(CH.SLIME, K.WHITE, 0.45);
+    R(x0 - 2, ey, 2, 2, [40, 44, 50]); R(x1, ey, 2, 2, [40, 44, 50]);
+    alpha(0.32, () => R(x0 + 1, ey - 2, x1 - x0 - 2, 7, [200, 240, 250]));
+    R(x0, ey - 3, x1 - x0, 1, fr); R(x0 + 1, ey - 4, x1 - x0 - 2, 1, fh); R(x0, ey + 5, x1 - x0, 1, fd); R(x0, ey - 3, 1, 9, fr); R(x1 - 1, ey - 3, 1, 9, fd);
+    R(mx - 1, ey + 3, 3, 2, fr); for (let k = 0; k < 4; k++) R(x0 + 3 + k * Math.round((x1 - x0 - 6) / 3), ey - 4, 1, 1, fd);
+    R(x0 + 2, ey - 1, 2, 1, K.WHITE); R(x0 + 2, ey, 1, 1, K.WHITE);
+    return;
+  }
   if (face === 6) { R(mx - 2, my + 2, 1, 2, K.WHITE); R(mx + 1, my + 2, 1, 2, K.WHITE); return; }
   if (face === 8) { lit(() => { R(mx - 2, my - 2, 4, 3, [236, 40, 50]); R(mx - 1, my - 3, 2, 1, [236, 40, 50]); R(mx - 1, my - 2, 1, 1, [255, 170, 170]); }); return; } // red nose, glowing
   if (face === 7) {

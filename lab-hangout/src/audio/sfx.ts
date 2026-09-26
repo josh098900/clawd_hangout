@@ -123,4 +123,18 @@ export const SFX = {
   mapTick: (u = 0.5) => tone('sine', 620 + u * 700, 620 + u * 700, 0.035, 0.018),
   pin: () => { tone('triangle', 1500, 900, 0.07, 0.035); noise(3000, 3, 0.03, 0.05, 0.08); },
   nope: () => { tone('square', 220, 190, 0.08, 0.03); tone('square', 180, 150, 0.12, 0.03, 0.1); },
+  /** The chem lab (features/chem.ts): a reagent clinking into the beaker, a bubble, a foam volcano, a sparkler's crackle, a puff,
+   *  ice forming, the DISCO's beat, a fizz, a gulp of potion, shrinking and growing, the goggles' snap. */
+  clink: () => { tone('sine', 2400, 2350, 0.12, 0.035); tone('sine', 3600, 3500, 0.08, 0.018, 0.01); },
+  blub: () => { tone('sine', 280, 640, 0.08, 0.05); tone('sine', 360, 820, 0.06, 0.03, 0.12); },
+  foam: () => { noise(600, 0.9, 0.8, 0.08, 0, 1800); tone('sine', 180, 520, 0.6, 0.04); for (let i = 0; i < 4; i++) tone('sine', rnd(300, 500), rnd(600, 900), 0.06, 0.025, 0.2 + i * 0.13); },
+  crackle: () => { for (let i = 0; i < 16; i++) noise(rnd(3000, 6500), 6, 0.012, 0.05, i * 0.07 + rnd(0, 0.04)); },
+  poof: () => { noise(1200, 0.7, 0.3, 0.1, 0, 300); tone('triangle', 1568, 2093, 0.18, 0.025, 0.08); },
+  frost: () => [2637, 3136, 3520, 4186, 3520].forEach((f, i) => tone('sine', f, f, 0.22, 0.025, i * 0.09)),
+  disco: () => { for (let i = 0; i < 8; i++) { tone('sine', 150, 50, 0.1, 0.1, i * 0.25); noise(8000, 1, 0.03, 0.03, i * 0.25 + 0.125); } [392, 523, 659, 784, 659, 523, 392, 523].forEach((f, i) => tone('square', f, f, 0.1, 0.02, i * 0.25 + 0.06)); },
+  fizz: () => { noise(5200, 0.8, 0.9, 0.05, 0, 7000); for (let i = 0; i < 5; i++) noise(rnd(6000, 8000), 5, 0.015, 0.03, 0.1 + i * 0.13); },
+  gulp: () => { tone('sine', 240, 150, 0.12, 0.08); tone('sine', 230, 140, 0.12, 0.07, 0.2); },
+  shrink: () => tone('square', 900, 180, 0.5, 0.03),
+  grow: () => { tone('square', 140, 720, 0.5, 0.03); tone('sine', 70, 50, 0.4, 0.08, 0.1); },
+  snap: () => { noise(3000, 2, 0.03, 0.08); tone('square', 1200, 800, 0.03, 0.02); },
 };

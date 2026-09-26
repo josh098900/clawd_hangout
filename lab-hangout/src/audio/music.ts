@@ -271,6 +271,13 @@ export const CRITICAL_MASS: Track[] = [
     bass: 'E2 E2 E2 E2 E2 E2 E2 E2 F2 F2 F2 F2 F2 F2 F2 F2 E2 E2 E2 E2 E2 E2 E2 E2 B1 B1 B1 B1 C2 C2 D#2 D#2',
     drums: 'k h s h k h s h k h s h k k s h k h s h k h s h k k s s k k s s' },
 ];
+/** THE CHEM LAB's music: bouncy and plinky, a little bit mad science. */
+export const CHEM_TRACK: Track = {
+  name: 'BUBBLE AND SQUEAK', bpm: 124, wave: 'triangle', leadVol: 0.03,
+  lead: 'C5 . E5 G5 . E5 C5 . D5 . F5 A5 . F5 D5 . E5 . G5 C6 . B5 A5 G5 F5 . E5 . D5 - . .',
+  bass: 'C3 . G2 . C3 . G2 . D3 . A2 . D3 . A2 . E3 . B2 . E3 . C3 . F2 . G2 . C3 . . .',
+  drums: 'k . h . s . h h k . h . s . h . k . h . s . h h k k h . s . h .',
+};
 /** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
 class NoiseLoop {
   private g: GainNode | null = null;

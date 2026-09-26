@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor' | 'chem';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor', 'chem'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -33,7 +33,7 @@ export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number 
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map' | 'rstation' | 'rfault' | 'rshift';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map' | 'rstation' | 'rfault' | 'rshift' | 'chem' | 'recipes' | 'goggles' | 'shower';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -55,7 +55,7 @@ export interface Spot {
 }
 
 /** A non-walking character you can talk to (the Dev Den's rubber duck). Bubbles anchor at (x, y). */
-export interface Talker { id: string; name: string; x: number; y: number; /** where you stand to talk */ sx: number; sy: number; lines: string[]; /** what E says for it (TALK) */ verb?: string }
+export interface Talker { id: string; name: string; x: number; y: number; /** where you stand to talk */ sx: number; sy: number; lines: string[]; /** what E says for it (TALK) */ verb?: string; /** something it does when you talk to it (BONEY clacks his jaw) */ poke?: () => void }
 
 /** A room's music source (the Lab jukebox, the Den radio). `current()` comes from room state. */
 export interface RoomMusic { x: number; tracks: import('../audio/music').Track[]; current(): { n: number; t0: number } }

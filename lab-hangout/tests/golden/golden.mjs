@@ -33,7 +33,7 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
@@ -51,6 +51,19 @@ const res = await p.evaluate(async () => {
     room.build(); out[id + ':bg'] = H(room.bg) + (room.bgAlt ? '/' + H(room.bgAlt) : '');
     out[id + ':scene'] = draw(room, () => { room.drawBack(A); for (const pr of [...room.props].sort((p, q) => p.y - q.y)) pr.draw(A); room.drawFront?.(A); });
   }
+  // THE CHEM LAB's reactions: one of each kind going off (1.5 s in) and both two-chemist ones, fingerprinted; then every
+  // one of the 84 mixes drawn at three moments at both benches (none may throw: the reactor-freeze lesson)
+  const chemW = await import('/src/world/chem.ts'), chemG = await import('/src/game/chem.ts'), NOWMS = Date.now(), cr = rooms.chem;
+  const liveMix = (b, m, u) => ({ b, mix: m, out: chemG.outcome(m), at: NOWMS - u * 1000, by: 'x', seed: 4242 + m });
+  const chemScene = () => { cr.drawBack(A); for (const pr of [...cr.props, ...(cr.extras?.(A) ?? [])].sort((p, q) => p.y - q.y)) pr.draw(A); cr.drawFront?.(A); };
+  const kinds = new Map(); for (const m of chemG.ALL_MIXES) { const k = chemG.outcome(m).kind; if (!kinds.has(k)) kinds.set(k, m); }
+  for (const [kind, m] of kinds) { chemW.CHEM.live = [liveMix(0, m, 1.5)]; out['chem:rx:' + kind] = draw(cr, chemScene); }
+  chemW.CHEM.live = [];
+  for (const [id, u] of [['toothpaste', 6], ['confetti', 2]]) { chemW.CHEM.duo = { id, at: NOWMS - u * 1000 }; out['chem:duo:' + id] = draw(cr, chemScene); }
+  { const c = px.mk(cr.w, cr.h), g = px.mk(Math.ceil(cr.w / 2), Math.ceil(cr.h / 2)), pc = px.PX.ctx, pg = px.PX.glow; px.PX.glow = g.getContext('2d');
+    px.withCtx(c.getContext('2d'), () => { for (const m of chemG.ALL_MIXES) for (const u of [0.3, 1.5, 3.2]) for (const b of [0, 1]) { chemW.CHEM.live = [liveMix(b, m, u)]; chemW.CHEM.duo = null; chemScene(); } });
+    px.PX.glow = pg; px.PX.ctx = pc; }
+  chemW.CHEM.live = []; chemW.CHEM.duo = null;
   season.setSeason('winter'); W.installWinter(rooms);
   for (const room of Object.values(rooms)) draw(room, () => W.winterGround(room)); // (build the snow once first: the snow layer is cached, like in the game)
   for (const [id, room] of Object.entries(rooms)) out[id + ':winter'] = draw(room, () => { W.winterGround(room); W.winterBack(room, A); for (const pr of W.winterProps(id)) pr.draw(A); W.winterFront(room, A, { x: 0, y: 0, w: room.w, h: room.h }, false); });
@@ -77,6 +90,10 @@ const res = await p.evaluate(async () => {
   let badRx = 0;
   for (let seed = 0; seed < 5000; seed++) { const g0 = { t0: 1790000000000, seed, lvl: 1 + (seed % 4) }; for (const sg of rx.surges(g0)) if (typeof sg.text !== 'string' || !sg.text || !(sg.mw > 0)) badRx++; for (const f of rx.faults(g0)) if (!(f.kind >= 0 && f.kind < 5)) badRx++; }
   if (badRx) throw new Error(badRx + ' reactor surges / faults are malformed');
+  // THE CHEM LAB's chemistry: 84 mixes, each makes something well formed (the table itself is fingerprinted too)
+  let badChem = 0; for (let m = 0; m < 256; m++) { if (!chemG.okMix(m)) continue; const o = chemG.outcome(m); if (!o.name || !(o.dur > 0) || !o.kind || o.c.length !== 3 || o.c.some((v) => !(v >= 0 && v <= 255))) badChem++; }
+  if (chemG.ALL_MIXES.length !== 84 || badChem) throw new Error('chem: ' + chemG.ALL_MIXES.length + ' mixes, ' + badChem + ' malformed');
+  { const t = chemG.ALL_MIXES.map((m) => { const o = chemG.outcome(m); return m + ':' + o.kind + ':' + o.name + ':' + o.c.join('.') + ':' + o.dur; }).join(' '); out.chem = t.length + ':' + [...t].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
   out.reactor = [7, 4242, 99999].map((seed) => { let g = { ...rx.newShift('h', 'H', 2, 1790000000000), seed }; g.fixed = rx.faults(g).map(() => 0); g.rods = 6; g.pumps = 3; g.turb = 7; g = rx.advance(g, g.t0 + 240000, () => 0.3); return [g.heat.toFixed(3), g.sat.toFixed(3), g.secs, g.melt, rx.grid(g)].join(','); }).join(' ');
   out.fmt = [0, 0.4, 9.5, 59.4, 59.6, 60, 119.6, 600, 3599.9].map((s) => [fm.mmss(s), fm.mmss(s), gd.duration(s * 60), kt.raceTime(s * 1000)].join(',')).join(' ');
   const done = Object.fromEntries(await Promise.all(jobs));
@@ -129,6 +146,11 @@ Object.assign(res, await p2.evaluate(async () => {
   av.ENV.zeroG = true; await grid('zerog', L(6).map((i) => [{}, (a) => { a.moving = i % 2 === 1; a.pose = i < 2 ? 5 : 0; }])); av.ENV.free = true; await grid('free', L(4).map(() => [{}])); av.ENV.zeroG = false; av.ENV.free = false;
   av.ENV.ice = () => true; await grid('ice', L(4).map((i) => [{}, (a) => { a.moving = true; a.walkDist = i * 13; }])); av.ENV.ice = null;
   av.ENV.g = 0.6; await grid('gforce', L(3).map(() => [{}])); av.ENV.g = 0;
+  // the chem lab: a potion in hand (each kind), every effect mid-way and just starting (and on Clawd), and the poses at a bench, the shower, the book
+  await grid('potions', L(6).map((k) => [{}, (a) => { a.hold = av.HOLD_POTION + k; }]));
+  const fxAt = (k, since) => (a) => { a.fx = { k, t0: NOW - since, t1: NOW + 20 }; };
+  await grid('fx', L(7).flatMap((k) => [[{}, fxAt(k + 1, 3)], [{}, fxAt(k + 1, 0.2)]]).concat([1, 2, 7].map((k) => [{ sp: 1 }, fxAt(k, 3)])));
+  await grid('chempose', ['chem', 'shower', 'recipes'].map((u) => [{}, (a) => { a.use = 0; }, u]));
   // the Moon: a rock in hand, the buggy (bouncing), a moon jump, bounding, the rover (and a pet that waits inside), mining
   av.ENV.lowG = true; av.ENV.airless = true; av.ENV.bump = () => 3;
   await grid('moon', [[{}, (a) => { a.hold = 18; }], [{}, (a) => { a.pose = 6; a.moving = true; }], [{}, (a) => { a.pose = 5; }], [{}, (a) => { a.moving = true; a.walkDist = 13; }], [{ pet: 8 }], [{ pet: 2 }], [{}, (a) => { a.use = 0; }, 'rock']]);

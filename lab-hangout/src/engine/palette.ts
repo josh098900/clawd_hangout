@@ -117,6 +117,18 @@ export const RX = table({
   CRANE: '#F2C230', CRANE_DK: '#B8902A', HAZ: '#F2C230', HAZ_DK: '#202226', RED_BTN: '#E6414F', RED_HI: '#FF8A94',
 });
 
+/** THE CHEM LAB (world/chem.ts): white tiles with a row of mint, pale sage vinyl, black epoxy benches on white cabinets,
+ * steel fume hoods with glowing sashes, the lectern's wood, BONEY's bones, the burners' blue, foam, glass, and the 8 reagents. */
+export const CH = table({
+  TILE: '#EEF3F1', TILE2: '#E6EDEA', TILE_HI: '#FAFCFB', GROUT: '#C8D4D0', MINT: '#43BF8F', MINT_HI: '#7CE0B8', MINT_DK: '#2A8A66', SKIRT: '#2E4A44',
+  FLOOR: '#C5D1CB', FLOOR2: '#BAC7C1', FLOOR_LN: '#A5B4AD', STAIN: '#A88FB8',
+  EPOXY: '#26292E', EPOXY_HI: '#3F454C', EPOXY_DK: '#16181B', CAB: '#DDE3E2', CAB_HI: '#F2F5F4', CAB_DK: '#AEB8B6',
+  HOOD: '#C3CCCF', HOOD_HI: '#E2E8EA', HOOD_DK: '#8E9A9F', HOOD_IN: '#1E2B2F', SASH: '#9FE8D6', DUCT: '#AEB9BE', DUCT_DK: '#7F8C92',
+  WOOD: '#9A6A44', WOOD_HI: '#BC8A5E', WOOD_DK: '#6E4A2E', BONE: '#EFE8D8', BONE_DK: '#C8BEA6',
+  FLAME: '#5AA8FF', FLAME_HI: '#D8F0FF', FOAM: '#F4F8FA', FOAM_SH: '#CBD8DF', GLASS: '#CFEFF4', GLASS_DK: '#8FB8C2', BRASS: '#D9A441', BRASS_DK: '#9C7026',
+  FIZZ: '#F4E6F0', GOO: '#3B6CFF', SPARK: '#FFC83A', SLIME: '#72D84A', OIL: '#E45CFF', BUBBLE: '#7FDFFF', GLOW: '#9CFFC8', TONIC: '#FF7A45',
+});
+
 /** The city map (world/map.ts, ui/map.ts): the ground, the park, the sea and the sand, the roads, by night and by day. */
 export const MP = table({
   GROUND: '#1A2238', GROUND2: '#1F2843', GROUND_D: '#6F8A6A', GROUND2_D: '#7C976F',

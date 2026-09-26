@@ -1,7 +1,7 @@
 # CLAUDE.md — Lab Hangout
 
 A multiplayer 2D pixel hangout. Players are little "lab critters" (or Clawd) who walk around
-29 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
+30 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
 play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
@@ -11,7 +11,7 @@ Room map (doors):
     ├── escape pod → CITY PARK (the pond)
     └── LANDER BAY ── the lander (every 10 min) ── THE MOON (the pad) ── airlock ── MOON BASE
                 ROOF (garden) ── ladder ── DEV DEN ── stairs ── THE LAB ── exit ── THE SQUARE
-                                                               └── right edge → SCIENCE WING (corridor) ── blast door → THE REACTOR
+                                                               └── right edge → SCIENCE WING (corridor) ── blast door → THE REACTOR; glass door → THE CHEM LAB
                                                                                   ├── red doors → CINEMA
                                                                                   ├── tower door → STAGE
                                                                                   ├── grate → CRYPT
@@ -78,7 +78,10 @@ src/
                        garden, halloween, arcade (claw, pong, tanks, hi score), diner (+ COOKIE's tour), karts, flats,
                        hideseek, moon (the lander's news, mining + assaying moon rocks, the buggy race), reactor (clocking in, stations, SCRAM, faults, the host
                        applying 'rx' and re-sending snapshots, hand-over, alarms, the meltdown, pay, telling the city), map (THE CITY MAP's travel rules: routeTo /
-                       travel / goToRoom, zoneNow, the places you've been, openCityMap). Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
+                       travel / goToRoom, zoneNow, the places you've been, openCityMap), chem (a bench: 1-8 into the beaker, MIX; every mix going off for
+                       everyone ('chem'), the two-chemist reactions, discoveries in the recipe book, potions: in hand, drunk, the effect everyone sees ('fx',
+                       re-sent to anyone who arrives), the KA-BOOM's frazzle, the goggles dispenser, the shower, BONEY watching). Each owns its state; main calls
+                       what it exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
     palette.ts         all colour tokens (K, LK, BODY, CONFETTI)
@@ -156,12 +159,17 @@ src/
                        (drawMapLive: signs, the train / rocket / lander on their timetables, weather, seasons, people, friends' tags,
                        YOU, stickers, hover brackets, the pin); spotOf(room) is where someone in that room is drawn
     wing.ts            THE SCIENCE WING (1200x640): the corridor off the Lab's right edge: lockers, the REACTOR's blast door (its porthole
-                       glows with the pool), the RADIATION display, posters, notice board, trophy case, the CHEM LAB's door (taped up
-                       until push 2), eyewash, water cooler, two OPENING SOON doors, the floor robot (robotAt); everything says a line (talkers)
+                       glows with the pool), the RADIATION display, posters, notice board, trophy case, the CHEM LAB's glass door (the lab's
+                       green glows through it), eyewash, water cooler, two OPENING SOON doors, the floor robot (robotAt); everything says a line (talkers)
     reactor.ts         THE REACTOR (1500x680): the control room (SCRAM / RODS / COOLANT / TURBINE consoles, START SHIFT, THE BIG BOARD:
                        heat, power vs city demand, GRID %, faults), the glass wall + airlock (past it everyone's in a hazmat suit:
                        ENV.suitX), the hall (the pool's Cherenkov glow, the core, the rods on the gantry crane, pipes, the turbine, the
                        fault spots FAULT_AT); REACT (the shift from room state), reactorNow() (the shift worked forward, cached); the BLORP
+    chem.ts            THE CHEM LAB (1100x660): two FUME HOODS (flasks on a hot plate, a distillation rig), THE REAGENT SHELVES (the 8 flasks,
+                       numbered 1-8), the confetti cannon, the GOGGLES dispenser, the SAFETY SHOWER, the EXPERIMENTS board (room state 'chemlog'),
+                       the PERIODIC TABLE OF CRITTERS, SIR BUBBLES, BONEY (watches passers-by); BENCH A and B (islands you stand behind) and the
+                       lectern's RECIPE BOOK; CHEM (the mixes going off, the two-chemist one, your picks) and every reaction's drawing (drawRx),
+                       ELEPHANT TOOTHPASTE's flood (extras: a strip per band of depth, knee-deep) and the CONFETTI CANNON
     grid.ts            GRID: whether a reactor shift is on and the last meltdown (from the lobby's 'grid'): the Square's POWERED BY sign,
                        its brownout, the corridor's RADIATION display, the map's cooling tower, meltGlow (everyone in the wing glows green)
     boards.ts          BOARD.near: you're at this room's map board (the Square's kiosk, a platform's line map, the station's chart)
@@ -191,6 +199,9 @@ src/
   game/reactor.ts      THE REACTOR's shift game (pure): settings (rods / pumps / turbine / scram), faults and surges from the seed,
                        advance() (fixed 0.25 s ticks from a snapshot, so every browser gets the same heat and score), act() (the host
                        applies it, others predict), grid(), verdict(); tuned by simulating hundreds of shifts (see the step 17 brief)
+  game/chem.ts         THE CHEM LAB's chemistry (pure): the 8 REAGENTS, a mix = a bitmask of 2-3 (84 mixes), REACTIONS (the recipe book: 12
+                       reactions, 6 potions, 2 two-chemist ones, DUOS), outcome(mix) (a discovery, or one of three everyday results picked by a
+                       hash), FX (TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY, FRAZZLED), POTION_S / FRAZZLE_S
   game/diner.ts        the Diner's co-op kitchen game: tickets (from t0 + seed), cookAct() (pure: host applies, others predict),
                        missed tickets / shift end / score all derived from the clock
   game/dinertour.ts    COOKIE's hands-on kitchen tour for first-timers (TOUR steps; a local practice kitchen, lvl 0;
@@ -203,7 +214,8 @@ src/
   game/party.ts        party games (musical chairs, tag): host-run state machine + banner text
   game/slop.ts         the slop invasion world event (wall clock waves, blob paths, hits)
   game/fish.ts         the Pier's fish table (keep in step with 0010_fishing.sql), rollFish (LOCAL), the fish log
-  game/npcs.ts         NPCs (Prof. Fizz, Gus): routines driven by the wall clock, so all players see the same thing
+  game/npcs.ts         NPCs (Prof. Fizz, Gus): routines driven by the wall clock, so all players see the same thing; `when` puts an NPC
+                       somewhere only some of the time (PROF. FIZZ works 6 minutes of every 20 in the chem lab: fizzInChem)
   game/ambient.ts      local-only life: pigeons in the Square, robot vacuum in the Lab, the office cat in the Den
   ui/
     start.ts           start screen + look editor with live preview; guest/login chooser, account row
@@ -223,6 +235,7 @@ src/
     quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
+    chembook.ts        THE RECIPE BOOK (the chem lab's lectern): found entries with their recipe chips, the rest as riddles
     map.ts             the CITY MAP panel: its two canvases (crisp + glow), the card for a place (live look inside, who's there,
                        how you'd get there), the pin + zoom when you pick one; 30 fps while open. Phones: the card goes under the map
   audio/sfx.ts         synthesized blips (no audio files)
@@ -269,7 +282,8 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        = the MOON ROVER pet 'pet:8'; moon_crystals; the moonwalk / moonrock / buggy quests + MOONWALKER badge) ·
                        0020 map (the EXPLORER badge: nothing else, the map needs no server) ·
                        0021 reactor (reactor_pay: nothing under 40% grid, 1 + grid/25 (max 5) a shift, one per 200 s, 15 a day; the reactor
-                       quest + CHIEF ENGINEER badge)
+                       quest + CHIEF ENGINEER badge) ·
+                       0022 chem (the chem quest + CHEMIST badge: nothing else, every mix is worked out in the browsers)
 docs/ART_STYLE.md      the style bible (§9: the polish standard every new room follows)
 docs/briefs/           each step's design brief (written and agreed before any code)
 ```
@@ -324,6 +338,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
 | moon | none for the lander: `lander()` from the clock; broadcast `junk` `{ id, n }` on the Moon = you mined rock slot n (`rockKey`); room state `moonbest` `{ name, ms }` (the fastest buggy lap); RPCs `moon_assay()` (hand in a rock: the server rolls it), `moon_crystals()` | `{ tokens, paid, crystal, crystals, prize }` |
 | reactor | room state `reactor` (the shift: host, t0, seed, settings, when each fault was fixed, a snapshot of heat + score at `at`; only its host writes it, re-sent every 3 s) + broadcast `rx` `{ id, st, d }` ("I worked station st" / fixed a fault, st 10+kind: the host applies it with `act`); `reactbest`; lobby broadcast `grid` `{ k: on / melt / off, until?, at? }` from the host (the city's sign, brownout, tower); RPC `reactor_pay(grid)` at the end | see game/reactor.ts |
+| chem lab | broadcast `chem` `{ id, b, m, at }` ("I mixed m, a bitmask of 2-3 reagents, at bench b": every browser works out the same reaction with `outcome`; the same discovery at both benches within 3 s by two players = a two-chemist reaction) + `fx` `{ id, k, s }` ("I'm under potion / frazzle k for s more seconds": sent when you drink, and again whenever anyone arrives); room state `chemlog` (the EXPERIMENTS board); no server calls | see game/chem.ts |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
@@ -340,13 +355,15 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
-8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 cocoa, 18 a moon rock); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
+8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 cocoa, 18 a moon rock, 19-24 a chem lab potion: TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
 4 rowing a boat (moves only where `room.water()` is true), 5 floating up high (weightless: SPACE pushed you off the floor; walking
 doesn't clear it, it ends after FLOAT_S; in moon gravity it's a big slow jump, JUMP_S), 6 driving a moon buggy. Weightless rooms (`room.zeroG()`) move you with momentum (`drift` in main.ts) and
 avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) puts helmets on and SPACE fires a jetpack.
 `room.lowG()` (the Moon) makes walking a bounding stride and SPACE a jump; `room.airless` puts helmets on and leaves pets inside
 (except the MOON ROVER). In THE REACTOR everyone past the glass (`ENV.suitX`) is drawn in the HAZMAT SUIT (fit 10); after a
-meltdown everyone in the Science Wing glows green for a minute (`ENV.glow`). FITS 10 HAZMAT SUIT (earned: 80% grid), 11 HI-VIS VEST (free).
+meltdown everyone in the Science Wing glows green for a minute (`ENV.glow`). FITS 10 HAZMAT SUIT (earned: 80% grid), 11 HI-VIS VEST (free). FACES 9 LAB GOGGLES (free, from the chem
+lab's dispenser). A drunk potion (or a KA-BOOM) is `Avatar.fx` `{ k, t0, t1 }`: drawAvatar scales, recolours, lights, floats or frazzles
+anyone with one, in any room.
 Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the

@@ -221,6 +221,7 @@ function snowLayer(room: Room): HTMLCanvasElement {
 /** Little decorated trees standing indoors (on the same safe spots Halloween's pumpkins use). */
 const XTREES: Partial<Record<RoomId, [number, number][]>> = {
   lab: [[520, 452]], den: [[700, 452]], cinema: [[940, 464]], stage: [[186, 496]], arcade: [[1060, 488]], diner: [[760, 492]], lofts: [[820, 500]], station: [[1000, 488]],
+  wing: [[1050, 476]], chem: [[1080, 478]],
 };
 function smallTree(x: number, y: number, a: number): void {
   r(x - 3, y - 8, 6, 8, [110, 70, 40]); r(x - 9, y - 4, 18, 4, [214, 44, 56]); r(x - 9, y - 4, 18, 1, [240, 90, 96]);

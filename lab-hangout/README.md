@@ -72,6 +72,8 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Emote wheel (8 more emotes) | R, then 1-8 | MORE button |
 | Play an instrument at the Stage | 1-8 while at it | pads |
 | Work a reactor station (Science Wing) | E at RODS / COOLANT / TURBINE, then 1 down · 2 up; E twice at SCRAM (the cover, then the button) | ▼ ▲ buttons |
+| Mix at a chem lab bench (Science Wing) | E at a bench, 1-8 to put 2 or 3 reagents in (again to take one out), then E to MIX | the reagent pills, then MIX! |
+| Drink a potion you've made | Q (here or anywhere) | DRINK button |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
@@ -133,6 +135,8 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
     itself needs nothing from the server
 21. `supabase/migrations/0021_reactor.sql`: THE REACTOR's pay for a shift (capped), the reactor quest and the
     CHIEF ENGINEER badge
+22. `supabase/migrations/0022_chem.sql`: THE CHEM LAB's daily quest (brew a potion) and the CHEMIST badge (the whole
+    recipe book). The mixing itself needs nothing from the server
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

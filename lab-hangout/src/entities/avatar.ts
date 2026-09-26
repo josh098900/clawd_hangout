@@ -2,11 +2,12 @@
 // animation state that turns it into a Pose each frame (walk cycle, settle, emotes).
 
 import { basePose, stampCritter, PETS, PET_SAY, type Look, type Pose } from './critter';
+import { FX, potionOf } from '../game/chem';
 import type { SpotKind } from '../world/room';
-import { BODY, CONFETTI, K, MN, SK, type RGB } from '../engine/palette';
+import { BODY, CH, CONFETTI, K, MN, SK, type RGB } from '../engine/palette';
 
 const OUTLINE = K.OUTLINE;
-import { alpha, oval, disc, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, puff, star4, M, PX, shade } from '../engine/pixel';
+import { alpha, oval, disc, ring, lit, r, line, txt, txtOutlined, tw, twinkle, Gd, G, Gsoft, puff, star4, M, PX, shade } from '../engine/pixel';
 import { bump, eOB, eOut, eIO, h1, seg, lerp } from '../engine/math';
 import { drawUmbrella, wind } from '../world/weather';
 import { crewPose } from '../game/dance';
@@ -38,12 +39,15 @@ export const HOLD_PATTY = 9, HOLD_COOKED = 10, HOLD_CHAR = 11, HOLD_BURGER = 12,
 export const HOLD_SNOWBALL = 16, HOLD_COCOA = 17;
 /** The Moon: a glowing moon rock from the crystal field, to carry to the Moon Base's ASSAY machine. */
 export const HOLD_MOONROCK = 18;
+/** The chem lab: a potion in a corked flask, 19-24 (game/chem.ts FX 1-6: TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY). Q drinks it. */
+export const HOLD_POTION = 19;
+export const isPotion = (hold: number): boolean => hold >= HOLD_POTION && hold < HOLD_POTION + 6;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 /**
  * Everything you can hold (MoveMsg.hold): how many sips / bites it has, what the Q button says for it (Q sips it,
  * eats it, drops it, puts it away or throws it), and what the log says when it's all gone.
  */
-export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 'PUT AWAY' | 'THROW'; done?: string }> = {
+export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 'PUT AWAY' | 'THROW' | 'DRINK'; done?: string }> = {
   [HOLD_MUG]: { uses: 5, q: 'SIP', done: 'Mug empty. Refill it at the coffee machine' },
   [HOLD_POPCORN]: { uses: 8, q: 'EAT', done: 'All the popcorn is gone' },
   [HOLD_SODA]: { uses: 6, q: 'SIP', done: 'Slurp! Soda finished' },
@@ -56,6 +60,7 @@ export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 
   [HOLD_SNOWBALL]: { q: 'THROW' },
   [HOLD_MOONROCK]: { q: 'DROP' },
   [HOLD_COCOA]: { uses: 5, q: 'SIP', done: "Cocoa all gone. There's more at the coffee machine" },
+  ...Object.fromEntries([0, 1, 2, 3, 4, 5].map((k) => [HOLD_POTION + k, { q: 'DRINK' as const }])),
 };
 /** Sips / bites in each thing you can finish. */
 export const USES: Record<number, number> = Object.fromEntries(Object.entries(HOLDS).filter(([, h]) => h.uses).map(([k, h]) => [k, h.uses!]));
@@ -133,6 +138,11 @@ export interface Avatar {
   splat?: number;
   /** The pet's own errand (roaming its owner's flat) instead of trailing behind. */
   petGoal?: { x: number; y: number } | null;
+  /** A potion (or a KA-BOOM's frazzle) at work: which (game/chem.ts FX), and when it started and ends (page seconds). */
+  fx?: { k: number; t0: number; t1: number } | null;
+  /** The BUBBLES potion's trail (world px, page seconds), and how far you'd walked at the last one. */
+  trail?: { x: number; y: number; t0: number; s: number; w: number }[];
+  trailAt?: number;
 }
 
 export function makeAvatar(id: string, name: string, look: Look, x: number, y: number, self: boolean, now: number): Avatar {
@@ -238,6 +248,12 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
   } else if (using === 'arcade' || using === 'claw' || using === 'pong') {
     P.eyes = 'w'; P.lean = Math.round(Math.sin(a * 3.1)) * 1.5; P.ant = Math.sin(a * 9) * 1.5;
     if ((a * 1.3 + av.seed) % 1 < 0.08) P.mouth = 'O';
+  } else if (using === 'chem') { // at a chem bench: stirring, peering in
+    P.arm = 'wave'; P.wave = Math.sin(a * 7 + av.seed * 3) * 1.1; P.lean = 1; P.eyes = (a * 0.4 + av.seed) % 1 < 0.05 ? 'b' : 'n';
+  } else if (using === 'shower') { // under the safety shower: eyes shut, arms up, shivering
+    P.eyes = 'b'; P.mouth = 'o'; P.arm = 'up'; P.lean = Math.sin(a * 40) * 0.6; P.sy = 0.95 + 0.02 * Math.sin(a * 30); P.ant = Math.sin(a * 25);
+  } else if (using === 'recipes') { // reading the recipe book
+    P.lean = 1.5; P.eyes = (a * 0.3 + av.seed) % 1 < 0.06 ? 'b' : 'n'; P.ant = Math.sin(a * 1.2) * 0.8;
   }
   // weightless: bob in the air, swim instead of walking, and float up high after pushing off
   if (ENV.zeroG && av.use < 0 && av.pose !== POSE_BOAT) {
@@ -498,19 +514,84 @@ function drawSheet(x: number, y: number, a: number, seed: number): void {
   r(X - 6, Y - 26, 3, 4, [30, 24, 40]); r(X + 3, Y - 26, 3, 4, [30, 24, 40]); r(X - 2, Y - 19, 4, 3, [30, 24, 40]);
 }
 
+// ---------- the chem lab's potions (and the KA-BOOM's frazzle), on anyone: see features/chem.ts ----------
+type Fx = { k: number; t0: number; t1: number };
+/** A potion from the chem lab in your hand: corked, glowing in its colour. */
+function drawPotion(cx: number, cy: number, hold: number, a: number): void {
+  const x = Math.round(cx), y = Math.round(cy), c = potionOf(hold - HOLD_POTION + 1)?.c ?? K.WHITE, gl: RGB = [214, 240, 246];
+  r(x - 3, y - 4, 7, 7, OUTLINE); r(x - 2, y - 3, 5, 5, gl); lit(() => { r(x - 2, y - 1, 5, 3, c); r(x - 1, y - 2, 3, 1, c); r(x - 2, y - 1, 1, 1, K.WHITE); });
+  r(x - 1, y - 8, 3, 5, OUTLINE); r(x, y - 7, 1, 4, gl); r(x - 1, y - 10, 3, 2, [176, 132, 84]);
+  const q = (a * 1.3) % 1; if (q < 0.3) lit(() => r(x + 1, y - 2 - Math.floor(q * 10), 1, 1, K.WHITE));
+  Gd(x, y - 1, 6, c, 0.35);
+}
+/** An effect's colour: its potion's (the frazzle's is soot). */
+const fxCol = (k: number): RGB => (k === FX.FRAZZLED ? [96, 92, 100] : potionOf(k)?.c ?? K.WHITE);
+/**
+ * An effect's pose, before the critter is drawn: TINY / HUGE scale you (in with a boing over half a second, out over the
+ * last half), RAINBOW cycles your colour, FLOATY lifts you up, the frazzle opens your eyes wide. Returns the look to draw,
+ * how high you are and your scale.
+ */
+function fxPose(av: Avatar, fx: Fx, P: Pose, look: Look, hop: number, a: number, now: number): { look: Look; hop: number; sc: number } {
+  const u = now - fx.t0, left = fx.t1 - now, k = u < 0.5 ? eOB(u / 0.5) : Math.min(1, left / 0.5);
+  let sc = 1;
+  if (fx.k === FX.TINY) sc = 1 - 0.5 * k;
+  else if (fx.k === FX.HUGE) sc = 1 + k;
+  else if (fx.k === FX.RAINBOW) look = { ...look, c: Math.floor(a * 5 + av.seed * 9) % BODY.length };
+  else if (fx.k === FX.FLOATY) { hop += (18 + Math.sin(a * 2.2 + av.seed * 5) * 3) * Math.max(0, Math.min(1, k)); P.lift = Math.floor(a * 1.5) % 2 ? 1 : 2; if (u < 1) { P.arm = 'up'; P.eyes = 'w'; P.mouth = 'O'; } else P.ant = Math.sin(a * 1.6) * 2; }
+  else if (fx.k === FX.FRAZZLED) { if (u < 2) { P.eyes = 'w'; P.mouth = 'o'; } P.ant = Math.sin(a * 13) * 1.5; }
+  if (sc !== 1) { P.sy *= sc; P.sx *= sc * Math.sqrt(sc); hop *= sc; }
+  return { look, hop, sc };
+}
+/** An effect's extras, after the critter is drawn: the glow, the sparkles, the bubbles, the frazzled fur; a poof as it starts and ends. */
+function fxOver(av: Avatar, fx: Fx, TX: (x: number, y: number) => [number, number], a: number, now: number, sc: number): void {
+  const u = now - fx.t0, left = fx.t1 - now;
+  if (fx.k === FX.GLOWING) {
+    const [gx, gy] = TX(0, -14), col = M(BODY[av.look.c]?.c ?? BODY[0].c, K.WHITE, 0.4), k = Math.max(0, Math.min(1, u / 0.4, left / 0.6));
+    Gsoft(gx, gy, 22, 76, col, 0.42 * k); Gd(gx, gy, 12, col, 0.08 * k); G(av.x - 44, av.y - 3, 88, 6, col, 0.3 * k); // a halo round you and a pool of light at your feet (not over you: you'd wash out)
+  } else if (fx.k === FX.RAINBOW) lit(() => { for (let j = 0; j < 4; j++) { const q = ((a * 1.2) + j / 4 + av.seed) % 1, [x, y] = TX(-14 + (j * 9) % 28, -30 + q * 26); if (q < 0.8) star4(Math.round(x), Math.round(y), j % 2, CONFETTI[(j + Math.floor(a * 4)) % CONFETTI.length]); } });
+  else if (fx.k === FX.BUBBLES) bubbleTrail(av, now, TX);
+  else if (fx.k === FX.FRAZZLED) frazzle(av, TX, a);
+  if (u < 0.5 || left < 0.4) { const q = u < 0.5 ? u / 0.5 : 1 - left / 0.4, [x, y] = TX(0, -14), col = fxCol(fx.k); lit(() => { for (let j = 0; j < 8; j++) { const an = j * 0.785 + a, d = (8 + q * 20) * Math.max(1, sc); star4(Math.round(x + Math.cos(an) * d), Math.round(y + Math.sin(an) * d * 0.7), 1, j % 2 ? K.WHITE : col); } }); }
+}
+/** BUBBLES: a bubble every 10 px you walk (and now and then standing still), floating up, wobbling, popping. */
+function bubbleTrail(av: Avatar, now: number, TX: (x: number, y: number) => [number, number]): void {
+  const tr = av.trail ?? (av.trail = []), last = tr[tr.length - 1];
+  if (last && Math.hypot(last.x - av.x, last.y - av.y) > 220) tr.length = 0; // (through a door: leave the old room's bubbles behind)
+  if (av.trailAt === undefined || av.walkDist - av.trailAt > 10 || (!av.moving && now - (last?.t0 ?? -9) > 0.7)) {
+    av.trailAt = av.walkDist; const n = tr.length, [x, y] = TX(-av.dir * 10, -8 - (n % 3) * 6); tr.push({ x, y, t0: now, s: 1 + (n % 3), w: (n * 1.7) % 6.3 }); if (tr.length > 24) tr.shift();
+  }
+  for (let i = tr.length - 1; i >= 0; i--) {
+    const b = tr[i], t = now - b.t0, life = 1.6 + b.s * 0.4; if (t > life + 0.1) { tr.splice(i, 1); continue; }
+    const x = Math.round(b.x + Math.sin(t * 3 + b.w) * 3), y = Math.round(b.y - t * 16);
+    if (t > life) { lit(() => star4(x, y, 1, K.WHITE)); continue; }
+    lit(() => { ring(x, y, b.s, b.s, CH.BUBBLE); r(x - Math.max(0, b.s - 1), y - Math.max(0, b.s - 1), 1, 1, K.WHITE); if (b.s > 1) r(x + b.s - 1, y + b.s - 1, 1, 1, [50, 130, 180]); });
+  }
+}
+/** The KA-BOOM's frazzle: fur sticking out all round the top, soot smudges, a wisp of smoke off the head. */
+function frazzle(av: Avatar, TX: (x: number, y: number) => [number, number], a: number): void {
+  const dk: RGB = [40, 36, 44], fur = shade(BODY[av.look.c]?.c ?? BODY[0].c, 0.62);
+  for (let k = 0; k < 11; k++) { const an = Math.PI * (1.05 + k * 0.09), e = 3 + (k % 2) * 2, [x0, y0] = TX(Math.cos(an) * 12, -14 + Math.sin(an) * 12), [x1, y1] = TX(Math.cos(an) * (12 + e), -14 + Math.sin(an) * (12 + e)); line(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), k % 3 ? fur : dk); }
+  for (const [lx, ly] of [[-6, -17], [5, -12], [-2, -8], [8, -20]]) { const [x, y] = TX(lx, ly); r(Math.round(x), Math.round(y), 2, 1, dk); r(Math.round(x) + 1, Math.round(y) - 1, 1, 1, dk); }
+  const [hx, hy] = TX(0, -32); for (let k = 0; k < 2; k++) { const q = ((a * 0.8) + k * 0.5) % 1; puff(hx + Math.sin(a * 2 + k) * 3, hy - q * 12, q, 1, 4, [110, 110, 118], 0.6); }
+}
+
 /** `brolly`: out in the rain, so hold an umbrella (world/weather.ts). */
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0, brolly = false): { headX: number; headY: number } {
   if (av.look.pet && !ENV.free && (!ENV.airless || av.look.pet === PET_ROVER)) drawPet(av, a, now, av.look.pet); // (pets wait inside during a spacewalk, and on the Moon: except the robot)
-  const { P, hopY } = poseFor(av, a, now, using);
+  const { P, hopY: hop0 } = poseFor(av, a, now, using);
   const suited = ENV.suitX !== null && av.x > ENV.suitX;
-  const look = suited ? { ...av.look, fit: FIT_HAZMAT, hat: 0 } : (ENV.free || ENV.airless) && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside; suits on past the reactor's glass
+  const look0 = suited ? { ...av.look, fit: FIT_HAZMAT, hat: 0 } : (ENV.free || ENV.airless) && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside; suits on past the reactor's glass
+  // a potion (or a KA-BOOM) at work: everyone sees it (features/chem.ts)
+  const fx = av.fx && now < av.fx.t1 ? av.fx : null, ff = fx ? fxPose(av, fx, P, look0, hop0, a, now) : null;
+  const look = ff ? ff.look : look0, hopY = ff ? ff.hop : hop0, sc = ff ? ff.sc : 1;
   // contact shadow shrinks while airborne (none when seated: the seat is the ground; none out in space)
   const sk = Math.max(0.4, 1 - hopY / 30);
-  if (!lift && !ENV.free) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
+  if (!lift && !ENV.free) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk * sc), 2, [10, 10, 24]));
   const boat = av.pose === POSE_BOAT, buggy = av.pose === POSE_BUGGY;
   if (boat) drawBoat(av.x, av.y, a, false, av.moving, av.seed);
   if (buggy) drawBuggy(av.x, av.y, a, av.dir, false, av.moving, hopY);
-  const { TX, c } = stampCritter(look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0) - (buggy ? 12 : 0), dim);
+  const { TX, c } = stampCritter(look, P, av.x, av.y - lift - hopY + (boat ? 4 : 0) - (buggy ? 12 : 0), fx?.k === FX.GLOWING ? 0 : dim);
+  if (fx) fxOver(av, fx, TX, a, now, sc);
   if (boat) drawBoat(av.x, av.y, a, true, av.moving, av.seed);
   if (buggy) drawBuggy(av.x, av.y, a, av.dir, true, av.moving, hopY);
   if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
@@ -533,6 +614,7 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_SNOWBALL) { const x = Math.round(mx), y = Math.round(my); r(x - 2, y - 3, 5, 5, OUTLINE); r(x - 1, y - 2, 3, 3, [240, 244, 250]); r(x - 1, y - 2, 1, 1, K.WHITE); r(x + 1, y, 1, 1, [200, 212, 230]); }
     else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
     else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);
+    else if (isPotion(av.hold)) drawPotion(mx, my, av.hold, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);
     if (em?.kind === 'eat') { const u = now - em.t0; for (let k = 0; k < 3; k++) { const q = u - 0.45 - k * 0.12; if (q > 0 && q < 0.5) r(Math.round(mx + (k - 1) * 3 + q * 8 * (k - 1)), Math.round(my - 2 + q * 30 * q * 4), 1, 1, K.POPCORN_HI); } }
   }

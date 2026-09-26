@@ -62,8 +62,9 @@ export const PLACES: MapPlace[] = [
   { id: 'moonbase', name: 'MOON BASE', hits: [R_(254, 28, 292, 50)], at: [272, 48], zone: 'moon', pick: true, tag: [252, 29] },
   { id: 'station', name: 'SPACE STATION', hits: [ORBIT], at: [149, 32], zone: 'orbit', pick: true, tag: [186, 9] },
   { id: 'moon', name: 'THE MOON', hits: [MOONBOX], at: [236, 50], zone: 'moon', pick: true, tag: [268, 9] },
+  { id: 'chem', name: 'THE CHEM LAB', hits: [R_(60, 118, 77, 150), R_(60, 100, 67, 118)], at: [69, 149], zone: 'earth', pick: true, tag: [55, 110] },
   { id: 'reactor', name: 'THE REACTOR', hits: [R_(64, 86, 94, 118)], at: [79, 116], zone: 'earth', pick: true, tag: [61, 89] },
-  { id: 'wing', name: 'THE SCIENCE WING', hits: [R_(60, 118, 94, 150)], at: [80, 149], zone: 'earth', pick: true, tag: [88, 121] },
+  { id: 'wing', name: 'THE SCIENCE WING', hits: [R_(77, 118, 94, 150)], at: [85, 149], zone: 'earth', pick: true, tag: [88, 121] },
   { id: 'roof', name: 'THE ROOFTOP', hits: [R_(8, 70, 60, 98)], at: [24, 95], zone: 'earth', pick: true, tag: [12, 77] },
   { id: 'den', name: 'THE DEV DEN', hits: [R_(8, 98, 60, 124)], at: [33, 122], zone: 'earth', pick: true, tag: [1, 104] },
   { id: 'lab', name: 'THE LAB', hits: [R_(8, 124, 60, 150)], at: [33, 149], zone: 'earth', pick: true, tag: [1, 130] },
@@ -182,12 +183,13 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
       r(40, 90, 19, 6, dn(SK.CONCRETE_DK, SK.CONCRETE)); for (let x = 40; x < 59; x += 4) r(x, 95, 2, 1, SK.HAZ); r(46, 91, 8, 3, dn([50, 50, 56], [110, 110, 118])); // the pad and its scorch mark
       for (let y = 72; y < 92; y += 3) { r(42, y, 1, 3, SK.TOWER_DK); r(44, y, 1, 3, SK.TOWER_DK); line(42, y, 44, y + 2, dn(SK.TOWER_DK, SK.TOWER)); } r(41, 72, 5, 1, dn(SK.TOWER_DK, SK.TOWER));
     }
-    // ---- THE SCIENCE WING: a low white annex beside the Lab tower, and the reactor's cooling tower behind it ----
+    // ---- THE SCIENCE WING: a low white annex beside the Lab tower (the CHEM LAB is its left half, with a fume stack), and the reactor's cooling tower behind it ----
     { const hy = (y: number) => { const u = (y - 90) / 28; return Math.round(u < 0.3 ? 8 - 2 * (u / 0.3) : 6 + 6 * Math.pow((u - 0.3) / 0.7, 1.6)); }; // a cooling tower: a wide base, a gentle waist up high, a flared lip
       for (let y = 90; y < 120; y++) { const w = hy(y); r(79 - w, y, w * 2, 1, dn([150, 156, 168], [214, 218, 226])); r(79 - w, y, 2, 1, dn([180, 186, 198], [236, 240, 246])); r(79 + w - 3, y, 3, 1, dn([116, 122, 134], [180, 186, 196])); }
       r(79 - hy(90), 89, hy(90) * 2, 2, dn([110, 116, 128], [170, 176, 186])); for (let y = 96; y < 118; y += 6) r(79 - hy(y) + 2, y, hy(y) * 2 - 4, 1, dn([136, 142, 154], [200, 204, 214]));
       block(62, 94, 120, BASE, dn([196, 204, 206], [236, 240, 240]), dn([150, 158, 162], [210, 216, 218]));
-      r(62, 134, 32, 3, dn([36, 100, 108], [47, 122, 130])); for (let x = 65; x < 84; x += 6) { r(x, 124, 4, 7, dn([40, 50, 70], [190, 220, 240])); if (!day) { r(x, 124, 4, 7, [180, 230, 255]); WGLOW.push([x, 124, 4, 7]); } }
+      r(62, 134, 32, 3, dn([36, 100, 108], [47, 122, 130])); for (let x = 65; x < 84; x += 6) { const chem = x < 77; r(x, 124, 4, 7, dn([40, 50, 70], chem ? [190, 236, 214] : [190, 220, 240])); if (!day) { r(x, 124, 4, 7, chem ? [150, 255, 196] : [180, 230, 255]); if (!chem) WGLOW.push([x, 124, 4, 7]); } }
+      r(63, 106, 3, 14, dn([110, 118, 128], [170, 178, 188])); r(63, 106, 1, 14, dn([140, 148, 158], [210, 216, 224])); r(62, 104, 5, 2, dn([80, 86, 96], [140, 146, 156])); // the chem lab's fume stack (it puffs, live)
       r(85, 138, 7, 12, RX.HAZ_DK); for (let y = 138; y < 150; y++) for (let x = 85; x < 92; x++) if ((x + y) % 4 < 2) r(x, y, 1, 1, RX.HAZ); r(86, 131, 5, 5, RX.HAZ); r(88, 133, 1, 1, RX.HAZ_DK); }
     // ---- the Square's other fronts ----
     // THE CINEMA: velvet red, gold trim, the marquee board, poster cases, a red carpet out onto the Square
@@ -506,6 +508,9 @@ export function drawMapLive(L: MapLive): void {
   { const on = (a * 1.3) % 11 > 0.25; lit(() => { r(345, 130, 30, 6, [30, 24, 40]); txt('LOFTS', 350, 131, on ? [124, 242, 208] : [40, 80, 70]); }); if (on) G(345, 130, 30, 6, [124, 242, 208], 0.2); }
   // ---- the Lofts: a lit window for every flat in use (a HOUSE PARTY flashes) ----
   for (let i = 0; i < Math.min(L.flats, LOFT_WIN.length); i++) { const [x, y] = LOFT_WIN[(i * 13 + 5) % LOFT_WIN.length], party = L.party && i === 0; const c: RGB = party ? CONFETTI[Math.floor(a * 6) % CONFETTI.length] : [255, 206, 130]; lit(() => { r(x, y, 2, 6, c); r(x + 3, y, 2, 6, c); }); G(x - 1, y - 1, 7, 8, c, party ? 0.5 : 0.25); }
+  // ---- the chem lab: its windows glow potion-green at night, and its fume stack puffs a new colour every few seconds ----
+  if (night > 0.05) G(64, 123, 14, 9, [120, 255, 170], 0.2 * night);
+  { const c = CONFETTI[Math.floor(a / 3) % CONFETTI.length]; for (let i = 0; i < 3; i++) { const u = ((a * 0.3) + i / 3) % 1; alpha(0.6 * (1 - u), () => disc(Math.round(64 + u * (4 + wd.dx * 6)), Math.round(103 - u * 14), Math.round(1 + u * 3), c)); } }
   // ---- the reactor's cooling tower: steam (thicker during a shift; green for a minute after a meltdown) ----
   { const on = gridOn(), green = meltAgo() < 60, n = on ? 6 : 3; for (let i = 0; i < n; i++) { const u = ((a * (on ? 0.35 : 0.2)) + i / n) % 1; alpha((on ? 0.7 : 0.45) * (1 - u), () => disc(Math.round(79 + u * (6 + wd.dx * 8) + Math.sin(i * 2 + a) * 2), Math.round(88 - u * 26), Math.round(2 + u * (on ? 6 : 4)), green ? [140, 255, 120] : day > 0.5 ? [244, 246, 250] : [150, 156, 176])); } if (green) Gd(79, 100, 16, [120, 255, 110], 0.35); if (on && night > 0.2) Gd(79, 92, 10, [255, 240, 200], 0.2); }
   // ---- the rides: the train (under the town), the rocket, the lander ----

@@ -25,7 +25,10 @@ interface Stop {
   /** Dance (1) or sit on the floor (2) while waiting here. */
   pose?: number;
 }
-interface NpcDef { id: string; name: string; room: RoomId; look: Look; speed: number; stops: Stop[]; chat: string[]; /** only around in this season (see world/season.ts) */ season?: string; /** always a sheet ghost */ ghost?: boolean; /** pad the loop to exactly this long (s), to line up with a wall-clock cycle */ cycle?: number }
+interface NpcDef { id: string; name: string; room: RoomId; look: Look; speed: number; stops: Stop[]; chat: string[]; /** only around in this season (see world/season.ts) */ season?: string; /** always a sheet ghost */ ghost?: boolean; /** pad the loop to exactly this long (s), to line up with a wall-clock cycle */ cycle?: number; /** only around while this is true (T = wall-clock seconds): PROF. FIZZ splits the day between two rooms */ when?: (T: number) => boolean }
+
+/** PROF. FIZZ works part-time in the chem lab: the last 6 minutes of every 20 (both routines loop every 120 s, so the switch comes as one loop ends: Fizz walks out of the Lab's SCIENCE WING doorway and in at the chem lab's door, and back). */
+export const fizzInChem = (T: number): boolean => T % 1200 >= 840;
 
 const DEFS: NpcDef[] = [
   {
@@ -41,8 +44,27 @@ const DEFS: NpcDef[] = [
       { x: 772, y: 450, wait: 6, say: ['where did i put that book', "ah, 'voxels for beginners'", 'so many books'] },
       { x: 470, y: 462, wait: 6, say: ['nice night out there', 'is the dragon still up?'] },
       { use: 4, wait: 9, say: ['one more round...', 'this cabinet is rigged', 'new high score?!'] },
+      { x: 930, y: 520, wait: 3, say: ['is that bubbling i hear?', 'the chem lab calls. soon', 'smells like soup through there'] }, // by the SCIENCE WING doorway (Fizz goes off to the chem lab from here)
     ],
-    chat: ['welcome to the lab!', 'try the coffee machine', 'the sofa has great lumbar support', 'i am 87% sure the plan is ???', 'have you seen the dragon outside?', 'careful, the arcade is addictive', 'zero days without slop. sigh.'],
+    cycle: 120, when: (T) => !fizzInChem(T),
+    chat: ['welcome to the lab!', 'try the coffee machine', 'the sofa has great lumbar support', 'i am 87% sure the plan is ???', 'have you seen the dragon outside?', 'careful, the arcade is addictive', 'zero days without slop. sigh.', 'i do a few hours in the chem lab too. through the science wing'],
+  },
+  {
+    // PROF. FIZZ in the chem lab (part-time: see fizzInChem), in their lab coat and the LAB GOGGLES
+    id: 'npc-fizz-chem', name: 'PROF. FIZZ', room: 'chem', speed: 40,
+    look: { c: 2, hat: 0, face: 9, fit: 1, sp: 0 },
+    stops: [
+      { x: 150, y: 500 },
+      { x: 470, y: 486, wait: 14, say: ['hmm. needs more fizz', 'ooh, that one is glowing. is that new?', 'hood 1 is my favourite hood'] },
+      { x: 640, y: 482, wait: 10, say: ['we\'re low on bubble juice again', 'who labelled this one YUM?', 'eight reagents. endless possibilities. mostly brown'] },
+      { x: 662, y: 546, wait: 8, say: ['page 7 is just a doodle of a duck', 'i should write that one down', 'the book never lies. it just leaves things out'] },
+      { x: 1010, y: 522, wait: 8, say: ['morning, Boney', 'Boney, your goggles are on your head again', 'he is a very good listener'] },
+      { x: 1000, y: 486, wait: 6, say: ['hello, Sir Bubbles', 'blub to you too'] },
+      { x: 800, y: 486, wait: 12, say: ['hood 2 smells of soup. again.', 'drip... drip...', 'nearly a whole beaker. of what, though?'] },
+      { x: 150, y: 500 }, { x: 70, y: 490, wait: 2 },
+    ],
+    cycle: 120, when: fizzInChem,
+    chat: ['welcome to my OTHER lab!', 'mix two or three reagents at a bench and see what happens', 'CRITTER TONIC works on critters. mix it with something...', 'goggles on! the dispenser is by the door', 'if anything goes wrong, the shower is in the corner. it will not. probably.', 'two chemists, the same mix, the same moment... stand well back', 'who keeps mixing the blue ones? ...oh. it is me. it has always been me', 'the recipe book on the lectern fills in as you discover things'],
   },
   {
     id: 'npc-gus', name: 'GUS', room: 'plaza', speed: 34,
@@ -289,7 +311,7 @@ export class Npcs {
   /** Let go of a puppet: it walks back to where its routine has got to (instead of jumping there). */
   release(id: string): void { if (this.puppet.delete(id)) this.homing.add(id); }
   private homing = new Set<string>();
-  inRoom(id: RoomId): Npc[] { return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season()) && !this.away.has(n.def.id)); }
+  inRoom(id: RoomId): Npc[] { const T = Date.now() / 1000; return this.list.filter((n) => n.def.room === id && (!n.def.season || n.def.season === season()) && (!n.def.when || n.def.when(T)) && !this.away.has(n.def.id)); }
 
   /**
    * Put every NPC where the clock says. `taken(i)` = a player is using spot i in the NPC's room

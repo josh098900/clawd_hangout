@@ -50,6 +50,8 @@ export interface Game {
   emote(kind: EmoteKind): boolean;
   /** Put on something you own ('slot:index'), and cheer. */
   wear(item: string): void;
+  /** Change how you look (and tell everyone). */
+  setLook(look: import('../entities/critter').Look): void;
   /** onClose for a panel opened from spot i: hand the keys back to walking and step off the spot. */
   closeSpot(i: number): () => void;
   /** Forget where you tapped to walk to. */

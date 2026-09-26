@@ -17,6 +17,9 @@ export const LIGHT_LINES: Partial<Record<RoomId, Line[]>> = {
   pier: [[380, 380, 900, 380]], karts: [[10, 340, 650, 340], [650, 340, 1290, 340]],
   subway: STATION_LIGHTS, parkstn: STATION_LIGHTS, dinerstn: STATION_LIGHTS, kartstn: STATION_LIGHTS,
   flat: [[20, 300, 940, 300]], flatbed: [[20, 300, 740, 300]], flatkit: [[20, 300, 700, 300]],
+  // the Science Wing: just under the ceiling, in the gaps between the door signs, the RADIATION display and BONEY's corner
+  wing: [[90, 337, 280, 337], [500, 337, 720, 337], [826, 337, 938, 337]], reactor: [[8, 321, 160, 321]],
+  chem: [[100, 333, 300, 333], [400, 333, 600, 333], [680, 333, 880, 333], [890, 333, 1080, 333]],
 };
 
 /** How a season's lights look: bulb colours (in turn), how far they sag, every nth bulb blinks off, the wire. */

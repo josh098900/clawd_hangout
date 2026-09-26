@@ -12,16 +12,18 @@ import { scrub } from './filter';
 import { COOKS_MAX, type DinerState } from '../game/diner';
 import { SONGS, type KaraokeState } from '../game/karaoke';
 import { CREW_MAX, SHIFT_S as REACTOR_S, faults as reactorFaults, type ReactorState } from '../game/reactor';
+import { FX_MAX, okMix, rxById } from '../game/chem';
 
 export interface PeerState { id: string; name: string; look: Look; x: number; y: number; dir: 1 | -1; moving: boolean }
 /**
  * `use` = index into room.spots you're using (-1 = none). `hold` = what's in your hand
  * (0 nothing, 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite, 8 hot dog, 9-15 the Diner's kitchen:
- * patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 hot cocoa, 18 a moon rock). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
+ * patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 hot cocoa, 18 a moon rock, 19-24 a potion from the chem lab:
+ * TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY). `pose` = 0 normal, 1 dancing, 2 sitting on the floor,
  * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor; on the Moon: a big slow jump), 6 driving a moon buggy.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 18, POSE_MAX = 6;
+export const SPOTS_MAX = 40, HOLD_MAX = 24, POSE_MAX = 6;
 
 /** The Dev Den's build: passing?, commit + deploy counts, and the last commit (who + message). */
 export interface BuildState { ok: boolean; n: number; dep: number; by: string; id: string; msg: string }
@@ -58,7 +60,10 @@ export type StateVal =
   | { k: 'karaoke'; v: KaraokeState }
   | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } }
   | { k: 'moonbest'; v: { name: string; ms: number } }
-  | { k: 'reactor'; v: ReactorState } | { k: 'reactbest'; v: { name: string; score: number } };
+  | { k: 'reactor'; v: ReactorState } | { k: 'reactbest'; v: { name: string; score: number } }
+  | { k: 'chemlog'; v: ChemLog };
+/** THE CHEM LAB's EXPERIMENTS board: how many mixes, and the latest discovery (a reaction id, see game/chem.ts) and who made it. */
+export interface ChemLog { n: number; rx: string; by: string }
 /**
  * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
  * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
@@ -88,8 +93,12 @@ export type MsgEvent = { [K in MsgType]: { type: K } & NonNullable<ReturnType<(t
 export interface Outgoing {
   emote: { kind: EmoteKind }; state: StateMsg; draw: DrawMsg; note: { i: number; n: number }; pong: PongMsg; cook: { st: number };
   kart: KartMsg; tank: TankMsg; junk: { n: number }; kscore: KScore; snowball: SnowballMsg; flat: FlatMsg; world: HideSeek;
-  rx: { st: number; d: number }; grid: GridMsg;
+  rx: { st: number; d: number }; grid: GridMsg; chem: ChemMsg; fx: FxMsg;
 }
+/** THE CHEM LAB: "I mixed `m` (a bitmask of reagents, 2 or 3 of them) at bench `b`, at wall time `at` (ms)". */
+export interface ChemMsg { b: number; m: number; at: number }
+/** "I'm under effect `k` (a potion, a frazzle; 0 = none: see game/chem.ts FX) for `s` more seconds". */
+export interface FxMsg { k: number; s: number }
 /**
  * THE REACTOR and the city (on the lobby channel, from the shift's host): a shift is on until `until` (epoch ms),
  * it melted down at `at`, or it's over.
@@ -524,6 +533,7 @@ const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>
   moonbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), ms = num(v.ms, 1000, 1e6); return name && ms !== null ? { name, ms } : null; },
   reactor: (x) => { const v = obj(x); return v && parseReactor(v); },
   reactbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 100); return name && score !== null ? { name, score } : null; },
+  chemlog: (x) => { const v = obj(x); if (!v) return null; const n = int(v.n, 0, 1e7), rx = v.rx === '' || (typeof v.rx === 'string' && rxById(v.rx)) ? (v.rx as string) : null; return n === null || rx === null ? null : { n, rx, by: cleanName(v.by) }; },
 };
 export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   const o = obj(p);
@@ -586,6 +596,14 @@ export function parseGrid(p: unknown): { id: string; g: GridMsg } | null {
   if (o.until !== undefined) { const u = num(o.until, 0, 1e14); if (u === null) return null; g.until = u; }
   if (o.at !== undefined) { const a = num(o.at, 0, 1e14); if (a === null) return null; g.at = a; }
   return { id: o.id, g };
+}
+export function parseChem(p: unknown): { id: string; b: number; m: number; at: number } | null {
+  const o = obj(p), b = int(o?.b, 0, 1), at = num(o?.at, 0, 1e14);
+  return o && isId(o.id) && b !== null && okMix(o.m) && at !== null ? { id: o.id, b, m: o.m, at } : null;
+}
+export function parseFx(p: unknown): { id: string; k: number; s: number } | null {
+  const o = obj(p), k = int(o?.k, 0, FX_MAX), sec = num(o?.s, 0, 60);
+  return o && isId(o.id) && k !== null && sec !== null ? { id: o.id, k, s: sec } : null;
 }
 export function parseKart(p: unknown): { id: string; k: KartMsg } | null {
   const o = obj(p);
@@ -690,6 +708,8 @@ export function parseLobby(p: unknown): LobbyPerson | null {
  *   flat    FlatMsg                      a knock, an answer, a HOUSE PARTY, to the whole server
  *   rx      { st, d }                    THE REACTOR: "I worked station st (d -1/+1)" or fixed a fault (st 10+kind); the host applies it
  *   grid    GridMsg                      THE REACTOR's host to the whole server: a shift is on / melted down / over
+ *   chem    ChemMsg                      THE CHEM LAB: "I mixed m at bench b" (every browser works out the same reaction from it)
+ *   fx      FxMsg                        "I'm under a potion (or a frazzle) for s more seconds": sent on drinking, and again whenever anyone arrives
  */
 export const MESSAGES = {
   move: { parse: parseMove, on: 'room' },
@@ -709,6 +729,8 @@ export const MESSAGES = {
   flat: { parse: parseFlatMsg, on: 'lobby' },
   rx: { parse: parseRx, on: 'room' },
   grid: { parse: parseGrid, on: 'lobby' },
+  chem: { parse: parseChem, on: 'room' },
+  fx: { parse: parseFx, on: 'room' },
 } as const satisfies Record<string, { parse: (p: unknown) => { id: string } | null; on: 'room' | 'srv' | 'lobby' }>;
 export type MsgType = keyof typeof MESSAGES;
 export const MSG_TYPES = Object.keys(MESSAGES) as MsgType[];

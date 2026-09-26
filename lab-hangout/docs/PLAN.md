@@ -203,14 +203,19 @@ lander bay); the city by day and night with the train, rocket and lander on thei
 everyone's dot, friends' name tags, YOU; a card per place with a live look inside; Earth is free, space keeps its rides
 (the escape pod is a way home); ? stickers + the EXPLORER badge; WHO'S ONLINE's GO follows the same rules.
 
-## 17. The Science Wing  ← push 1 (the corridor + THE REACTOR) built, waiting for Josh's check; push 2 = the chem lab
-Brief: docs/briefs/17-science-wing.md (with an "as built" section). Migration `0021_reactor.sql`.
+## 17. The Science Wing  ← push 1 (the corridor + THE REACTOR) live and confirmed; push 2 (THE CHEM LAB) built, waiting for Josh's check
+Brief: docs/briefs/17-science-wing.md (§9 is the chem lab; "as built" sections for both pushes). Migrations `0021_reactor.sql`, `0022_chem.sql`.
 Off the Lab. The centrepiece is the **reactor control room**: stations for the rods, the coolant
 pumps, the turbine and the gauge wall, one player each; the reactor drifts, alarms go off, and you
 keep it in the green together. A **meltdown** is cartoon, not scary: the room goes green and
 everyone glows for a minute; the HAZMAT suit is the outfit to earn. One player's browser runs the
 reactor and sends a small update (like Pong), so it's cheap on the network. Plus a **chemistry
 bench**: mix things, discover reactions, fill in a recipe book.
+**Built, push 2 (the chem lab):** two benches you stand behind like a science demo, 8 reagents (keys 1-8), 84 mixes: 18
+discoveries (12 reactions, 6 potions) and 3 everyday results; potions everyone sees (TINY, HUGE, RAINBOW, GLOWING,
+BUBBLES, FLOATY) that follow you through doors; two-chemist reactions (ELEPHANT TOOTHPASTE floods the floor, the
+CONFETTI CANNON); the RECIPE BOOK (20 entries, the CHEMIST badge), LAB GOGGLES from the dispenser, the safety shower,
+BONEY, SIR BUBBLES, PROF. FIZZ part-time; the map's annex, the fume stack; a daily quest (migration `0022_chem.sql`).
 
 ## Later (order to be decided)
 - **18. Submarine + City Aquarium:** the aquarium on the Pier; the sub dives from it, portholes that

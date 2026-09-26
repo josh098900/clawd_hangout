@@ -1,7 +1,7 @@
 // THE SCIENCE WING: the corridor off the right side of the Lab. Bright and clean, the calm before the reactor: white
 // panels with the Lab's teal band, lockers (one hangs open: a lab coat and a rubber duck), the REACTOR's blast door
 // with its porthole glowing blue and a RADIATION display (UH OH after a meltdown), safety posters, the notice board,
-// the EXPERIMENT OF THE MONTH case, the CHEM LAB's glass door (taped up until it opens), the eyewash station, a water
+// the EXPERIMENT OF THE MONTH case, the CHEM LAB's glass door (glowing green from inside), the eyewash station, a water
 // cooler that glugs, and two doors taped OPENING SOON (the Tesla lab, the wind tunnel). A little floor robot does laps.
 // Everything that looks usable says something (talkers).
 
@@ -110,13 +110,14 @@ function build(this: Room): void {
       r(x + 8, y + 50, 14, 10, [230, 230, 240]); r(x + 12, y + 46, 6, 4, [230, 230, 240]); r(x + 30, y + 52, 12, 8, [60, 150, 80]); // a flask and a medal ribbon on the shelf below
       alpha(0.35, () => { r(x + 4, y + 4, 3, 60, K.WHITE); r(x + 10, y + 4, 1, 34, K.WHITE); });
       r(x - 2, y + 72, 56, 10, [110, 74, 44]); r(x + 2, y + 74, 48, 6, [196, 160, 90]); txt('EXPT OF', x + 5, y + 73, [60, 40, 20]); }
-    // ---- the CHEM LAB's door: frosted glass in a steel frame, its sign; taped up for now ----
+    // ---- the CHEM LAB's door: frosted glass in a steel frame (the lab's green glows through it, live), its sign, a GOGGLES sticker ----
     { const cx = WING.chem;
-      r(cx - 34, DOOR_TOP - 2, 68, FL - DOOR_TOP + 2, RX.STEEL_DK); r(cx - 30, DOOR_TOP + 2, 60, FL - DOOR_TOP - 2, [200, 226, 232]);
+      r(cx - 34, DOOR_TOP - 2, 68, FL - DOOR_TOP + 2, RX.STEEL_DK); r(cx - 30, DOOR_TOP + 2, 60, FL - DOOR_TOP - 2, [196, 230, 220]);
       for (let k = 0; k < 10; k++) line(cx - 28 + k * 6, DOOR_TOP + 4, cx - 28 + k * 6 + 10, DOOR_TOP + 24, [220, 240, 246]); r(cx - 1, DOOR_TOP + 2, 2, FL - DOOR_TOP - 2, RX.STEEL_DK); r(cx + 6, 404, 3, 14, RX.STEEL_HI);
       r(cx - 40, SIGN_Y, 80, 16, [30, 60, 70]); r(cx - 38, SIGN_Y + 2, 76, 12, [40, 120, 110]); txt('CHEM LAB', cx - tw('CHEM LAB') / 2 + 6, SIGN_Y + 5, K.WHITE);
       r(cx - 32, SIGN_Y + 5, 6, 7, [200, 240, 255]); r(cx - 31, SIGN_Y + 3, 4, 2, [200, 240, 255]); r(cx - 32, SIGN_Y + 9, 6, 3, [124, 242, 156]); // a flask icon
-      r(cx - 22, 380, 44, 26, K.PAPER); txt('BACK', cx - 8, 384, [60, 60, 70]); txt('SOON!', cx - 10, 392, [200, 40, 60]); for (const [tx, ty] of [[-24, 378], [18, 378]]) r(cx + tx, ty, 6, 3, [230, 220, 170]); // taped to the glass
+      for (let j = 0; j < 9; j++) r(cx - 22 + j, 436 - j, 17 - j * 2 > 0 ? 17 - j * 2 : 1, 1, RX.HAZ); txt('!', cx - 15, 430, RX.HAZ_DK); r(cx - 22, 437, 17, 1, RX.HAZ_DK); // a warning sticker: EXPERIMENTS
+      r(cx - 10, FL - 8, 20, 8, RX.STEEL); r(cx - 10, FL - 8, 20, 1, RX.STEEL_HI); // the kick plate
     }
     // ---- the eyewash station, the fire extinguisher ----
     { const x = 850; r(x - 16, 364, 32, 16, [40, 150, 90]); r(x - 5, 367, 10, 6, K.WHITE); disc(x, 370, 2, [40, 150, 90]); txt('EYES', x - 7, 374, K.WHITE);
@@ -156,6 +157,9 @@ function drawBack(a: number): void {
   lit(() => r(WING.reactor + 66, 400, 4, 2, (a % 1.6) < 0.2 ? RX.LED_G : shade(RX.LED_G, 0.35)));
   lit(() => { const bad = melt, s = bad ? ((a % 0.5) < 0.3 ? 'UH OH!' : '') : 'NORMAL'; txt(s, 456 - tw(s) / 2, 358, bad ? RX.LED_R : RX.LED_G); });
   G(420, 346, 72, 22, melt ? RX.LED_R : RX.LED_G, melt ? 0.25 : 0.08);
+  // the CHEM LAB: its green through the frosted glass (a shadow drifting past it now and then), and the flask on its sign bubbling
+  { const cx = WING.chem; G(cx - 30, DOOR_TOP + 2, 60, FL - DOOR_TOP - 2, [124, 242, 180], 0.1 + 0.03 * Math.sin(a * 1.3)); const sh = (a * 0.07) % 1; if (sh < 0.3) alpha(0.12, () => r(Math.round(cx - 30 + sh / 0.3 * 44), DOOR_TOP + 30, 16, 50, [60, 90, 80]));
+    lit(() => { r(cx - 32, SIGN_Y + 9, 6, 3, M([124, 242, 156], K.WHITE, 0.15 + 0.15 * Math.sin(a * 3))); const q = (a * 0.8) % 1; if (q < 0.7) r(cx - 30 + Math.round(Math.sin(a * 4)), Math.round(SIGN_Y + 9 - q * 7), 1, 1, K.WHITE); }); Gd(cx - 29, SIGN_Y + 8, 5, [124, 242, 156], 0.3); }
   // the water cooler: a bubble glugs up every so often
   { const u = (a * 0.11) % 1; if (u < 0.12) { const k = u / 0.12; lit(() => { r(898, Math.round(416 - k * 20), 3, 3, [210, 240, 255]); r(903, Math.round(418 - k * 16), 2, 2, [210, 240, 255]); }); } }
   // the trophy: a glint that runs over the beaker
@@ -202,7 +206,6 @@ const TALKERS: Talker[] = [
   T_('rad', 'RADIATION', 'READ', 456, 344, ['RADIATION: NORMAL. (it\'s mostly the bananas)', 'if it says UH OH, the pool has gone green again']),
   T_('notice', 'NOTICE BOARD', 'READ', 609, 360, ['ROTA: whoever broke the kettle is on mop duty', 'LOST: ONE GLOVE (LEFT). IF FOUND, IT\'S MINE. - ROD', 'WHO KEEPS MIXING THE BLUE ONES?? - FIZZ', 'REMINDER: SUITS ON PAST THE GLASS']),
   T_('trophy', 'TROPHY CASE', 'LOOK', 688, 366, ['EXPERIMENT OF THE MONTH: DOES COFFEE WORK ON ROBOTS? (it does)', 'a tiny golden beaker. somebody polishes it every day']),
-  T_('chem', 'CHEM LAB', 'LOOK', WING.chem, DOOR_TOP, ['FITTING THE FUME HOODS. BACK SOON!', 'you can hear something bubbling in there...']),
   T_('eyes', 'EYEWASH', 'USE', 850, 362, ['*splash* ...refreshing!', 'rinse for 15 minutes. or until bored']),
   T_('cooler', 'WATER COOLER', 'SIP', 900, 388, ['*glug glug* ahh', 'reactor-grade refreshment']),
   T_('tesla', 'TESLA LAB', 'LOOK', WING.tesla, DOOR_TOP, ['OPENING SOON: THE TESLA LAB. it crackles in there', 'the door handle is... slightly buzzy']),
@@ -218,6 +221,7 @@ export function makeWing(): Room {
     doors: [
       { trigger: { x0: 14, y0: 470, x1: 22, y1: 612 }, edge: true, to: 'lab', arrive: { x: 910, y: 520 }, label: 'THE LAB', area: { x0: 0, y0: DOOR_TOP - 14, x1: 38, y1: 612 } },
       { trigger: { x0: WING.reactor - 18, y0: 470, x1: WING.reactor + 18, y1: 478 }, to: 'reactor', arrive: { x: 96, y: 540 }, label: 'REACTOR', area: { x0: WING.reactor - 56, y0: SIGN_Y, x1: WING.reactor + 56, y1: 470 } },
+      { trigger: { x0: WING.chem - 18, y0: 470, x1: WING.chem + 18, y1: 478 }, to: 'chem', arrive: { x: 70, y: 500 }, label: 'CHEM LAB', area: { x0: WING.chem - 34, y0: SIGN_Y, x1: WING.chem + 34, y1: 470 } },
     ],
     spots: WING_SPOTS, inUse: new Map(),
     spawn: { x: 60, y: 540 },
