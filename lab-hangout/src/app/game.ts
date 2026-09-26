@@ -26,6 +26,8 @@ export interface Game {
   readonly tokens: number;
   readonly input: Input;
   readonly npcs: Npcs;
+  /** Walking through a door to another room (mid-fade). */
+  readonly switching: boolean;
   /** Changing your look (the start screen is up). */
   readonly editing: boolean;
   /** A touch screen (the hints say TAP, not PRESS E). */
@@ -38,6 +40,12 @@ export interface Game {
   usingOf(av: Avatar): Using;
   /** Step off the spot you're using (back to where you stand to use it). */
   leaveSpot(): void;
+  /** Emote (unless you only just did): true if it happened. */
+  emote(kind: EmoteKind): boolean;
+  /** Put on something you own ('slot:index'), and cheer. */
+  wear(item: string): void;
+  /** onClose for a panel opened from spot i: hand the keys back to walking and step off the spot. */
+  closeSpot(i: number): () => void;
   /** Forget where you tapped to walk to. */
   clearTap(): void;
   /** Ask the server to do something to a shared thing, one at a time per `what`; then `ok` and refresh(true), or say why not. */

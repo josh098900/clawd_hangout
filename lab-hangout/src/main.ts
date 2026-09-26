@@ -11,7 +11,7 @@ import { Input, isTyping } from './engine/input';
 import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, alpha, puff, bake, arrowDown } from './engine/pixel';
 import { K, SK } from './engine/palette';
 import { clamp, seg } from './engine/math';
-import { makeLab, LAB_INFO } from './world/lab';
+import { makeLab } from './world/lab';
 import { openAlbum, openPinEditor } from './ui/photos';
 import { makeDen, DEN_INFO, lightning, pomodoro } from './world/den';
 import { makeRoof, rocketTop, showStart } from './world/roof';
@@ -24,13 +24,12 @@ import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
 import { COUNT_IN, SONGS, kLive, kTime, lane, stepS } from './game/karaoke';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
-import { makeArcade, ARCADE_INFO, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
-import { openTanks, type TankHandle } from './ui/tanks';
+import { makeArcade, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
 import { makeStation, makeTrain, STATIONS, train } from './world/subway';
 import { makePark, PARK_INFO, DOCK, pondEdge, pondFeedPoint } from './world/park';
 import { openSandbox } from './ui/sandbox';
 import { quests } from './game/quests';
-import { makeDiner, DINER, DINER_SPOTS } from './world/diner';
+import { makeDiner, DINER } from './world/diner';
 import { makeKarts, KARTS } from './world/karts';
 import { makeLofts, LOFTS_INFO } from './world/lofts';
 import { FLAT, FLAT_ROOMS, applyLayout, drawEditOverlay, flatTitle, isFlat, makeFlatRoom, partyOn, petSpot, roomLayout, type FlatRoomId } from './world/flat';
@@ -38,19 +37,16 @@ import { closeDecorate, decorating, openDecorate } from './ui/decorate';
 import { knockPrompt, openLift, openShow } from './ui/flats';
 import { openRace, type RaceHandle } from './ui/race';
 import { LOBBY_S, MAX_RACERS, RACE_MAX_S, TRACKS, ordinal, raceTime, trackOf } from './game/kart';
-import { TOUR, BURNT, isBurnt, retryStep, type TourStep } from './game/dinertour';
-import { ST, cookAct, live as shiftLive, newShift, practiceShift, stationLabel, verdict, SHIFT_S, openTickets, missed, score, shiftEnd, type DinerState } from './game/diner';
-import { syncTickets } from './ui/tickets';
+import { ST, cookAct, live as shiftLive, stationLabel, openTickets } from './game/diner';
 import { OUTDOORS, WEATHER_NEWS, drawWeather, forceWeather, lightning as stormBolt, raining, weather } from './world/weather';
 import { drawCrewFloor, drawCrewTag, findCrews, type Crew } from './game/dance';
 import { openQuests, badgeChips } from './ui/quests';
-import { openClaw, withItem } from './ui/claw';
-import { openPong, type PongHandle } from './ui/pong';
+import { withItem } from './ui/claw';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
 import { setSeason, isHalloween, isWinter, season } from './world/season';
 import { WINTER, installWinter, onIce, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
-import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
+import { installHalloween, halloweenProps, halloweenBack, halloweenFront, candleOrder } from './world/halloween';
 import { GARDEN } from './world/garden';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { fishNamed, logFish } from './game/fish';
@@ -88,6 +84,9 @@ import { openTyping } from './ui/typing';
 import { openKanban } from './ui/kanban';
 import { button, flash, modalOpen, openModal, row, type Modal } from './ui/modal';
 import { $, cap, errText, narrow, now, setGame } from './app/game';
+import { clockIn, cook, dinerEntered, dinerLine, dinerStep, drawTourArrow, endTour, initTourButton, leaveKitchen, settled, startTour, tour, tourStepNow } from './features/diner';
+import { endArcade, openClawMachine, pong, roomHi, startPong, startTank, tank } from './features/arcade';
+import { candle, ghostUntil, knock } from './features/halloween';
 import { refreshGarden, tendBed } from './features/garden';
 import { crowdEmote, initKaraokeHud, karaokeStep, openKaraoke, perf } from './features/karaoke';
 import { albumHooks, checkMyPhotos, checkQueue, loadFlatPhoto, photosAt, photosStale, refreshPhotos, setAdmin } from './features/photos';
@@ -417,7 +416,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   zv.x = zv.y = 0;
   if (id === 'station') STATION.dirty = true;
   if (id === 'lab') photosStale();
-  if (id === 'diner') dinerSince = now();
+  if (id === 'diner') dinerEntered();
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
@@ -694,8 +693,7 @@ function subwaySounds(): void {
   if (room.id === 'train' && tr.phase === 'ride' && t - lastClack > 0.55) { lastClack = t; SFX.clack(); }
 }
 
-// ---------- Halloween (world/halloween.ts) ----------
-let ghostUntil = 0, knocking = false, lastHowl = -1;
+// ---------- seasons: dressing the world for Halloween / Winter, and their collect-them-all prizes ----------
 async function refreshSeason(): Promise<void> {
   let s = params.get('season');
   if (!s) { try { s = await net.season(); } catch { s = null; } }
@@ -709,88 +707,15 @@ function seasonPrize(prize: string | null, all: string, what: string): void {
   if (prize === 'tokens:5') toast(all + ' You have every ' + what + ' already, so +5 tokens', 5000);
   else if (prize) { save.addPrize(prize); SFX.score(); celebrate(); toast(all + ' You got the ' + itemName(prize) + '! (Look menu)', 6000); }
 }
-/** Trick or treat at door n: the server pays (or tricks you into a ghost for a minute). */
-function knock(n: number): void {
-  if (knocking) return; knocking = true;
-  SFX.door(); me.dir = me.x < TREAT_DOORS[n].x ? 1 : -1;
-  net.trickOrTreat(n).then((r) => {
-    markKnocked(n); setTokens(r.tokens);
-    if (r.trick) { quests.stat('tricks'); me.pose = POSE_GHOST; ghostUntil = now() + 60; forceSend = true; SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
-    else { SFX.chime(); floatText('+1'); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }
-    seasonPrize(r.prize, 'ALL 8 DOORS!', 'costume');
-  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) markKnocked(n); toast(cap(m), 3000); })
-    .finally(() => { knocking = false; });
-}
-/** The haunted Crypt's candles: today's order is on the old scroll. */
-function candle(n: number): void {
-  const res = lightCandle(n);
-  if (res === 'lit') return;
-  if (res === 'wrong') { SFX.boo(); toast('The candles gutter out... a cold laugh echoes. Check the scroll!', 3500); return; }
-  SFX.zap();
-  if (res === 'solved') {
-    SFX.score(); celebrate();
-    const first = save.unlock('hat:12');
-    toast(first ? 'The crypt sighs... you earned the PUMPKIN HEAD! (Look menu)' : 'The candles burn bright. The crypt is pleased.', 5000);
-  }
-}
-/** The SLOP INVADERS high score of the cabinet you're at (the Lab's or the Arcade's). */
-const roomHi = () => (room.id === 'arcade' ? ARCADE_INFO.hi : LAB_INFO.hi);
+// ---------- spots: stepping off, what's in your hand, wearing things, the desks, things you talk to ----------
 /** Put on a hat / face item / outfit / pet you own ('slot:index'). */
 function wearItem(item: string): void { applyProfile(me.name, withItem(me.look, item)); celebrate(); }
-function openClawMachine(i: number): void {
-  openClaw({
-    play: async () => { const r = await net.playClaw(); setTokens(r.tokens); return r; },
-    look: () => me.look,
-    wear: wearItem,
-    started: () => { ARCADE_INFO.clawT = now(); celebrate('wow'); quests.bump('claw'); },
-    won: (r) => { if (!r.dupe) { save.addPrize(r.item); setState({ k: 'claw', v: { name: me.name, item: r.item } }); } },
-    onClose: closeSpot(i),
-  });
-}
-/** Whoever is standing at spot `spot` (the other side of a Pong table or a tank cabinet). */
-const seatedAt = (spot: number): { id: string; name: string } | null => { for (const o of others.values()) if (o.use === spot) return { id: o.id, name: o.name }; return null; };
-let pong: PongHandle | null = null;
-function startPong(i: number): void {
-  const side = (PONG_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = PONG_SPOTS[1 - side];
-  pong = openPong({
-    side, myName: me.name,
-    opponent: () => seatedAt(other),
-    send: (p) => { net.sendPong(p); pongSeen(p); },
-    over: (winner) => {
-      const ch = ARCADE_INFO.champ;
-      setState({ k: 'champ', v: { name: winner, wins: ch && ch.name === winner ? ch.wins + 1 : 1 } });
-      if (winner === me.name) { celebrate(); }
-    },
-    won: () => { quests.bump('pong'); quests.stat('pongWins'); },
-    onClose: () => { pong = null; input.clear(); if (me.use === i) leaveSpot(); },
-  });
-}
-let tank: TankHandle | null = null;
-function startTank(i: number): void {
-  const side = (TANK_SPOTS[0] === i ? 0 : 1) as 0 | 1, other = TANK_SPOTS[1 - side];
-  tank = openTanks({
-    side, myName: me.name,
-    opponent: () => seatedAt(other),
-    send: (m) => { net.sendTank(m); tankSeen(m); },
-    won: (vsCpu) => { quests.bump('tank'); quests.stat('tankWins'); celebrate(); toast(vsCpu ? 'You beat the CPU!' : 'TANK DUEL CHAMPION!', 3000); },
-    onClose: () => { tank = null; input.clear(); if (me.use === i) leaveSpot(); },
-  });
-}
 /** onClose for a panel opened from spot i: hand the keys back to walking and step off the spot. */
 const closeSpot = (i: number) => (): void => { input.clear(); if (me.use === i) leaveSpot(); };
 function leaveSpot(): void {
   const s = room.spots[me.use];
   if (s) { me.x = s.sx; me.y = s.sy; }
   me.use = -1; me.stopT = now(); forceSend = true;
-}
-function endArcade(score: number): void {
-  input.clear();
-  if (me.use >= 0 && usingOf(me) === 'arcade') leaveSpot();
-  if (score <= 0) return;
-  const roomBest = roomHi()?.score ?? 0;
-  if (score > save.data.hi) save.update((d) => { d.hi = score; });
-  if (score > roomBest) { setState({ k: 'hi', v: { name: me.name, score } }); say(net.selfId, 'NEW HI SCORE: ' + score + '!', now(), true); SFX.score(); emote('joy'); }
-  else say(net.selfId, 'SCORE: ' + score, now(), true);
 }
 /** Sip / eat whatever's in your hand. */
 function useItem(): void {
@@ -1451,96 +1376,7 @@ function weatherStep(t: number): void {
   }
 }
 
-// ---------- the Diner (game/diner.ts, world/diner.ts) ----------
-/** When you walked into the Diner: wait for the others to catch you up before acting as the shift's host. */
-let dinerSince = 0;
-const settled = (): boolean => now() - dinerSince > 1.5;
-/** predictUntil: don't copy your hand from the shift state until the host has had time to answer. */
-let predictUntil = 0, hostGone = 0, shiftSeen = '', lastDone = 0, lastMissed = 0, lastOpen = 0;
-const tipped = new Set<number>();
-/** Walking out mid-shift: put down what you're carrying, and hand the kitchen to a cook who's still here. */
-function leaveKitchen(): void {
-  const g = DINER.g;
-  if (isKitchen(me.hold)) { cook(ST.BIN, true); me.hold = 0; }
-  if (g && shiftLive(DINER.g) && DINER.g!.host === net.selfId) { const next = DINER.g!.ids.find((id) => id !== net.selfId && others.has(id)); if (next) setState({ k: 'diner', v: { ...DINER.g!, host: next } }); }
-}
-function clockIn(): void {
-  if (!settled()) return;
-  if (tour && tour.step < TOUR.length - 1) { toast('Finish the tour with COOKIE first (or SKIP TOUR)'); return; }
-  if (tour) endTour(true);
-  if (shiftLive(DINER.g)) { toast('A shift is already on: grab a station and help out!'); return; }
-  const cooks = 1 + [...others.keys()].filter((id) => !id.startsWith('bot-')).length;
-  setState({ k: 'diner', v: newShift(net.selfId, me.name, cooks) });
-  SFX.dingdong(); toast('SHIFT STARTED! Orders coming in. Patties are in the FRIDGE', 4000);
-}
-/** The kitchen's sound for pressing E at station st (your hands already updated); `cheer` = the tour's extra fanfare for an order up. */
-function cookSound(st: number, ticket: boolean, cheer = false): void {
-  if (st === ST.GRILL || st === ST.FRYER) { if (!me.hold) SFX.sizzle(); else SFX.blip(); }
-  else if (st === ST.PASS) { if (ticket) { SFX.bell(); if (cheer) SFX.score(); } else SFX.chime(); }
-  else if (st === ST.SHAKE) SFX.zap(); else SFX.pop();
-}
-/** Press E at kitchen station `st`: the host applies it, everyone else asks the host. */
-function cook(st: number, quiet = false): void {
-  if (tour) { tourCook(st); return; }
-  const g = DINER.g;
-  if (!shiftLive(g)) { if (!quiet) toast('Clock in first: the time clock is by the kitchen door'); return; }
-  if (!settled()) return;
-  const res = cookAct(g, net.selfId, me.name, st);
-  if ('err' in res) { if (!quiet) { toast(res.err, 1800); SFX.blip(); } return; }
-  if (!quiet) toast(res.msg, 1800);
-  const k = res.g.ids.indexOf(net.selfId);
-  me.hold = res.g.hands[k] ?? 0; forceSend = true; predictUntil = now() + 0.8;
-  cookSound(st, !!res.ticket);
-  if (g.host === net.selfId) setState({ k: 'diner', v: res.g }); else net.sendCook(st);
-}
-function dinerStep(dt: number, t: number): void {
-  const g = DINER.g, inDiner = room.id === 'diner' && playing && !switching, on = inDiner && shiftLive(g); // (not while walking out: the tour mustn't start mid-fade and follow you)
-  npcs.away.clear(); if (on) npcs.away.add('npc-cookie');
-  syncTickets(tour ? tour.g : on ? g : null);
-  if (inDiner && settled()) tourStep();
-  if (tour) return;
-  if (!inDiner || !g) { if (isKitchen(me.hold) && room.id !== 'diner') { me.hold = 0; forceSend = true; } return; }
-  if (!settled()) return;
-  // the host walked out: the first cook still here (by id) takes over
-  if (on && g.host !== net.selfId && !others.has(g.host)) {
-    hostGone += dt;
-    const here = g.ids.filter((id) => id === net.selfId || others.has(id)).sort();
-    if (hostGone > 3 && here[0] === net.selfId) { hostGone = 0; setState({ k: 'diner', v: { ...g, host: net.selfId } }); toast('The shift boss left: you are running the kitchen now!', 3000); }
-  } else hostGone = 0;
-  // your hands are whatever the shift says (after a moment for the host to answer)
-  const k = g.ids.indexOf(net.selfId), want = on && k >= 0 ? g.hands[k] : 0;
-  if (t > predictUntil && me.hold !== want && (isKitchen(me.hold) || isKitchen(want))) { me.hold = want; forceSend = true; }
-  // sounds for everyone in the kitchen: a new ticket, an order up, a missed one
-  const key = g.t0 + ':' + (on ? 'on' : 'over'), miss = missed(g);
-  if (key !== shiftSeen) { const first = shiftSeen === ''; shiftSeen = key; lastDone = g.done; lastMissed = miss; lastOpen = 0; if (!on && !first && Date.now() >= shiftEnd(g)) shiftOver(g); }
-  if (on) {
-    const open = openTickets(g).length;
-    if (open > lastOpen) SFX.dingdong();
-    lastOpen = open;
-    if (g.done > lastDone && g.host !== net.selfId) SFX.bell();
-    if (miss > lastMissed) { SFX.hurt(); toast('A customer gave up waiting! -5', 2000); }
-    lastDone = g.done; lastMissed = miss;
-  }
-}
-/** The shift ended: tips, the best-shift board, quests, the chef's hat. */
-function shiftOver(g: DinerState): void {
-  if (!g.ids.includes(net.selfId) || tipped.has(g.t0) || Date.now() - shiftEnd(g) > 60000) return;
-  tipped.add(g.t0);
-  const sc = score(g);
-  SFX.score(); toast('SHIFT OVER! ' + sc + ' points, ' + g.done + ' orders served. ' + verdict(sc), 5000);
-  quests.bump('diner');
-  if (sc > (save.data.stats.dinerBest ?? 0)) { save.update((d) => { d.stats.dinerBest = sc; }); quests.checkBadges(); }
-  if (sc >= 120 && save.unlock('hat:13')) setTimeout(() => { toast('You earned the CHEF HAT! Wear it from Look', 5000); SFX.score(); }, 2500);
-  if (g.host === net.selfId && sc > (DINER.best?.score ?? 0)) setState({ k: 'dinerbest', v: { name: g.names.slice(0, 2).join(' & ').slice(0, 16), score: sc } });
-  if (sc > 0) net.dinerTip(sc).then((r) => { if (r.paid) { setTokens(r.tokens); setTimeout(() => toast('Tips: +' + r.paid + (r.paid === 1 ? ' token' : ' tokens'), 3000), 5200); } }).catch((e: unknown) => console.warn('[tips]', e));
-}
-/** The top banner in the Diner during a shift. */
-function dinerLine(): string {
-  if (tour && room.id === 'diner') return tourStepNow().bar;
-  const g = DINER.g; if (room.id !== 'diner' || !shiftLive(g)) return '';
-  return 'KITCHEN SHIFT · ' + mmss((g.t0 + SHIFT_S * 1000 - Date.now()) / 1000) + ' · ' + score(g) + ' PTS · ' + g.ids.length + (g.ids.length === 1 ? ' COOK' : ' COOKS');
-}
-
+initTourButton(emoteBar);
 // ---------- the Kart Track (game/kart.ts, ui/race.ts, world/karts.ts) ----------
 let raceUI: RaceHandle | null = null;
 /** Your finish in the race with this t0 (so we know when everyone's done). */
@@ -1683,6 +1519,7 @@ function startDecorating(): void {
 const decoBtn = document.createElement('button');
 decoBtn.type = 'button'; decoBtn.className = 'pill'; decoBtn.textContent = 'DECORATE'; decoBtn.style.display = 'none';
 decoBtn.addEventListener('click', () => { if (decorating()) closeDecorate(true); else startDecorating(); });
+emoteBar.appendChild(decoBtn); // (after SKIP TOUR in the bar)
 function syncDecoBtn(): void {
   const show = playing && FLAT.mine && isFlat(room.id);
   decoBtn.style.display = show && !decorating() ? '' : 'none';
@@ -1701,79 +1538,8 @@ function flatStep(): void {
   if (owner && owner.look.pet) owner.petGoal = petSpot(room.id as FlatRoomId, owner.seed * 1000);
 }
 
-// ---------- COOKIE's tour of the kitchen (game/dinertour.ts) ----------
-/** The tour: which step, the private practice kitchen, when this step started, and the step to go back to after a burn. */
-let tour: { step: number; g: DinerState; t0: number; said: string; back: number } | null = null;
-const skipBtn = document.createElement('button');
-skipBtn.type = 'button'; skipBtn.className = 'pill'; skipBtn.textContent = 'SKIP TOUR'; skipBtn.style.display = 'none';
-skipBtn.addEventListener('click', () => { endTour(true); toast('Tour skipped. TALK to COOKIE any time to see it again', 3500); });
-emoteBar.appendChild(skipBtn);
-emoteBar.appendChild(decoBtn);
-const tourStepNow = (): TourStep => (tour && tour.back >= 0 ? BURNT : TOUR[tour?.step ?? 0]);
-function startTour(again = false): void {
-  if (tour || shiftLive(DINER.g)) return;
-  if (isKitchen(me.hold)) me.hold = 0;
-  tour = { step: again ? 1 : 0, g: practiceShift(net.selfId, me.name), t0: now(), said: '', back: -1 };
-  DINER.tour = tour.g; skipBtn.style.display = '';
-  // COOKIE comes straight over: if he's far off, he runs in from just out of view
-  const ck = npcs.byId('npc-cookie');
-  if (ck && Math.abs(ck.av.x - me.x) > 360) { ck.av.x = clamp(me.x + (ck.av.x > me.x ? 250 : -250), 30, 1370); ck.av.y = clamp(me.y, 500, 660); }
-  if (again) say('npc-cookie', 'The tour? Happy to! Follow me.', now(), false);
-}
-function endTour(done: boolean): void {
-  if (!tour) return;
-  tour = null; DINER.tour = null; npcs.release('npc-cookie'); skipBtn.style.display = 'none';
-  if (isKitchen(me.hold)) { me.hold = 0; forceSend = true; }
-  if (done && !save.data.stats.dinerTour) save.update((d) => { d.stats.dinerTour = 1; });
-}
-/** Where a tour step points: the station's stand point (COOKIE waits beside it) and the top of its picture (the arrow). */
-function tourSpot(at: TourStep['at']): { x: number; y: number; top: number } {
-  if (at === 'you') return { x: me.x + (me.x > 1300 ? -30 : 30), y: me.y + 2, top: me.y - 60 };
-  const sp = DINER_SPOTS.find((q) => (at === 'clock' ? q.kind === 'shift' : q.kind === 'cook' && q.n === at))!;
-  return { x: sp.sx, y: sp.sy, top: sp.area.y0 };
-}
-/** Run the tour: start it for first-timers, walk COOKIE, say each line, move on when a step is done. */
-function tourStep(): void {
-  if (!tour) {
-    if (!save.data.stats.dinerTour && !shiftLive(DINER.g) && playing && !editing) startTour();
-    return;
-  }
-  if (shiftLive(DINER.g)) { endTour(false); toast('A real shift just started! Jump in: COOKIE will show you around another time', 4000); return; }
-  const t = now();
-  if (isBurnt(me.hold) && tour.back < 0) { tour.back = retryStep(tour.step); tour.t0 = t; }
-  const st = tourStepNow(), sp = tourSpot(st.at), cookie = npcs.byId('npc-cookie');
-  const cx = st.at === 'you' ? sp.x : sp.x + (sp.x > 1300 ? -30 : 30);
-  npcs.puppet.set('npc-cookie', { x: cx, y: sp.y + 6 });
-  if (cookie && !cookie.av.moving) npcs.face(cookie, me.x, t);
-  const key = tour.step + ':' + tour.back;
-  const near = cookie ? Math.hypot(cookie.av.x - cx, cookie.av.y - sp.y - 6) < 40 : true;
-  if (tour.said !== key && cookie && (near || t - tour.t0 > (st.at === 'you' ? 6 : 3))) { tour.said = key; say('npc-cookie', st.say, t, false); SFX.chat(); }
-  const done = st.done ? st.done({ hold: me.hold, g: tour.g }) : t - tour.t0 > (st.wait ?? 5) && tour.said === key;
-  if (!done) return;
-  if (tour.back >= 0) { tour.step = tour.back; tour.back = -1; tour.t0 = t; return; }
-  if (tour.step >= TOUR.length - 1) { endTour(true); return; }
-  tour.step++; tour.t0 = t;
-  if (TOUR[tour.step].done && tour.step > 2) SFX.chime();
-}
-/** E at a station on the tour: the practice kitchen, just for you. */
-function tourCook(st: number): void {
-  if (!tour) return;
-  const res = cookAct(tour.g, net.selfId, me.name, st);
-  if ('err' in res) { toast(res.err, 1800); SFX.blip(); return; }
-  tour.g = res.g; DINER.tour = res.g;
-  me.hold = res.g.hands[res.g.ids.indexOf(net.selfId)] ?? 0; forceSend = true;
-  cookSound(st, !!res.ticket, true);
-}
-/** A big bouncing arrow over where the tour wants you. */
-function drawTourArrow(a: number): void {
-  if (!tour) return;
-  const st = tourStepNow(); if (st.at === 'you') return;
-  const sp = tourSpot(st.at), x = Math.round(sp.x), y = Math.round(sp.top - 14 - Math.abs(Math.sin(a * 4)) * 5), c: [number, number, number] = [124, 242, 156];
-  arrowDown(x, y, c, 6, 6, 2, 8);
-  Gd(x, y, 12, c, 0.45);
-}
-
 // ---------- loop ----------
+let lastHowl = -1;
 // Capped at 60 fps: 120 Hz displays would otherwise draw every frame twice for no visible gain.
 const FRAME_MIN_MS = 1000 / 60 - 1.5;
 let last = performance.now();
@@ -2003,8 +1769,8 @@ if (import.meta.env.DEV && params.has('debug')) {
 setGame({
   get net() { return net; }, get me() { return me; }, get room() { return room; }, get others() { return others; }, get playing() { return playing; },
   get lobby() { return lobby; }, get tokens() { return myTokens; }, get input() { return input; }, get npcs() { return npcs; },
-  get editing() { return editing; }, isTouch, zv, R, usingOf,
+  get editing() { return editing; }, get switching() { return switching; }, isTouch, zv, R, usingOf,
   sendMe: () => { forceSend = true; }, setState, setTokens, celebrate, floatText, everyone, hidden: hiddenAv, seasonPrize,
-  leaveSpot, clearTap: () => { tapTarget = null; }, serverDo,
+  leaveSpot, clearTap: () => { tapTarget = null; }, serverDo, emote, wear: wearItem, closeSpot,
 });
 void boot();
