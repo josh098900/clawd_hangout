@@ -160,4 +160,5 @@ export function moonArrive(from: RoomId, id: RoomId): void {
   if (id === 'moonbase') { SFX.hiss(); refreshCrystals(); if (from === 'moon' && !save.data.stats.base) { quests.stat('base'); toast('The MOON BASE! Air in here, so helmets off. Bring moon rocks to the ASSAY machine (far right)', 6000); } }
   if (from === 'moonbase' && id === 'moon') SFX.hiss();
   if (from === 'lander' && id === 'station') toast('Back on the SPACE STATION', 2500);
+  else if (id === 'station' && !save.data.stats.moonNews) { quests.stat('moonNews'); setTimeout(() => { if (game.room.id === 'station') toast('NEW: the LANDER BAY (the far right end of the station) flies down to THE MOON every 10 minutes!', 6500); }, 5000); } // (once, for everyone who knew the station before)
 }
