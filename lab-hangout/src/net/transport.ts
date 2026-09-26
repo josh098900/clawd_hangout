@@ -127,9 +127,9 @@ export function parseLayout(v: unknown): FlatLayout {
 export const DOORS: DoorMode[] = ['locked', 'friends', 'open'];
 export const parseDoor = (v: unknown): DoorMode => (DOORS.includes(v as DoorMode) ? v as DoorMode : 'locked');
 export function parseFlatMsg(p: unknown): { id: string; f: FlatMsg } | null {
-  const o = p as Record<string, unknown> | null;
-  if (!o || !isId(o.id) || !['knock', 'in', 'no', 'party'].includes(o.k as string)) return null;
-  const f: FlatMsg = { k: o.k as FlatMsg['k'], nm: cleanName(o.nm) || '?' };
+  const o = obj(p), k = oneOf(o?.k, ['knock', 'in', 'no', 'party'] as const);
+  if (!o || !isId(o.id) || !k) return null;
+  const f: FlatMsg = { k, nm: cleanName(o.nm) || '?' };
   if (o.to !== undefined) { if (!isId(o.to)) return null; f.to = o.to; }
   if (o.until !== undefined) { const u = num(o.until, 0, 1e11); if (u === null) return null; f.until = u; }
   return { id: o.id, f };
@@ -384,235 +384,220 @@ export function cleanChat(v: unknown): string {
   if (typeof v !== 'string') return '';
   return scrub(v.replace(CTRL, '').replace(/\s+/g, ' ').trim()).slice(0, CHAT_MAX);
 }
+// The kit every validator below is built from. Anything that isn't exactly right is dropped (null).
+/** The payload as an object to read fields from (null if it isn't one). */
+const obj = (p: unknown): Record<string, unknown> | null => (p && typeof p === 'object' ? (p as Record<string, unknown>) : null);
+/** A finite number, clamped into lo..hi (null if it isn't a number). */
 const num = (v: unknown, lo: number, hi: number): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
+/** A whole number in lo..hi (null if not). */
+const int = (v: unknown, lo: number, hi: number): number | null => (typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi ? v : null);
+/** A list of at most `max` whole numbers, each in lo..hi (null if not). */
+const ints = (v: unknown, max: number, lo: number, hi: number): number[] | null => (Array.isArray(v) && v.length <= max && v.every((x) => Number.isInteger(x) && x >= lo && x <= hi) ? (v as number[]) : null);
+/** v, if it's one of `opts`. */
+const oneOf = <T extends string>(v: unknown, opts: readonly T[]): T | null => (opts.includes(v as T) ? (v as T) : null);
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64 && /^[\w-]+$/.test(v);
+/** Players' names from a payload, cleaned (an empty one becomes `blank`). */
+const names = (v: unknown[], blank = '?'): string[] => v.map((x) => cleanName(x) || blank);
 
 export function parseMove(p: unknown): { id: string; m: MoveMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
   const x = num(o.x, 0, 4000), y = num(o.y, 0, 4000);
   if (x === null || y === null) return null;
-  const use = typeof o.use === 'number' && Number.isInteger(o.use) && o.use >= 0 && o.use < SPOTS_MAX ? o.use : -1;
-  const int = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : 0);
-  return { id: o.id, m: { x, y, dir: o.dir === -1 ? -1 : 1, moving: o.moving === true, use, hold: int(o.hold, HOLD_MAX), pose: int(o.pose, POSE_MAX) } };
+  return { id: o.id, m: { x, y, dir: o.dir === -1 ? -1 : 1, moving: o.moving === true, use: int(o.use, 0, SPOTS_MAX - 1) ?? -1, hold: int(o.hold, 0, HOLD_MAX) ?? 0, pose: int(o.pose, 0, POSE_MAX) ?? 0 } };
 }
 export function parsePeer(p: unknown): PeerState | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
   const mv = parseMove(o);
   const name = cleanName(o.name) || 'GUEST';
   return { id: o.id, name, look: sanitizeLook(o.look), x: mv?.m.x ?? 0, y: mv?.m.y ?? 0, dir: mv?.m.dir ?? 1, moving: false };
 }
 export function parseChat(p: unknown): { id: string; text: string } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
   const text = cleanChat(o.text);
   return text ? { id: o.id, text } : null;
 }
 export function parseEmote(p: unknown): { id: string; kind: EmoteKind } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id) || !isEmote(o.kind)) return null;
   return { id: o.id, kind: o.kind };
 }
-export function parseState(p: unknown): { id: string; s: StateMsg } | null {
-  const o = p as Record<string, unknown> | null;
-  if (!o || !isId(o.id) || typeof o.ts !== 'number' || !Number.isFinite(o.ts)) return null;
-  const v = o.v as Record<string, unknown> | null, ts = o.ts;
-  if (o.k === 'juke' && v && typeof v === 'object') {
-    const n = v.n, t0 = num(v.t0, 0, 1e11);
-    if (typeof n !== 'number' || !Number.isInteger(n) || n < -1 || n > 15 || t0 === null) return null;
-    return { id: o.id, s: { k: 'juke', v: { n, t0 }, ts } };
-  }
-  if (o.k === 'hi' && v && typeof v === 'object') {
-    const score = v.score, name = cleanName(v.name);
-    if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > 999999 || !name) return null;
-    return { id: o.id, s: { k: 'hi', v: { name, score }, ts } };
-  }
-  if (o.k === 'build' && v && typeof v === 'object') {
-    const int = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 1e6 ? x : null);
-    const n = int(v.n), dep = int(v.dep);
-    if (typeof v.ok !== 'boolean' || n === null || dep === null) return null;
-    return { id: o.id, s: { k: 'build', v: { ok: v.ok, n, dep, by: cleanName(v.by), id: isId(v.id) ? v.id : '', msg: cleanChat(v.msg).slice(0, 40) }, ts } };
-  }
-  if (o.k === 'deploy' && v && typeof v === 'object') {
-    const t0 = num(v.t0, 0, 1e11);
-    if (t0 === null || typeof v.ok !== 'boolean') return null;
-    return { id: o.id, s: { k: 'deploy', v: { t0, ok: v.ok, by: cleanName(v.by) }, ts } };
-  }
-  if (o.k === 'notes' && Array.isArray(o.v) && o.v.length <= NOTES_MAX) {
+/** Each kind of room state's own check (the compiler makes sure every kind in StateVal has one). */
+const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>['v'] | null } = {
+  juke: (x) => { const v = obj(x); if (!v) return null; const n = int(v.n, -1, 15), t0 = num(v.t0, 0, 1e11); return n === null || t0 === null ? null : { n, t0 }; },
+  hi: (x) => { const v = obj(x); if (!v) return null; const score = int(v.score, 0, 999999), name = cleanName(v.name); return score === null || !name ? null : { name, score }; },
+  build: (x) => {
+    const v = obj(x); if (!v) return null;
+    const n = int(v.n, 0, 1e6), dep = int(v.dep, 0, 1e6);
+    return typeof v.ok !== 'boolean' || n === null || dep === null ? null : { ok: v.ok, n, dep, by: cleanName(v.by), id: isId(v.id) ? v.id : '', msg: cleanChat(v.msg).slice(0, 40) };
+  },
+  deploy: (x) => { const v = obj(x); if (!v) return null; const t0 = num(v.t0, 0, 1e11); return t0 === null || typeof v.ok !== 'boolean' ? null : { t0, ok: v.ok, by: cleanName(v.by) }; },
+  notes: (x) => {
+    if (!Array.isArray(x) || x.length > NOTES_MAX) return null;
     const notes: KanbanNote[] = [];
-    for (const x of o.v as unknown[]) {
-      const q = x as Record<string, unknown> | null, t = cleanChat(q?.t).slice(0, NOTE_LEN), c = q?.c;
-      if (!t || typeof c !== 'number' || !Number.isInteger(c) || c < 0 || c > 2) return null;
-      notes.push({ t, c });
-    }
-    return { id: o.id, s: { k: 'notes', v: notes, ts } };
-  }
-  if (o.k === 'game' && v && typeof v === 'object') { const g = parseGame(v); return g ? { id: o.id, s: { k: 'game', v: g, ts } } : null; }
-  if (o.k === 'slop' && v && typeof v === 'object') {
-    const w = v.w, dead = v.dead;
-    if (typeof w !== 'number' || !Number.isInteger(w) || w < 0 || !Array.isArray(dead) || dead.length > 64 || !dead.every((i) => Number.isInteger(i) && i >= 0 && i < 64)) return null;
-    return { id: o.id, s: { k: 'slop', v: { w, dead: dead as number[] }, ts } };
-  }
-  if (o.k === 'fw' && v && typeof v === 'object') {
-    const t0 = num(v.t0, 0, 1e11), seed = num(v.seed, 0, 1e6);
-    return t0 === null || seed === null ? null : { id: o.id, s: { k: 'fw', v: { t0, seed }, ts } };
-  }
-  if (o.k === 'crypt' && v && typeof v === 'object') {
+    for (const q of x) { const o = obj(q), t = cleanChat(o?.t).slice(0, NOTE_LEN), c = int(o?.c, 0, 2); if (!t || c === null) return null; notes.push({ t, c }); }
+    return notes;
+  },
+  game: (x) => { const v = obj(x); return v && parseGame(v); },
+  slop: (x) => { const v = obj(x); if (!v) return null; const w = int(v.w, 0, Infinity), dead = ints(v.dead, 64, 0, 63); return w === null || !dead ? null : { w, dead }; },
+  fw: (x) => { const v = obj(x); if (!v) return null; const t0 = num(v.t0, 0, 1e11), seed = num(v.seed, 0, 1e6); return t0 === null || seed === null ? null : { t0, seed }; },
+  crypt: (x) => {
+    const v = obj(x); if (!v) return null;
     const b = v.b, open = num(v.open, 0, 1e11);
-    if (!Array.isArray(b) || b.length !== 4 || !b.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 4000) || open === null) return null;
-    return { id: o.id, s: { k: 'crypt', v: { b: b as number[], open }, ts } };
-  }
-  if (o.k === 'sand' && typeof o.v === 'string' && /^[0-4]{320}$/.test(o.v)) return { id: o.id, s: { k: 'sand', v: o.v, ts } };
-  if (o.k === 'garden' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'garden', v: { n }, ts } }; }
-  if (o.k === 'claw' && v && typeof v === 'object') {
+    return !Array.isArray(b) || b.length !== 4 || !b.every((q) => typeof q === 'number' && Number.isFinite(q) && q >= 0 && q <= 4000) || open === null ? null : { b: b as number[], open };
+  },
+  sand: (x) => (typeof x === 'string' && /^[0-4]{320}$/.test(x) ? x : null),
+  garden: (x) => { const v = obj(x); if (!v) return null; const n = num(v.n, 0, 1e13); return n === null ? null : { n }; },
+  claw: (x) => {
+    const v = obj(x); if (!v) return null;
     const name = cleanName(v.name), item = typeof v.item === 'string' && /^[a-z]{2,8}:[0-9]{1,3}$/.test(v.item) ? v.item : '';
-    return name && item ? { id: o.id, s: { k: 'claw', v: { name, item }, ts } } : null;
-  }
-  if (o.k === 'champ' && v && typeof v === 'object') {
-    const name = cleanName(v.name), wins = v.wins;
-    return name && typeof wins === 'number' && Number.isInteger(wins) && wins >= 1 && wins <= 9999 ? { id: o.id, s: { k: 'champ', v: { name, wins }, ts } } : null;
-  }
-  if (o.k === 'diner' && v && typeof v === 'object') { const g = parseDiner(v); return g ? { id: o.id, s: { k: 'diner', v: g, ts } } : null; }
-  if (o.k === 'flat' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13), party = v.party === null ? null : num(v.party, 0, 1e11); return n === null || party === undefined || (v.party !== null && party === null) ? null : { id: o.id, s: { k: 'flat', v: { n, party }, ts } }; }
-  if (o.k === 'scope' && v && typeof v === 'object') {
-    const x = num(v.x, 0, 1e4), y = num(v.y, 0, 1e4), at = num(v.at, 0, 1e11), saw = typeof v.saw === 'string' && /^[A-Z0-9 ?!]{0,24}$/.test(v.saw) ? v.saw : null;
-    return x === null || y === null || at === null || saw === null ? null : { id: o.id, s: { k: 'scope', v: { x, y, by: cleanName(v.by), saw, at }, ts } };
-  }
-  if (o.k === 'karaoke' && v && typeof v === 'object') {
-    const song = v.song, t0 = num(v.t0, 0, 1e14);
-    if (typeof song !== 'number' || !Number.isInteger(song) || song < -1 || song >= SONGS.length || t0 === null) return null;
-    return { id: o.id, s: { k: 'karaoke', v: { song, t0, by: cleanName(v.by) }, ts } };
-  }
-  if (o.k === 'snowman' && v && typeof v === 'object') {
+    return name && item ? { name, item } : null;
+  },
+  champ: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), wins = int(v.wins, 1, 9999); return name && wins !== null ? { name, wins } : null; },
+  diner: (x) => { const v = obj(x); return v && parseDiner(v); },
+  flat: (x) => {
+    const v = obj(x); if (!v) return null;
+    const n = num(v.n, 0, 1e13), party = v.party === null ? null : num(v.party, 0, 1e11);
+    return n === null || (v.party !== null && party === null) ? null : { n, party };
+  },
+  scope: (x) => {
+    const v = obj(x); if (!v) return null;
+    const px = num(v.x, 0, 1e4), py = num(v.y, 0, 1e4), at = num(v.at, 0, 1e11), saw = typeof v.saw === 'string' && /^[A-Z0-9 ?!]{0,24}$/.test(v.saw) ? v.saw : null;
+    return px === null || py === null || at === null || saw === null ? null : { x: px, y: py, by: cleanName(v.by), saw, at };
+  },
+  karaoke: (x) => { const v = obj(x); if (!v) return null; const song = int(v.song, -1, SONGS.length - 1), t0 = num(v.t0, 0, 1e14); return song === null || t0 === null ? null : { song, t0, by: cleanName(v.by) }; },
+  snowman: (x) => {
+    const v = obj(x); if (!v) return null;
     const day = num(v.day, 0, 1e6), rolls = num(v.rolls, 0, 30), deco = num(v.deco, 0, 31);
-    return day === null || rolls === null || deco === null ? null : { id: o.id, s: { k: 'snowman', v: { day: Math.floor(day), rolls: Math.floor(rolls), deco: Math.floor(deco) }, ts } };
-  }
-  if (o.k === 'snowfight' && v && typeof v === 'object') { const t0 = num(v.t0, 0, 1e14); return t0 === null ? null : { id: o.id, s: { k: 'snowfight', v: { t0, by: cleanName(v.by) }, ts } }; }
-  if (o.k === 'trays' && v && typeof v === 'object') { const n = num(v.n, 0, 1e13); return n === null ? null : { id: o.id, s: { k: 'trays', v: { n }, ts } }; }
-  if (o.k === 'race' && v && typeof v === 'object') { const r = parseRace(v); return r ? { id: o.id, s: { k: 'race', v: r, ts } } : null; }
-  if (o.k === 'kartbest' && Array.isArray(o.v) && o.v.length <= 8) {
+    return day === null || rolls === null || deco === null ? null : { day: Math.floor(day), rolls: Math.floor(rolls), deco: Math.floor(deco) };
+  },
+  snowfight: (x) => { const v = obj(x); if (!v) return null; const t0 = num(v.t0, 0, 1e14); return t0 === null ? null : { t0, by: cleanName(v.by) }; },
+  trays: (x) => { const v = obj(x); if (!v) return null; const n = num(v.n, 0, 1e13); return n === null ? null : { n }; },
+  race: (x) => { const v = obj(x); return v && parseRace(v); },
+  kartbest: (x) => {
+    if (!Array.isArray(x) || x.length > 8) return null;
     const recs: KartRecord[] = [];
-    for (const x of o.v as unknown[]) { if (x === null) { recs.push(null); continue; } const q = x as Record<string, unknown>, name = cleanName(q?.name), ms = num(q?.ms, 1000, 1e6); if (!name || ms === null) return null; recs.push({ name, ms }); }
-    return { id: o.id, s: { k: 'kartbest', v: recs, ts } };
-  }
-  if (o.k === 'dinerbest' && v && typeof v === 'object') {
-    const name = cleanName(v.name), score = v.score;
-    return name && typeof score === 'number' && Number.isInteger(score) && score >= 0 && score <= 99999 ? { id: o.id, s: { k: 'dinerbest', v: { name, score }, ts } } : null;
-  }
-  if (o.k === 'board' && typeof o.v === 'string' && o.v.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(o.v)) return { id: o.id, s: { k: 'board', v: o.v, ts } };
-  return null;
+    for (const q of x) { if (q === null) { recs.push(null); continue; } const o = obj(q), name = cleanName(o?.name), ms = num(o?.ms, 1000, 1e6); if (!name || ms === null) return null; recs.push({ name, ms }); }
+    return recs;
+  },
+  dinerbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 99999); return name && score !== null ? { name, score } : null; },
+  board: (x) => (typeof x === 'string' && x.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(x) ? x : null),
+};
+export function parseState(p: unknown): { id: string; s: StateMsg } | null {
+  const o = obj(p);
+  if (!o || !isId(o.id) || typeof o.ts !== 'number' || !Number.isFinite(o.ts) || typeof o.k !== 'string' || !Object.hasOwn(STATE, o.k)) return null;
+  const k = o.k as StateVal['k'], v = STATE[k](o.v);
+  return v === null ? null : { id: o.id, s: { k, v, ts: o.ts } as StateMsg };
 }
 export function parseDraw(p: unknown): { id: string; d: DrawMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id) || typeof o.ts !== 'number' || !Number.isFinite(o.ts)) return null;
   if (o.clear === true) return { id: o.id, d: { c: 0, p: [], clear: true, ts: o.ts } };
-  const c = o.c, pts = o.p;
-  if (typeof c !== 'number' || !Number.isInteger(c) || c < 0 || c >= BOARD_COLS || !Array.isArray(pts) || pts.length < 2 || pts.length > 256 || pts.length % 2) return null;
-  for (let i = 0; i < pts.length; i++) { const v = pts[i]; if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v >= (i % 2 ? BOARD_H : BOARD_W)) return null; }
+  const c = int(o.c, 0, BOARD_COLS - 1), pts = o.p;
+  if (c === null || !Array.isArray(pts) || pts.length < 2 || pts.length > 256 || pts.length % 2) return null;
+  for (let i = 0; i < pts.length; i++) if (int(pts[i], 0, (i % 2 ? BOARD_H : BOARD_W) - 1) === null) return null;
   return { id: o.id, d: { c, p: pts as number[], clear: false, ts: o.ts } };
 }
 function parseGame(v: Record<string, unknown>): GameState | null {
-  const kinds = ['chairs', 'tag', 'off'], phases = ['ready', 'music', 'grab', 'out', 'play', 'over'];
-  if (!kinds.includes(v.kind as string) || !phases.includes(v.phase as string) || !isId(v.host)) return null;
-  const ids = v.ids, names = v.names;
-  if (!Array.isArray(ids) || !Array.isArray(names) || ids.length > GAME_MAX || ids.length !== names.length || !ids.every(isId)) return null;
-  const n = ids.length, idx = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) && x >= -1 && x < n ? x : null);
-  const list = (x: unknown, max: number, lim: number) => (Array.isArray(x) && x.length <= max && x.every((i) => Number.isInteger(i) && i >= 0 && i < lim) ? (x as number[]) : null);
-  const t0 = num(v.t0, 0, 1e11), dur = num(v.dur, 0, 600), since = num(v.since, 0, 1e11), round = typeof v.round === 'number' && Number.isInteger(v.round) && v.round >= 0 && v.round <= 100 ? v.round : null;
-  const alive = list(v.alive, n, n), seats = list(v.seats, 32, 32), out = list(v.out, n, n), it = idx(v.it), last = idx(v.last);
+  const kind = oneOf(v.kind, ['chairs', 'tag', 'off'] as const), phase = oneOf(v.phase, ['ready', 'music', 'grab', 'out', 'play', 'over'] as const);
+  if (!kind || !phase || !isId(v.host)) return null;
+  const ids = v.ids, nm = v.names;
+  if (!Array.isArray(ids) || !Array.isArray(nm) || ids.length > GAME_MAX || ids.length !== nm.length || !ids.every(isId)) return null;
+  const n = ids.length;
+  const t0 = num(v.t0, 0, 1e11), dur = num(v.dur, 0, 600), since = num(v.since, 0, 1e11), round = int(v.round, 0, 100);
+  const alive = ints(v.alive, n, 0, n - 1), seats = ints(v.seats, 32, 0, 31), out = ints(v.out, n, 0, n - 1), it = int(v.it, -1, n - 1), last = int(v.last, -1, n - 1);
   const times = Array.isArray(v.times) && v.times.length <= n && v.times.every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x < 1e4) ? (v.times as number[]) : null;
   if (t0 === null || dur === null || since === null || round === null || !alive || !seats || !out || it === null || last === null || !times) return null;
-  return { kind: v.kind as GameState['kind'], host: v.host as string, phase: v.phase as GameState['phase'], t0, dur, round, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), alive, seats, out, it, last, since, times };
+  return { kind, host: v.host, phase, t0, dur, round, ids, names: names(nm), alive, seats, out, it, last, since, times };
 }
 function parseDiner(v: Record<string, unknown>): DinerState | null {
   if (!isId(v.host)) return null;
-  const ids = v.ids, names = v.names, hands = v.hands, n = Array.isArray(ids) ? ids.length : -1;
-  if (!Array.isArray(ids) || n < 1 || n > COOKS_MAX || !ids.every(isId) || !Array.isArray(names) || names.length !== n || !Array.isArray(hands) || hands.length !== n || !hands.every((h) => Number.isInteger(h) && h >= 0 && h <= HOLD_MAX)) return null;
+  const ids = v.ids, nm = v.names, n = Array.isArray(ids) ? ids.length : -1;
+  if (!Array.isArray(ids) || n < 1 || n > COOKS_MAX || !ids.every(isId) || !Array.isArray(nm) || nm.length !== n || !Array.isArray(v.hands) || v.hands.length !== n) return null;
+  const hands = ints(v.hands, n, 0, HOLD_MAX); if (!hands) return null;
   const times = (x: unknown, len: number) => (Array.isArray(x) && x.length === len && x.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t < 1e13) ? (x as number[]) : null);
-  const int = (x: unknown, lo: number, hi: number) => (typeof x === 'number' && Number.isInteger(x) && x >= lo && x <= hi ? x : null);
   const t0 = num(v.t0, 0, 1e13), shake = num(v.shake, 0, 1e13), seed = int(v.seed, 0, 1e6), lvl = int(v.lvl, 1, 4), pts = int(v.pts, 0, 99999), done = int(v.done, 0, 99);
-  const grill = times(v.grill, 2), fry = times(v.fry, 2), served = Array.isArray(v.served) && v.served.length <= 32 && v.served.every((x) => Number.isInteger(x) && x >= 0 && x <= 7) ? (v.served as number[]) : null;
+  const grill = times(v.grill, 2), fry = times(v.fry, 2), served = ints(v.served, 32, 0, 7);
   if (t0 === null || shake === null || seed === null || lvl === null || pts === null || done === null || !grill || !fry || !served) return null;
-  return { host: v.host as string, t0, seed, lvl, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), hands: hands as number[], grill, fry, shake, served, pts, done };
+  return { host: v.host, t0, seed, lvl, ids, names: names(nm), hands, grill, fry, shake, served, pts, done };
 }
 export function parseKart(p: unknown): { id: string; k: KartMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
   const r = num(o.r, 0, 1e13), x = num(o.x, -50, 1200), y = num(o.y, -50, 900), a = num(o.a, -100, 100), v = num(o.v, -100, 400), fin = num(o.fin, 0, 1e6), best = num(o.best, 0, 1e6);
-  const lap = typeof o.lap === 'number' && Number.isInteger(o.lap) && o.lap >= 0 && o.lap <= 9 ? o.lap : null, g = typeof o.g === 'number' && Number.isInteger(o.g) && o.g >= 0 && o.g < 5000 ? o.g : null;
+  const lap = int(o.lap, 0, 9), g = int(o.g, 0, 4999);
   if (r === null || x === null || y === null || a === null || v === null || fin === null || best === null || lap === null || g === null) return null;
   return { id: o.id, k: { r, x, y, a, v, lap, g, c: o.c === 1 ? 1 : 0, fin, best, b: o.b === 1 ? 1 : 0, d: o.d === 1 ? 1 : 0, ...(o.j === 1 ? { j: 1 as const } : {}) } };
 }
 function parseRace(v: Record<string, unknown>): RaceState | null {
-  const ids = v.ids, names = v.names, cols = v.cols, t0 = num(v.t0, 0, 1e13), seed = v.seed;
-  if (!isId(v.host) || t0 === null || typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 1e6) return null;
-  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(names) || names.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !cols.every((c) => Number.isInteger(c) && c >= 0 && c < 64)) return null;
-  return { host: v.host as string, t0, seed, ids: ids as string[], names: names.map((x) => cleanName(x) || '?'), cols: cols as number[] };
+  const ids = v.ids, nm = v.names, cols = v.cols, t0 = num(v.t0, 0, 1e13), seed = int(v.seed, 0, 1e6);
+  if (!isId(v.host) || t0 === null || seed === null) return null;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 4 || !ids.every(isId) || !Array.isArray(nm) || nm.length !== ids.length || !Array.isArray(cols) || cols.length !== ids.length || !ints(cols, 4, 0, 63)) return null;
+  return { host: v.host, t0, seed, ids, names: names(nm), cols: cols as number[] };
 }
 export function parseKScore(p: unknown): { id: string; k: KScore } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
-  const r = num(o.r, 0, 1e14), i = o.i, s = num(o.s, 0, 110), c = num(o.c, 0, 9999);
-  if (r === null || s === null || c === null || typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i > 3) return null;
+  const r = num(o.r, 0, 1e14), i = int(o.i, 0, 3), s = num(o.s, 0, 110), c = num(o.c, 0, 9999);
+  if (r === null || s === null || c === null || i === null) return null;
   return { id: o.id, k: { r, i, s: Math.round(s), c: Math.round(c), f: o.f === 1 ? 1 : 0 } };
 }
 export function parseSnowball(p: unknown): { id: string; b: SnowballMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
   const x0 = num(o.x0, 0, 4000), y0 = num(o.y0, 0, 4000), x1 = num(o.x1, 0, 4000), y1 = num(o.y1, 0, 4000);
   if (x0 === null || y0 === null || x1 === null || y1 === null || Math.hypot(x1 - x0, y1 - y0) > 320) return null;
   return { id: o.id, b: { x0, y0, x1, y1, hit: isId(o.hit) ? o.hit : '' } };
 }
 export function parseJunk(p: unknown): { id: string; n: number } | null {
-  const o = p as Record<string, unknown> | null;
-  return o && isId(o.id) && typeof o.n === 'number' && Number.isInteger(o.n) && o.n >= 0 && o.n < 1e10 ? { id: o.id, n: o.n } : null;
+  const o = obj(p), n = int(o?.n, 0, 1e10 - 1);
+  return o && isId(o.id) && n !== null ? { id: o.id, n } : null;
 }
 export function parseTank(p: unknown): { id: string; t: TankMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id) || (o.s !== 0 && o.s !== 1)) return null;
   const x = num(o.x, 0, 160), y = num(o.y, 0, 100), a = num(o.a, -1000, 1000), fin = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1000;
-  const int = (v: unknown, hi: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= hi ? v : null);
-  const sc = int(o.sc, 99), hit = int(o.hit, 999);
+  const sc = int(o.sc, 0, 99), hit = int(o.hit, 0, 999);
   if (x === null || y === null || a === null || sc === null || hit === null || !Array.isArray(o.sh) || o.sh.length > 8 || o.sh.length % 4 || !o.sh.every(fin)) return null;
   const t: TankMsg = { s: o.s, x, y, a, sh: o.sh as number[], sc, hit, inv: o.inv === 1 ? 1 : 0 };
-  if (o.ph !== undefined) { const ph = int(o.ph, 3); if (ph === null) return null; t.ph = ph; }
-  if (o.o !== undefined) { if (!Array.isArray(o.o) || o.o.length !== 3 || !o.o.every(fin)) return null; t.o = [o.o[0], o.o[1], o.o[2]]; const osc = int(o.osc, 99); if (osc !== null) t.osc = osc; }
+  if (o.ph !== undefined) { const ph = int(o.ph, 0, 3); if (ph === null) return null; t.ph = ph; }
+  if (o.o !== undefined) { if (!Array.isArray(o.o) || o.o.length !== 3 || !o.o.every(fin)) return null; t.o = [o.o[0], o.o[1], o.o[2]]; const osc = int(o.osc, 0, 99); if (osc !== null) t.osc = osc; }
   return { id: o.id, t };
 }
 export function parseCook(p: unknown): { id: string; st: number } | null {
-  const o = p as Record<string, unknown> | null;
-  return o && isId(o.id) && typeof o.st === 'number' && Number.isInteger(o.st) && o.st >= 0 && o.st <= 7 ? { id: o.id, st: o.st } : null;
+  const o = obj(p), st = int(o?.st, 0, 7);
+  return o && isId(o.id) && st !== null ? { id: o.id, st } : null;
 }
 export function parseNote(p: unknown): { id: string; i: number; n: number } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id)) return null;
-  const i = o.i, n = o.n;
-  if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i > 3 || typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 7) return null;
-  return { id: o.id, i, n };
+  const i = int(o.i, 0, 3), n = int(o.n, 0, 7);
+  return i === null || n === null ? null : { id: o.id, i, n };
 }
 const unit = (v: unknown, lo = -0.2, hi = 1.2): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 export function parsePong(p: unknown): { id: string; p: PongMsg } | null {
-  const o = p as Record<string, unknown> | null;
+  const o = obj(p);
   if (!o || !isId(o.id) || (o.s !== 0 && o.s !== 1) || !unit(o.p, 0, 1)) return null;
   const m: PongMsg = { s: o.s, p: o.p };
   if (o.b !== undefined) { const b = o.b; if (!Array.isArray(b) || b.length !== 4 || !unit(b[0]) || !unit(b[1]) || !unit(b[2], -5, 5) || !unit(b[3], -5, 5)) return null; m.b = [b[0], b[1], b[2], b[3]]; }
-  if (o.sc !== undefined) { const c = o.sc; if (!Array.isArray(c) || c.length !== 2 || !c.every((x) => Number.isInteger(x) && x >= 0 && x <= 9)) return null; m.sc = [c[0], c[1]]; }
-  if (o.ph !== undefined) { if (!Number.isInteger(o.ph) || (o.ph as number) < 0 || (o.ph as number) > 3) return null; m.ph = o.ph as number; }
+  if (o.sc !== undefined) { const c = ints(o.sc, 2, 0, 9); if (!c || c.length !== 2) return null; m.sc = [c[0], c[1]]; }
+  if (o.ph !== undefined) { const ph = int(o.ph, 0, 3); if (ph === null) return null; m.ph = ph; }
   return { id: o.id, p: m };
 }
 export function parseWorld(p: unknown): { id: string; w: HideSeek } | null {
-  const o = p as Record<string, unknown> | null;
-  if (!o || !isId(o.id) || !isId(o.seeker) || !['hide', 'seek', 'over'].includes(o.phase as string)) return null;
+  const o = obj(p), phase = oneOf(o?.phase, ['hide', 'seek', 'over'] as const);
+  if (!o || !isId(o.id) || !isId(o.seeker) || !phase) return null;
   const t0 = num(o.t0, 0, 1e11), ts = num(o.ts, 0, 1e13);
   if (t0 === null || ts === null || !Array.isArray(o.ids) || !Array.isArray(o.names) || !Array.isArray(o.found)) return null;
   if (o.ids.length > HS_MAX || o.ids.length !== o.names.length || !o.ids.every(isId)) return null;
-  const n = o.ids.length;
-  if (!o.found.every((i) => Number.isInteger(i) && i >= 0 && i < n)) return null;
-  return { id: o.id, w: { seeker: o.seeker, phase: o.phase as HideSeek['phase'], t0, ts, ids: o.ids as string[], names: (o.names as unknown[]).map((x) => cleanName(x) || 'GUEST'), found: [...new Set(o.found as number[])] } };
+  const found = ints(o.found, Infinity, 0, o.ids.length - 1);
+  if (!found) return null;
+  return { id: o.id, w: { seeker: o.seeker, phase, t0, ts, ids: o.ids, names: names(o.names, 'GUEST'), found: [...new Set(found)] } };
 }
 export function parseLobby(p: unknown): LobbyPerson | null {
-  const o = p as Record<string, unknown> | null;
-  if (!o || !isId(o.id) || typeof o.room !== 'string' || !(ROOM_IDS as string[]).includes(o.room)) return null;
-  return { id: o.id, name: cleanName(o.name) || 'GUEST', room: o.room as RoomId };
+  const o = obj(p), room = oneOf(o?.room, ROOM_IDS);
+  if (!o || !isId(o.id) || !room) return null;
+  return { id: o.id, name: cleanName(o.name) || 'GUEST', room };
 }
