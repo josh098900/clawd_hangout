@@ -1270,6 +1270,14 @@ function drawActionHint(a: number, act: Action | null): void {
   Gd(cx, y, 6, [255, 214, 90], 0.35);
 }
 
+/**
+ * Draw one part of a room's scene. If it throws, the rest of the frame still draws (so a bug in one prop or screen
+ * can't freeze the whole view), and the error is logged once rather than 60 times a second.
+ */
+const drawErrs = new Set<string>();
+function safeDraw(what: string, fn: () => void): void {
+  try { fn(); } catch (e) { const k = room.id + ':' + what + ':' + String(e); if (!drawErrs.has(k)) { drawErrs.add(k); console.error('[draw ' + room.id + ' ' + what + ']', e); } }
+}
 function render(a: number, t: number): void {
   R.begin();
   PX.dim = 0;
@@ -1280,7 +1288,7 @@ function render(a: number, t: number): void {
   const dim = room.dimNow?.() ?? room.dim;
   PX.dim = dim;
   if (isWinter()) winterGround(room, (c) => R.blitView(c, room.w, room.h));
-  room.drawBack(a);
+  safeDraw('back', () => room.drawBack(a));
   if (isHalloween()) halloweenBack(room, a);
   if (isWinter()) winterBack(room, a);
   for (const c of crews) drawCrewFloor(c);
@@ -1310,7 +1318,7 @@ function render(a: number, t: number): void {
   const outdoors = OUTDOORS.includes(room.id), brolly = outdoors && raining();
   for (const it of items) {
     PX.dim = dim;
-    if (it.draw) it.draw(a);
+    if (it.draw) { const d = it.draw; safeDraw('prop', () => d(a)); }
     else if (it.av) {
       const h = drawAvatar(it.av, a, t, dim, usingOf(it.av), liftOf(it.av), brolly && !it.av.hold && it.av.use < 0 && it.av.pose !== POSE_GHOST && it.av.pose !== POSE_BOAT);
       heads.set(it.av.self ? net.selfId : it.av.id, R.toScreen(h.headX, h.headY));
@@ -1346,7 +1354,7 @@ function render(a: number, t: number): void {
   if (pendingShot) { pendingShot = false; capture(); }
   if (playing) { drawDoorHints(a); drawActionHint(a, actNow); if (tour && room.id === 'diner') drawTourArrow(a); }
   for (const c of crews) drawCrewTag(c);
-  room.drawFront?.(a);
+  safeDraw('front', () => room.drawFront?.(a));
   if (FLAT.edit && isFlat(room.id)) drawEditOverlay(room.id, a);
   if (outdoors) drawWeather(room, R.cam, a, 1 - dayness());
   PX.gmul = 1;

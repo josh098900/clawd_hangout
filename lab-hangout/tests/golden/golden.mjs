@@ -71,6 +71,13 @@ const res = await p.evaluate(async () => {
   let rh = 0; for (let i = 0; i < 3000; i++) rh = (rh * 31 + wx.roll(i)) >>> 0; out.rollHash = rh;
   out.tickets = [1, 77, 4242].map((seed) => JSON.stringify(dn.tickets({ ...dn.newShift('h', 'H', 2, 1790000000000), seed }))).map((s) => s.length + ':' + [...s].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0)).join(' ');
   out.cpu = kt.TRACKS.map((tr) => [0, 3.3, 20, 61].map((t) => JSON.stringify(kt.cpuAt(tr, 1234, 1, t))).join('|')).join(' ');
+  // THE REACTOR's maths: every shift's surges and faults are well formed (a surge once had no message for half the seeds,
+  // which froze the board), and a whole shift worked forward (fixed settings, faults left alone) comes out the same
+  const rx = await import('/src/game/reactor.ts');
+  let badRx = 0;
+  for (let seed = 0; seed < 5000; seed++) { const g0 = { t0: 1790000000000, seed, lvl: 1 + (seed % 4) }; for (const sg of rx.surges(g0)) if (typeof sg.text !== 'string' || !sg.text || !(sg.mw > 0)) badRx++; for (const f of rx.faults(g0)) if (!(f.kind >= 0 && f.kind < 5)) badRx++; }
+  if (badRx) throw new Error(badRx + ' reactor surges / faults are malformed');
+  out.reactor = [7, 4242, 99999].map((seed) => { let g = { ...rx.newShift('h', 'H', 2, 1790000000000), seed }; g.fixed = rx.faults(g).map(() => 0); g.rods = 6; g.pumps = 3; g.turb = 7; g = rx.advance(g, g.t0 + 240000, () => 0.3); return [g.heat.toFixed(3), g.sat.toFixed(3), g.secs, g.melt, rx.grid(g)].join(','); }).join(' ');
   out.fmt = [0, 0.4, 9.5, 59.4, 59.6, 60, 119.6, 600, 3599.9].map((s) => [fm.mmss(s), fm.mmss(s), gd.duration(s * 60), kt.raceTime(s * 1000)].join(',')).join(' ');
   const done = Object.fromEntries(await Promise.all(jobs));
   for (const k of Object.keys(out)) out[k] = String(out[k]).replace(/#\d+/g, (m) => done[m]);

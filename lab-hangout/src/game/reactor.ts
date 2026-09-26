@@ -63,7 +63,7 @@ export function faults(g: Pick<ReactorState, 't0' | 'seed' | 'lvl'>): Fault[] {
 const SURGE_TEXT = ['THE ARCADE TOURNAMENT JUST STARTED', 'EVERYONE PUT THE KETTLE ON', 'THE CINEMA IS SHOWING A DOUBLE BILL', 'THE KART TRACK FLOODLIGHTS CAME ON', 'THE DINER FIRED UP EVERY GRILL', 'THE LOFTS ARE HAVING A HOUSE PARTY'];
 /** The city's surprises this shift: two spikes in demand. */
 export function surges(g: Pick<ReactorState, 't0' | 'seed'>): Surge[] {
-  return [0, 1].map((k) => { const h = ihash(g.seed * 53 + k * 101); return { at: g.t0 + (k ? 150 + (h % 40) : 60 + (h % 35)) * 1000, dur: 20000, mw: 12 + (h % 6), text: SURGE_TEXT[(h >> 4) % SURGE_TEXT.length] }; });
+  return [0, 1].map((k) => { const h = ihash(g.seed * 53 + k * 101); return { at: g.t0 + (k ? 150 + (h % 40) : 60 + (h % 35)) * 1000, dur: 20000, mw: 12 + (h % 6), text: SURGE_TEXT[(h >>> 4) % SURGE_TEXT.length] }; }); // (>>>: h is a full 32-bit hash, and >> would make half of them negative)
 }
 /** The city's demand (MW) at wall time T: `day` = the Square's dayness at T (0 night .. 1 day). */
 export function demand(g: Pick<ReactorState, 't0' | 'seed'>, T: number, day: number): number {
