@@ -28,6 +28,8 @@ assets: every pixel is drawn in code.
 
 The art style is copied from an existing pixel-art film. **Read `docs/ART_STYLE.md` before
 you touch anything visual.** Keeping that look is the top priority of this project.
+From step 16 on, every new room and feature follows **the polish standard (ART_STYLE §9)**: a detailed
+design brief for Josh before any code, rooms built in layers, a close-up review and a polish pass.
 
 ## Commands
 

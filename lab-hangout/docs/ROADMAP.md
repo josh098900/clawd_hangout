@@ -84,6 +84,18 @@ Guiding rules (from what already works):
 - [ ] 14. Winter (December)
 - [x] 15. The Moon (bonus: the lander, the surface, the Moon Base, moon rocks, the buggy)
 
+## Phase 8 — The next plan (one step at a time, polished: see docs/PLAN.md and ART_STYLE §9)
+- [ ] 16. The map: fast travel between rooms, and where your friends are  ← next
+- [ ] 17. The Science Wing: the reactor control room (co-op, cartoon meltdowns, HAZMAT suit) + the chemistry bench
+- [ ] 18. Submarine + City Aquarium (the aquarium on the Pier, the sub dives from it; crew stations)
+- [ ] 19. The Airport (check-in, X-ray scanner, baggage carousel, departures board) + its first destinations
+- [ ] 20. Carnival on the Pier
+- [ ] 21. Mini golf
+- [ ] 22. One rank for everything (a lab-coat rank every activity feeds)
+- [ ] 23. World events (meteor shower, blackout, pigeon invasion: a few minutes, the whole server)
+- [ ] 24. More labs (Tesla coil, wind tunnel, the physics drop)
+- (Player-made servers / private rooms are in Phase 6.) The order after 17 is to be decided.
+
 ## Before any public launch
 - [x] Permission from Anthropic for Clawd
 - [x] Permission + credit from the "Claw'd Labs, Part 0" film's creator for the sets/palette

@@ -97,3 +97,31 @@ Titles use Press Start 2P with the stepped orange drop shadow. Small text and ch
 VT323. Panels are dark translucent with a 3px coloured edge (left or bottom). Buttons are
 blurred "pills". Room names slide in on the angled name plate (`.plate.lab` cyan,
 `.plate.plaza` gold/purple). Keep it that small. The world is the show.
+
+## 9. The polish standard (every new room and feature, from step 16 on)
+
+Josh's rule: we go into detail on the art, the details and the elements of everything we make,
+so every room is as polished as it can be. Each step goes:
+
+1. **A design brief first, before any code**, for Josh to read and add to:
+   - the layout: a sketch with sizes, the floor band, the doors and where you arrive
+   - every prop: what it is, what it's made of, what it does when you use or click it
+   - the palette tokens and every light source (what glows, what it lights up around it)
+   - what moves on its own: steam, blinking LEDs, fans, screens, water, dust
+   - the sounds: the room's ambience and a sound for every interaction
+   - the NPC: their look, their day and their lines
+   - what players do *together* there
+2. **Build it in layers.** Each wall gets three depths: the structure (panels, seams, rivets,
+   beams), the fixtures (pipes, vents, screens, shelves) and the clutter (mugs, sticky notes,
+   tools, a scorch mark). No flat surface: every one gets texture, a lit edge and a shadow edge.
+3. **Make it lived-in.** Small stories someone could find: a half-eaten sandwich, a note on a
+   monitor, a plant that's seen better days. Something to spot in every screen width.
+4. **Make it alive.** Something moving in every screen width, and props that react to players
+   (doors slide, puddles ripple, screens wake up when you walk past).
+5. **Everything that looks usable does something**, or at least says a line when clicked.
+6. **Nothing spills.** Text fits its sign at the longest value it can show, and art stays inside
+   its frame (see the Den window and the roof launch board, fixed in 99085f8). Doors are tested by
+   *walking* into them, never only by `door(i)`.
+7. **The close-up review.** Screenshots of every part of the room at 3× zoom, day and night if
+   it's outdoors, checked against this list. Then a second pass purely for polish before it's
+   called done, and still 60 fps with 12 bots.

@@ -40,7 +40,7 @@ and the SQL tests cover it all. **Step 14, Winter, is built** (migration 0018;
 waiting for Josh to test it live with `set_season('winter')`, then `set_season(null)`): 1 Dec - 6 Jan by the date. Everything
 Josh picked: the tree + ornaments + hourly lighting, the present hunt, snowball fights, snowman + ice skating, advent
 calendar, Santa's sleigh, the winter wardrobe, festive music + cocoa + a SNOW DAY karaoke song, New Year's Eve, winter
-furniture, Secret Santa, and festive dressing everywhere. **That's the whole plan done**: next ideas are to be discussed.
+furniture, Secret Santa, and festive dressing everywhere. **That's the whole plan done**: the next plan is below (step 16 on).
 **Bonus step 15, THE MOON, is done and confirmed** (built overnight 26-27 Sep; migration 0019). Josh picked it from four ideas (the others, for later: a Carnival on the Pier, a City Aquarium, Mini golf).
 
 ## 1. Halloween (1 October to 1 November)  ← next
@@ -185,6 +185,39 @@ Everything switches on by date, from the shared clock (`season()` in a new `src/
   with a record board, and a crystal field: mine a glowing rock, carry it to the base's ASSAY machine.
 - **Database:** `0019_moon.sql`: `moon_assay` (the server decides: 1 in 6 is a MOON CRYSTAL; 1 or 3 tokens, 15 a day,
   one rock per 20 s; the 5th crystal is the MOON ROVER pet), `moon_crystals`, 3 quests, the MOONWALKER badge.
+
+---
+
+# The next plan (from 27 September 2026)
+
+Chosen with Josh after the Moon. Same five-stage loop as above, plus **the polish standard**
+(ART_STYLE §9): a detailed design brief for Josh before any code, rooms built in layers, a
+close-up review and a polish pass before anything is called done.
+
+## 16. The map (fast travel)  ← next
+27 rooms is a lot of walking. A map of the whole world (the Lab, the Square, the Subway line, the
+Station and the Moon...) that shows where everyone is, with your friends marked; pick a room to go
+there. The design brief will settle how it opens, what the map looks like, and whether some trips
+(the Moon, the Station) still need their ride.
+
+## 17. The Science Wing
+Off the Lab. The centrepiece is the **reactor control room**: stations for the rods, the coolant
+pumps, the turbine and the gauge wall, one player each; the reactor drifts, alarms go off, and you
+keep it in the green together. A **meltdown** is cartoon, not scary: the room goes green and
+everyone glows for a minute; the HAZMAT suit is the outfit to earn. One player's browser runs the
+reactor and sends a small update (like Pong), so it's cheap on the network. Plus a **chemistry
+bench**: mix things, discover reactions, fill in a recipe book.
+
+## Later (order to be decided)
+- **18. Submarine + City Aquarium:** the aquarium on the Pier; the sub dives from it, portholes that
+  change with depth, crew stations (helm, sonar, periscope).
+- **19. The Airport:** check-in, a security X-ray that shows what you're holding, a baggage carousel
+  game, a departures board on the clock; each flight opens a new destination (beach island, ski
+  mountain, a city abroad), so it's how the world keeps growing.
+- **20. Carnival on the Pier.**  **21. Mini golf.**
+- **22. One rank for everything:** a lab-coat rank that fishing, mining, karaoke, cooking all feed.
+- **23. World events:** a surprise meteor shower, blackout or pigeon invasion across the server.
+- **24. More labs:** a Tesla coil, a wind tunnel, the physics drop.
 
 ---
 
