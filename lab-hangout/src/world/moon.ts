@@ -102,7 +102,7 @@ export function drawLander(cx: number, base: number, a: number, flame: number, h
 const W = 1800, H = 760, HOR = 404;
 export const PAD_X = 190, PAD_Y = 462;
 /** Where you step out of the lander, and out of the base's airlock. */
-export const MOON_PAD_ARRIVE = { x: PAD_X, y: 486 }, MOON_AIRLOCK_ARRIVE = { x: 792, y: 486 };
+export const MOON_PAD_ARRIVE = { x: PAD_X, y: 500 }, MOON_AIRLOCK_ARRIVE = { x: 792, y: 500 };
 const HAB_X = 792, HAB_R = 112, GREEN_X = 1004, GREEN_R = 78, GARAGE_X = 1194, FLAG_X = 452, SUN = { x: 96, y: 300 }, EARTH = { x: 1004, y: 318, r: 36 }; // (Earth hangs over the greenhouse)
 /** Craters (centre x, y, radius across): the buggy bounces over their rims. */
 const CRATERS: [number, number, number][] = [[560, 640, 70], [1110, 690, 48], [1480, 560, 90], [330, 560, 36], [900, 610, 30], [1690, 700, 56], [700, 520, 24], [1300, 640, 28]];
@@ -277,9 +277,9 @@ function drawBack(a: number): void {
 
 // ---------- doors, spots ----------
 export const LANDER_CABIN_ARRIVE = { x: 76, y: 506 };
-const landerDoor: Door = { trigger: { x0: PAD_X - 22, y0: 470, x1: PAD_X + 22, y1: 478 }, to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER', area: { x0: PAD_X - 50, y0: 360, x1: PAD_X + 50, y1: 470 }, route: () => { const f = lander(); return f.phase === 'landed' && f.left > 4 ? { to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER HOME' } : null; } };
+const landerDoor: Door = { trigger: { x0: PAD_X - 22, y0: 478, x1: PAD_X + 22, y1: 486 }, to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER', area: { x0: PAD_X - 50, y0: 360, x1: PAD_X + 50, y1: 470 }, route: () => { const f = lander(); return f.phase === 'landed' && f.left > 4 ? { to: 'lander', arrive: LANDER_CABIN_ARRIVE, label: 'LANDER HOME' } : null; } };
 export const MOONBASE_ARRIVE = { x: 110, y: 500 };
-const airlock: Door = { trigger: { x0: HAB_X - 20, y0: 470, x1: HAB_X + 20, y1: 478 }, to: 'moonbase', arrive: MOONBASE_ARRIVE, label: 'MOON BASE', area: { x0: HAB_X - 30, y0: 410, x1: HAB_X + 30, y1: 470 } };
+const airlock: Door = { trigger: { x0: HAB_X - 20, y0: 478, x1: HAB_X + 20, y1: 486 }, to: 'moonbase', arrive: MOONBASE_ARRIVE, label: 'MOON BASE', area: { x0: HAB_X - 30, y0: 410, x1: HAB_X + 30, y1: 470 } };
 export const MOON_SPOTS: Spot[] = [
   { kind: 'buggy', x: GARAGE_X, y: 500, sx: GARAGE_X, sy: 500, lift: 0, label: 'DRIVE', area: { x0: GARAGE_X - 60, y0: 420, x1: GARAGE_X + 60, y1: 480 } }, // 0
   ...ROCKS.map(([x, y], n): Spot => ({ kind: 'rock', n, x: x - 20, y: y + 2, sx: x - 20, sy: y + 2, lift: 0, label: 'MINE', area: { x0: x - 14, y0: y - 22, x1: x + 14, y1: y + 4 } })), // 1..7
