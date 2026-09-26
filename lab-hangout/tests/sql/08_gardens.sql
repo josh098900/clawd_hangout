@@ -49,7 +49,7 @@ select public.dig_up(5);
 select pg_temp.ok('dig up your own plant', not exists (select 1 from public.plots where bed = 5));
 do $$ begin perform public.dig_up(3); raise notice 'FAIL dug up someone else''s'; exception when raise_exception then raise notice 'PASS cannot dig up others'' plants'; end $$;
 -- moonflower seed from the inventory
-reset role; insert into public.inventory (user_id, item) values ('aaaaaaaa-0000-0000-0000-000000000001', 'seed:4'); set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
+reset role; insert into public.inventory (user_id, item) values ('aaaaaaaa-0000-0000-0000-000000000001', 'seed:4') on conflict do nothing; set role authenticated; -- (the harvest above finds one 1 time in 10) select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
 select public.plant(6, 4);
 select pg_temp.ok('moonflower planted from the found seed, seed used up', (select seed from public.plots where bed = 6) = 4 and not exists (select 1 from public.inventory where item = 'seed:4'));
 -- other servers have their own beds
