@@ -75,6 +75,6 @@ function songOver(k: KaraokeState): void {
   if (mine === null) return;
   const score = mine, line = resultLine(SONGS[k.song].name, score, band);
   if (score >= 90 && save.unlock('fit:8')) setTimeout(() => { toast('ROCK STAR! You earned the ROCK STAR jacket. Wear it from Look', 5500); SFX.score(); }, 3000);
-  game.net.karaokeTip(score).then((r) => { game.setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) game.floatText('+' + r.paid, game.me.x, game.me.y - 60); }).catch(() => toast(line, 5000));
+  game.net.api.tips.karaoke(score).then((r) => { game.setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) game.floatText('+' + r.paid, game.me.x, game.me.y - 60); }).catch(() => toast(line, 5000));
 }
 

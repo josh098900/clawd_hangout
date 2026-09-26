@@ -100,7 +100,7 @@ function shiftOver(g: DinerState): void {
   if (sc > (save.data.stats.dinerBest ?? 0)) { save.update((d) => { d.stats.dinerBest = sc; }); quests.checkBadges(); }
   if (sc >= 120 && save.unlock('hat:13')) setTimeout(() => { toast('You earned the CHEF HAT! Wear it from Look', 5000); SFX.score(); }, 2500);
   if (g.host === game.net.selfId && sc > (DINER.best?.score ?? 0)) game.setState({ k: 'dinerbest', v: { name: g.names.slice(0, 2).join(' & ').slice(0, 16), score: sc } });
-  if (sc > 0) game.net.dinerTip(sc).then((r) => { if (r.paid) { game.setTokens(r.tokens); setTimeout(() => toast('Tips: +' + r.paid + (r.paid === 1 ? ' token' : ' tokens'), 3000), 5200); } }).catch((e: unknown) => console.warn('[tips]', e));
+  if (sc > 0) game.net.api.tips.diner(sc).then((r) => { if (r.paid) { game.setTokens(r.tokens); setTimeout(() => toast('Tips: +' + r.paid + (r.paid === 1 ? ' token' : ' tokens'), 3000), 5200); } }).catch((e: unknown) => console.warn('[tips]', e));
 }
 /** The top banner in the Diner during a shift. */
 export function dinerLine(): string {

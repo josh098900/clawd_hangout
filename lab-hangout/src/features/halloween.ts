@@ -15,7 +15,7 @@ export let ghostUntil = 0, knocking = false;
 export function knock(n: number): void {
   if (knocking) return; knocking = true;
   SFX.door(); game.me.dir = game.me.x < TREAT_DOORS[n].x ? 1 : -1;
-  game.net.trickOrTreat(n).then((r) => {
+  game.net.api.season.trickOrTreat(n).then((r) => {
     markKnocked(n); game.setTokens(r.tokens);
     if (r.trick) { quests.stat('tricks'); game.me.pose = POSE_GHOST; ghostUntil = now() + 60; game.sendMe(); SFX.boo(); toast('TRICK! You are a ghost for a minute. Boo! (' + r.visited + '/8 doors today)', 4000); }
     else { SFX.chime(); game.floatText('+1'); toast('TREAT! +1 token (' + r.visited + '/8 doors today)', 3000); }

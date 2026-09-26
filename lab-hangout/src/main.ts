@@ -547,12 +547,12 @@ function useSpot(i: number): void {
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
   if (s.kind === 'shift') { clockIn(); return; }
-  if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.flatDoors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.myFlat().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
+  if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.api.flats.doors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.api.flats.mine().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.api.flats.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
   if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
   if (s.kind === 'flatparty') {
     if (!FLAT.mine) { toast((partyOn() ? 'The party is ON! ' : 'Only ' + FLAT.name + ' can start a party here'), 2500); return; }
     const on = !partyOn();
-    net.flatParty(on).then((u) => {
+    net.api.flats.party(on).then((u) => {
       FLAT.party = u; setState({ k: 'flat', v: { n: flatRev, party: u } });
       if (on) { net.send('flat', { k: 'party', nm: me.name, until: u ?? 0 }); quests.stat('parties'); SFX.score(); toast('HOUSE PARTY! Everyone on the server has been told. 30 minutes of fun!', 5000); }
       else toast('Party over. Time to tidy up');
@@ -652,7 +652,7 @@ function subwaySounds(): void {
 // ---------- seasons: dressing the world for Halloween / Winter, and their collect-them-all prizes ----------
 async function refreshSeason(): Promise<void> {
   let s = params.get('season');
-  if (!s) { try { s = await net.season(); } catch { s = null; } }
+  if (!s) { try { s = await net.api.season.current(); } catch { s = null; } }
   setSeason(s);
   if (isHalloween()) installHalloween(ROOMS);
   npcs.dressFor(season());
@@ -719,8 +719,8 @@ function playerCard(o: Avatar): void {
     if (hsOn()) { toast('No following during hide and seek!'); return; }
     following = o.id; followT = 0; toast('Following ' + o.name + ' (walk to stop)', 2500); SFX.blip();
   }, true);
-  const chips = document.createElement('div'); net.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
-  const flat = button('VISIT FLAT', () => { m.close(); net.flatDoors([o.id]).then(([d]) => { if (!d) toast(o.name + " hasn't moved into THE LOFTS yet"); else if (d.can) void visitFlat(o.id); else knockOn(o.id, o.name); }).catch((e) => toast(errText(e))); }, true);
+  const chips = document.createElement('div'); net.api.quests.badgesOf(o.id).then((ids) => chips.replaceChildren(badgeChips(ids))).catch(() => {});
+  const flat = button('VISIT FLAT', () => { m.close(); net.api.flats.doors([o.id]).then(([d]) => { if (!d) toast(o.name + " hasn't moved into THE LOFTS yet"); else if (d.can) void visitFlat(o.id); else knockOn(o.id, o.name); }).catch((e) => toast(errText(e))); }, true);
   const gift = isWinter() ? [button('SEND A PRESENT', () => { m.close(); sendGiftTo(o.id); }, true)] : [];
   m.body.append(chips, note, row(wave, follow, flat, ...gift), row(mute, report, button('CLOSE', m.close, true)));
 }
@@ -808,7 +808,7 @@ function reel(): void {
   fishing = { bite: now() + (2.5 + Math.random() * 6) * biteK(), state: 'wait' };
   const inStorm = weather().kind === 'storm';
   // the server rolls the catch (so the contest leaderboard can be trusted)
-  net.catchFish().then((c) => {
+  net.api.fishing.catchFish().then((c) => {
     const f = fishNamed(c.fish), log = logFish(f.name), rare = f.rarity === 'RARE' || f.rarity === 'LEGENDARY';
     if (rare) quests.bump('fish');
     if (inStorm && f.rarity !== 'JUNK') quests.stat('stormFish');
@@ -823,7 +823,7 @@ function reel(): void {
 let contestAnnounced = -1, contestAck = '';
 function refreshContest(): void {
   CONTEST.fetchedAt = Date.now();
-  net.contestBoard().then((b) => {
+  net.api.fishing.contestBoard().then((b) => {
     CONTEST.board = b;
     const key = b.last ? String(b.last.at) : '';
     let seen = ''; try { seen = localStorage.getItem('labhangout.contestWon') ?? ''; } catch { /* ignore */ }
@@ -831,7 +831,7 @@ function refreshContest(): void {
       contestAck = key; try { localStorage.setItem('labhangout.contestWon', key); } catch { /* ignore */ }
       SFX.score(); celebrate(); quests.mine.add('trophy');
       toast('YOU WON THE FISHING CONTEST! ' + b.last!.fish + ' ' + b.last!.cm + 'cm · +' + b.last!.prize + ' tokens', 6000);
-      net.tokens().then(setTokens).catch(() => {});
+      net.api.tokens.balance().then(setTokens).catch(() => {});
     }
   }).catch(() => {});
 }
@@ -1069,7 +1069,7 @@ function updateMe(dt: number): void {
     const key = coinWindow() + ':' + i;
     if (coinsGot.has(key) || Math.abs(me.x - cx) > 9 || Math.abs(me.y - cy) > 7) return;
     coinsGot.add(key); SFX.pop();
-    net.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); quests.bump('coins'); SFX.chime(); floatText('+1', cx, cy - 20); }).catch(() => {});
+    net.api.tokens.claimCoin(i).then((n) => { if (n === null) return; setTokens(n); quests.bump('coins'); SFX.chime(); floatText('+1', cx, cy - 20); }).catch(() => {});
   });
   // fishing: wait for the bite, then a second to reel it in
   if (fishing && usingOf(me) === 'fish') {
@@ -1197,7 +1197,7 @@ function showStrip(frames: HTMLCanvasElement[]): void {
   const url = strip.toDataURL('image/png'), m = openModal('PHOTO STRIP', () => input.clear());
   const img = document.createElement('img'); img.src = url; img.alt = 'Your photo strip';
   const save = document.createElement('a'); save.className = 'mbtn'; save.href = url; save.download = 'lab-hangout-photo.png'; save.textContent = 'SAVE';
-  const pin = button('DECORATE & PIN IT', () => { m.close(); openPinEditor(frames, (png) => net.pinPhoto(png).then(() => { SFX.chime(); toast('Pinned! Once it\'s checked it goes up on the PHOTO WALL in the Lab', 5000); void checkMyPhotos(); }), () => input.clear()); });
+  const pin = button('DECORATE & PIN IT', () => { m.close(); openPinEditor(frames, (png) => net.api.photos.pin(png).then(() => { SFX.chime(); toast('Pinned! Once it\'s checked it goes up on the PHOTO WALL in the Lab', 5000); void checkMyPhotos(); }), () => input.clear()); });
   m.body.append(img, row(pin, save, button('CLOSE', m.close, true)));
 }
 
@@ -1332,7 +1332,7 @@ function weatherStep(t: number): void {
     if (!rainAt) rainAt = t + 5 + Math.random() * 60;
     else if (t >= rainAt) {
       rainSlot = w.slot; rainAt = 0;
-      net.rainWater().then((n) => { if (!n) return; GARDEN.dirty = true; if (room.id === 'roof') toast('The rain watered ' + n + (n === 1 ? ' plant' : ' plants') + ' in the garden', 3500); }).catch((e) => console.warn('[rain]', e));
+      net.api.garden.rainWater().then((n) => { if (!n) return; GARDEN.dirty = true; if (room.id === 'roof') toast('The rain watered ' + n + (n === 1 ? ' plant' : ' plants') + ' in the garden', 3500); }).catch((e) => console.warn('[rain]', e));
     }
   }
 }
@@ -1530,10 +1530,10 @@ async function boot(): Promise<void> {
   await nameServer();
   playing = true;
   await enterRoom('lab', null);
-  net.tokens().then(setTokens).catch(() => {});
-  net.isAdmin().then((a) => { setAdmin(a); void checkQueue(); }).catch(() => {});
+  net.api.tokens.balance().then(setTokens).catch(() => {});
+  net.api.photos.isAdmin().then((a) => { setAdmin(a); void checkQueue(); }).catch(() => {});
   void checkMyPhotos(); setInterval(() => { void checkMyPhotos(); void checkQueue(); }, 90000);
-  net.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
+  net.api.tokens.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
   logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
 }
 addEventListener('pagehide', () => { void net.leaveRoom(); net.leaveSeat(); });

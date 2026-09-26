@@ -27,7 +27,7 @@ export function endArcade(score: number): void {
 export const roomHi = () => (game.room.id === 'arcade' ? ARCADE_INFO.hi : LAB_INFO.hi);
 export function openClawMachine(i: number): void {
   openClaw({
-    play: async () => { const r = await game.net.playClaw(); game.setTokens(r.tokens); return r; },
+    play: async () => { const r = await game.net.api.arcade.playClaw(); game.setTokens(r.tokens); return r; },
     look: () => game.me.look,
     wear: game.wear,
     started: () => { ARCADE_INFO.clawT = now(); game.celebrate('wow'); quests.bump('claw'); },

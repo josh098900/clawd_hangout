@@ -200,9 +200,140 @@ export interface ContestBoard { live: boolean; top: { name: string; fish: string
 /** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
 export interface ClawResult { item: string; dupe: boolean; tokens: number }
 
+/**
+ * The game's server requests, grouped by feature (net.api.garden.plant(...)). Online each is a database function or
+ * table read (supabaseapi.ts); in LOCAL mode a pretend server in this browser keeps the same rules (localapi.ts).
+ */
+export interface Api {
+  /** Your token balance, and picking tokens up. */
+  tokens: {
+    /** Server-owned tokens: your balance, picking up a Square coin, the daily bonus (null = nothing new). */
+    balance(): Promise<number>;
+    claimCoin(i: number): Promise<number | null>;
+    claimDaily(): Promise<number | null>;
+  };
+  /** Daily quests and badges (0009_quests.sql). */
+  quests: {
+    /** Today's 3 quests (the same for everyone) and which you've handed in. */
+    today(): Promise<{ day: string; quests: string[]; done: string[] }>;
+    /** Hand in a quest (5 tokens; +10 with the third). */
+    complete(q: string): Promise<{ tokens: number; bonus: boolean }>;
+    /** Claim a badge you've earned (true = new). */
+    claimBadge(b: string): Promise<boolean>;
+    /** Someone's badges (anyone's, for their player card). */
+    badgesOf(id: string): Promise<string[]>;
+  };
+  /** The seasons (0007_halloween.sql). */
+  season: {
+    /** The season the server says it is ('halloween', 'winter' or null). */
+    current(): Promise<string | null>;
+    /** Knock on trick-or-treat door 0..7 (once each per day; the server pays). prize = costume for all 8 today. */
+    trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }>;
+  };
+  /** The Rooftop's community garden (0008_gardens.sql). */
+  garden: {
+    /** The Rooftop garden beds on your server (only the ones with something in them). */
+    plots(): Promise<Plot[]>;
+    /** Plant seed `seed` in bed `bed` (tokens, or a found moonflower seed). Resolves with your balance. */
+    plant(bed: number, seed: number): Promise<number>;
+    /** Water a plant (anyone's). thanked = +1 token for watering someone else's. */
+    water(bed: number): Promise<{ tokens: number; thanked: boolean }>;
+    /** It's raining (world/weather.ts): water every dry plant on every server. Returns how many (0 if the server says it isn't raining). */
+    rainWater(): Promise<number>;
+    /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
+    harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
+    digUp(bed: number): Promise<void>;
+  };
+  /** The Pier: fishing and the hourly contest (0010_fishing.sql). */
+  fishing: {
+    /** Reel one in: the server picks the fish and its size (and enters it in a live contest). */
+    catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }>;
+    contestBoard(): Promise<ContestBoard>;
+  };
+  /** The Space Station's STAR MELON trays and spacewalk pay (0015_space.sql). */
+  space: {
+    /** The Space Station's hydroponic trays on your server (only the ones with a melon in). */
+    trays(): Promise<Tray[]>;
+    /** Plant a STAR MELON (3 tokens). Resolves with your balance. */
+    plant(tray: number): Promise<number>;
+    /** Harvest your ripe melon: +5 and (unless you have one) a comet bloom seed; rotten = it went off. */
+    harvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }>;
+    digUp(tray: number): Promise<void>;
+    /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
+    spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
+  };
+  /** Winter (0018_winter.sql): the present hunt, the advent calendar, the tree, the sleigh, Secret Santa. */
+  winter: {
+    /** WINTER (0018_winter.sql). The present hunt: open present n (0..11) once a day. */
+    findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }>;
+    presentsToday(): Promise<number[]>;
+    /** The advent calendar: open door 1..24 (from its date). prize = 'tokens:N' or an item. */
+    openAdvent(door: number): Promise<{ tokens: number; prize: string }>;
+    adventDoors(): Promise<{ opened: number[]; upto: number }>;
+    /** The Square's tree on your server this winter, and hanging an ornament on it. */
+    ornaments(): Promise<Ornament[]>;
+    hangOrnament(kind: number, x: number, y: number): Promise<number>;
+    /** Catch present n from Santa's sleigh pass `pass`. Resolves with your balance. */
+    catchSleigh(pass: number, n: number): Promise<number>;
+    /** Secret Santa: wrap tokens (3/5/10) for someone; what's under the tree; open one of yours. */
+    sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number>;
+    treeGifts(): Promise<TreeGift[]>;
+    openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }>;
+  };
+  /** The Lab's PHOTO WALL (0017_photos.sql). */
+  photos: {
+    /** THE PHOTO WALL. Is this player an owner (can moderate)? */
+    isAdmin(): Promise<boolean>;
+    /** Pin a strip (a PNG data URL) for review; resolves with its id. */
+    pin(png: string): Promise<number>;
+    /** Approved photos, newest first (older than `before`), and which is the photo of the week. */
+    wall(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }>;
+    byId(id: number): Promise<Photo | null>;
+    heart(id: number): Promise<{ hearts: number; mine: boolean }>;
+    mine(): Promise<MyPhoto[]>;
+    feature(id: number): Promise<void>;
+    remove(id: number): Promise<void>;
+    /** The photo in someone's flat PHOTO FRAME (a data URL), or null. */
+    inFlat(owner: string): Promise<string | null>;
+    /** Owner only: the queue, and approving / rejecting (also takes approved ones down). */
+    pending(): Promise<Photo[]>;
+    review(id: number, ok: boolean): Promise<void>;
+  };
+  /** THE LOFTS: flats, furniture, doors and parties (0014_apartments.sql). */
+  flats: {
+    /** Your flat (made with a starter kit the first time) and the furniture you own. */
+    mine(): Promise<MyFlat>;
+    /** Someone's flat, if you may go in (throws "the door is locked" if not). */
+    get(owner: string): Promise<FlatInfo>;
+    /** Door status for these players (the lobby directory). */
+    doors(ids: string[]): Promise<FlatDoor[]>;
+    buy(what: string): Promise<{ tokens: number; n: number }>;
+    save(layout: FlatLayout): Promise<void>;
+    setDoor(door: DoorMode): Promise<void>;
+    /** Start (true) or stop a HOUSE PARTY; returns when it ends (epoch s) or null. */
+    party(on: boolean): Promise<number | null>;
+    /** Let someone who knocked in (30 minutes). */
+    letIn(who: string): Promise<void>;
+  };
+  /** The Arcade (0006_arcade.sql). */
+  arcade: {
+    /** Spend tokens on the claw machine; the server picks the prize. */
+    playClaw(): Promise<ClawResult>;
+  };
+  /** Tips paid for a performance (the server caps them). */
+  tips: {
+    /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
+    karaoke(score: number): Promise<{ tokens: number; paid: number }>;
+    /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
+    diner(score: number): Promise<{ tokens: number; paid: number }>;
+  };
+}
+
 export interface Transport {
   readonly mode: 'supabase' | 'local';
   readonly selfId: string;
+  /** The game's server requests, by feature (see Api). */
+  readonly api: Api;
   /** Resume an existing session (after a login redirect too). 'none' = nobody signed in yet. */
   connect(): Promise<Account>;
   account(): Account;
@@ -222,78 +353,6 @@ export interface Transport {
   storeSave(d: object): Promise<void>;
   /** Prizes you own (server-owned; see game/save.ts). */
   inventory(): Promise<string[]>;
-  /** The season the server says it is ('halloween', 'winter' or null). */
-  season(): Promise<string | null>;
-  /** Knock on trick-or-treat door 0..7 (once each per day; the server pays). prize = costume for all 8 today. */
-  trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }>;
-  /** The Rooftop garden beds on your server (only the ones with something in them). */
-  plots(): Promise<Plot[]>;
-  /** Plant seed `seed` in bed `bed` (tokens, or a found moonflower seed). Resolves with your balance. */
-  plant(bed: number, seed: number): Promise<number>;
-  /** Water a plant (anyone's). thanked = +1 token for watering someone else's. */
-  water(bed: number): Promise<{ tokens: number; thanked: boolean }>;
-  /** It's raining (world/weather.ts): water every dry plant on every server. Returns how many (0 if the server says it isn't raining). */
-  rainWater(): Promise<number>;
-  /** Harvest your ripe plant. bonus = 'seed:4' when you found a moonflower seed. */
-  harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }>;
-  digUp(bed: number): Promise<void>;
-  /** Reel one in: the server picks the fish and its size (and enters it in a live contest). */
-  catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }>;
-  contestBoard(): Promise<ContestBoard>;
-  /** The Space Station's hydroponic trays on your server (only the ones with a melon in). */
-  trays(): Promise<Tray[]>;
-  /** Plant a STAR MELON (3 tokens). Resolves with your balance. */
-  spacePlant(tray: number): Promise<number>;
-  /** Harvest your ripe melon: +5 and (unless you have one) a comet bloom seed; rotten = it went off. */
-  spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }>;
-  spaceDigUp(tray: number): Promise<void>;
-  /** Stardust brought in from a spacewalk: 1 token per 8 points (the server caps it). */
-  spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }>;
-  /** WINTER (0018_winter.sql). The present hunt: open present n (0..11) once a day. */
-  findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }>;
-  presentsToday(): Promise<number[]>;
-  /** The advent calendar: open door 1..24 (from its date). prize = 'tokens:N' or an item. */
-  openAdvent(door: number): Promise<{ tokens: number; prize: string }>;
-  adventDoors(): Promise<{ opened: number[]; upto: number }>;
-  /** The Square's tree on your server this winter, and hanging an ornament on it. */
-  ornaments(): Promise<Ornament[]>;
-  hangOrnament(kind: number, x: number, y: number): Promise<number>;
-  /** Catch present n from Santa's sleigh pass `pass`. Resolves with your balance. */
-  catchSleigh(pass: number, n: number): Promise<number>;
-  /** Secret Santa: wrap tokens (3/5/10) for someone; what's under the tree; open one of yours. */
-  sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number>;
-  treeGifts(): Promise<TreeGift[]>;
-  openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }>;
-  /** THE PHOTO WALL. Is this player an owner (can moderate)? */
-  isAdmin(): Promise<boolean>;
-  /** Pin a strip (a PNG data URL) for review; resolves with its id. */
-  pinPhoto(png: string): Promise<number>;
-  /** Approved photos, newest first (older than `before`), and which is the photo of the week. */
-  wallPhotos(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }>;
-  photoById(id: number): Promise<Photo | null>;
-  heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }>;
-  myPhotos(): Promise<MyPhoto[]>;
-  featurePhoto(id: number): Promise<void>;
-  deletePhoto(id: number): Promise<void>;
-  /** The photo in someone's flat PHOTO FRAME (a data URL), or null. */
-  flatPhoto(owner: string): Promise<string | null>;
-  /** Owner only: the queue, and approving / rejecting (also takes approved ones down). */
-  pendingPhotos(): Promise<Photo[]>;
-  reviewPhoto(id: number, ok: boolean): Promise<void>;
-  /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
-  karaokeTip(score: number): Promise<{ tokens: number; paid: number }>;
-  /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
-  dinerTip(score: number): Promise<{ tokens: number; paid: number }>;
-  /** Today's 3 quests (the same for everyone) and which you've handed in. */
-  todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }>;
-  /** Hand in a quest (5 tokens; +10 with the third). */
-  completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }>;
-  /** Claim a badge you've earned (true = new). */
-  claimBadge(b: string): Promise<boolean>;
-  /** Someone's badges (anyone's, for their player card). */
-  badgesOf(id: string): Promise<string[]>;
-  /** Spend tokens on the claw machine; the server picks the prize. */
-  playClaw(): Promise<ClawResult>;
   /** The world servers. `friendIds` = starred players to look for. */
   servers(friendIds: string[]): Promise<ServerInfo[]>;
   /** Take a seat on a server (rejects with 'that server is full'). Rooms and the lobby are per server. */
@@ -308,10 +367,6 @@ export interface Transport {
   joinWorld(code: string): Promise<boolean>;
   /** Report a player to the moderators. */
   report(id: string, reason: string): Promise<void>;
-  /** Server-owned tokens: your balance, picking up a Square coin, the daily bonus (null = nothing new). */
-  tokens(): Promise<number>;
-  claimCoin(i: number): Promise<number | null>;
-  claimDaily(): Promise<number | null>;
   loadProfile(): Promise<{ name: string; look: Look } | null>;
   saveProfile(name: string, look: Look): Promise<void>;
   /** `inst` = whose flat, for the flat rooms (their channels are per owner: hangout:<server>:flat.<owner>). */
@@ -324,20 +379,6 @@ export interface Transport {
   sendChat(text: string): Promise<string | null>;
   /** Broadcast a message: to this room, or (the lobby ones in MESSAGES) to everyone on this server. */
   send<K extends keyof Outgoing>(type: K, data: Outgoing[K]): void;
-  // ---- flats (supabase/migrations/0014_apartments.sql) ----
-  /** Your flat (made with a starter kit the first time) and the furniture you own. */
-  myFlat(): Promise<MyFlat>;
-  /** Someone's flat, if you may go in (throws "the door is locked" if not). */
-  getFlat(owner: string): Promise<FlatInfo>;
-  /** Door status for these players (the lobby directory). */
-  flatDoors(ids: string[]): Promise<FlatDoor[]>;
-  buyFurniture(what: string): Promise<{ tokens: number; n: number }>;
-  saveFlat(layout: FlatLayout): Promise<void>;
-  setDoor(door: DoorMode): Promise<void>;
-  /** Start (true) or stop a HOUSE PARTY; returns when it ends (epoch s) or null. */
-  flatParty(on: boolean): Promise<number | null>;
-  /** Let someone who knocked in (30 minutes). */
-  letIn(who: string): Promise<void>;
   /** Where server-wide messages (the lobby ones in MESSAGES: hide and seek, flat knocks) arrive. */
   watchWorld(on: (e: NetEvent) => void): void;
   /** Announce yourself (name + current room) to everyone online, in any room. */

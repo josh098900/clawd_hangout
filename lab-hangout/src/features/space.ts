@@ -117,7 +117,7 @@ function grabStep(): void {
 export function payWalk(): void {
   const pts = WALK.pts + walkOwed, dust = WALK.dust, things = WALK.things; WALK.pts = 0; WALK.dust = 0; WALK.things = 0;
   if (pts <= 0) return;
-  game.net.spacewalkPay(pts).then((r) => {
+  game.net.api.space.spacewalkPay(pts).then((r) => {
     walkOwed = 0; game.setTokens(r.tokens);
     const what = dust + ' stardust' + (things ? ' and ' + things + ' bit' + (things > 1 ? 's' : '') + ' of space junk' : '');
     if (r.paid) { SFX.score(); game.floatText('+' + r.paid, game.me.x, game.me.y - 60); toast('SPACEWALK HAUL: ' + what + ' · +' + r.paid + ' tokens', 5000); }
@@ -138,7 +138,7 @@ export function spaceArrive(from: RoomId, id: RoomId): void {
 // the hydroponic trays
 function refreshTrays(bump = false): void {
   STATION.dirty = false; STATION.fetchedAt = Date.now();
-  game.net.trays().then((ts) => { STATION.trays = ts; }).catch((e) => console.warn('[trays]', e));
+  game.net.api.space.trays().then((ts) => { STATION.trays = ts; }).catch((e) => console.warn('[trays]', e));
   if (bump) game.setState({ k: 'trays', v: { n: Date.now() } }); // tell everyone else here to look again
 }
 const trayDo = <T,>(act: () => Promise<T>, ok: (r: T) => void): void => game.serverDo('trays', act, ok, refreshTrays);
@@ -147,21 +147,21 @@ export function tendTray(n: number): void {
   if (t && t.owner === game.net.selfId) {
     const st = trayState(t);
     openMyTray(trayLine(t, true), st.stage === 4, {
-      harvest: () => trayDo(() => game.net.spaceHarvest(n), (res) => {
+      harvest: () => trayDo(() => game.net.api.space.harvest(n), (res) => {
         game.setTokens(res.tokens);
         if (res.rotten) { toast('It went off, sorry. The tray is free again', 3500); return; }
         quests.stat('melons'); SFX.score(); game.celebrate(); game.floatText('+5');
         toast('Harvested your STAR MELON! +5 tokens', 3500);
         if (res.bonus) { save.addPrize(res.bonus); setTimeout(() => { toast('Inside it: a COMET BLOOM seed! Plant it in any free bed in the Rooftop garden', 5500); SFX.chime(); }, 1800); }
       }),
-      digUp: () => trayDo(() => game.net.spaceDigUp(n), () => toast('Pulled up. The tray is free again', 2500)),
+      digUp: () => trayDo(() => game.net.api.space.digUp(n), () => toast('Pulled up. The tray is free again', 2500)),
     }, () => game.input.clear());
     return;
   }
   if (t && !trayState(t).rotten) { toast(trayLine(t, false), 3500); return; }
   if (mine) { toast('You already have a star melon growing (tray ' + (mine.tray + 1) + ')', 3500); return; }
   SFX.blip();
-  openFreeTray(n, game.tokens, () => trayDo(() => game.net.spacePlant(n), (bal) => { game.setTokens(bal); SFX.pop(); toast('Planted a STAR MELON! Ripe in 30 minutes', 3500); }), () => game.input.clear());
+  openFreeTray(n, game.tokens, () => trayDo(() => game.net.api.space.plant(n), (bal) => { game.setTokens(bal); SFX.pop(); toast('Planted a STAR MELON! Ripe in 30 minutes', 3500); }), () => game.input.clear());
 }
 // mission control
 export function spotted(th: SkyThing): void {

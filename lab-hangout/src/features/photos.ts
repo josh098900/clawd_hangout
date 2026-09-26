@@ -27,9 +27,9 @@ function thumb(p: Photo): Promise<HTMLCanvasElement> {
 /** The newest approved strips for the Lab's corkboard, with the photo of the week in the first spot. */
 export function refreshPhotos(): void {
   photosAt = Date.now();
-  game.net.wallPhotos(10, null).then(async (w) => {
+  game.net.api.photos.wall(10, null).then(async (w) => {
     let list = w.photos;
-    if (w.week !== null && !list.some((p) => p.id === w.week)) { const wk = await game.net.photoById(w.week).catch(() => null); if (wk) list = [wk, ...list.slice(0, 9)]; }
+    if (w.week !== null && !list.some((p) => p.id === w.week)) { const wk = await game.net.api.photos.byId(w.week).catch(() => null); if (wk) list = [wk, ...list.slice(0, 9)]; }
     else if (w.week !== null) list = [...list.filter((p) => p.id === w.week), ...list.filter((p) => p.id !== w.week)];
     const out: typeof LAB_INFO.photos = [];
     for (const p of list) { try { out.push({ id: p.id, name: p.ownerName, thumb: await thumb(p), week: p.id === w.week }); } catch { /* a broken image: skip it */ } }
@@ -38,22 +38,22 @@ export function refreshPhotos(): void {
 }
 export function albumHooks(): AlbumHooks {
   return {
-    page: (before) => game.net.wallPhotos(12, before), heart: (p) => game.net.heartPhoto(p.id).then((r) => { photosAt = 0; return r; }),
-    feature: (p) => game.net.featurePhoto(p.id).then(() => { FLAT.photoOf = ''; }), remove: (p) => (p.owner === game.net.selfId ? game.net.deletePhoto(p.id) : game.net.reviewPhoto(p.id, false)).then(() => { photosAt = 0; thumbCache.delete(p.id); }),
+    page: (before) => game.net.api.photos.wall(12, before), heart: (p) => game.net.api.photos.heart(p.id).then((r) => { photosAt = 0; return r; }),
+    feature: (p) => game.net.api.photos.feature(p.id).then(() => { FLAT.photoOf = ''; }), remove: (p) => (p.owner === game.net.selfId ? game.net.api.photos.remove(p.id) : game.net.api.photos.review(p.id, false)).then(() => { photosAt = 0; thumbCache.delete(p.id); }),
     me: game.net.selfId, admin: isAdmin, toast: (t) => toast(t, 4000),
   };
 }
 /** The owner's MODERATE button (only shown to owners), with how many photos are waiting. */
 const modBtn = document.createElement('button'); modBtn.type = 'button'; modBtn.id = 'mod'; modBtn.className = 'pill'; modBtn.style.display = 'none';
 $('#hud').insertBefore(modBtn, $('#quests').nextSibling);
-modBtn.addEventListener('click', () => { if (modalOpen()) return; openModerate({ list: () => game.net.pendingPhotos(), review: (p, ok) => game.net.reviewPhoto(p.id, ok).then(() => { photosAt = 0; }), toast: (t) => toast(t, 3000) }, () => { game.input.clear(); void checkQueue(); }); });
+modBtn.addEventListener('click', () => { if (modalOpen()) return; openModerate({ list: () => game.net.api.photos.pending(), review: (p, ok) => game.net.api.photos.review(p.id, ok).then(() => { photosAt = 0; }), toast: (t) => toast(t, 3000) }, () => { game.input.clear(); void checkQueue(); }); });
 export async function checkQueue(): Promise<void> {
   if (!isAdmin) return;
-  try { const n = (await game.net.pendingPhotos()).length; modBtn.style.display = ''; modBtn.textContent = (narrow() ? 'MOD' : 'MODERATE') + (n ? ' · ' + n : ''); modBtn.classList.toggle('hot', n > 0); } catch { /* try again later */ }
+  try { const n = (await game.net.api.photos.pending()).length; modBtn.style.display = ''; modBtn.textContent = (narrow() ? 'MOD' : 'MODERATE') + (n ? ' · ' + n : ''); modBtn.classList.toggle('hot', n > 0); } catch { /* try again later */ }
 }
 /** Tell the pinner when their photo's been approved or not (remembered per browser, so each news comes once). */
 export async function checkMyPhotos(): Promise<void> {
-  let mine; try { mine = await game.net.myPhotos(); } catch { return; }
+  let mine; try { mine = await game.net.api.photos.mine(); } catch { return; }
   const key = 'labhangout.photoSeen.' + game.net.selfId; let seen: Record<string, string> = {}; try { seen = JSON.parse(localStorage.getItem(key) || '{}'); } catch { /* none */ }
   for (const p of mine) {
     const was = seen[p.id]; seen[p.id] = p.status;
@@ -65,6 +65,6 @@ export async function checkMyPhotos(): Promise<void> {
 /** The flat owner's photo for their PHOTO FRAME. */
 export function loadFlatPhoto(owner: string): void {
   FLAT.photoOf = owner; FLAT.photo = null;
-  game.net.flatPhoto(owner).then((png) => { if (!png || FLAT.photoOf !== owner) return; const im = new Image(); im.onload = () => { if (FLAT.photoOf === owner) FLAT.photo = thumbOf(im); }; im.src = png; }).catch(() => {});
+  game.net.api.photos.inFlat(owner).then((png) => { if (!png || FLAT.photoOf !== owner) return; const im = new Image(); im.onload = () => { if (FLAT.photoOf === owner) FLAT.photo = thumbOf(im); }; im.src = png; }).catch(() => {});
 }
 

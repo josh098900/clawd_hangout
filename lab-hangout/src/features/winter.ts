@@ -25,14 +25,14 @@ const balls: { from: string; b: SnowballMsg; t0: number; landed: boolean }[] = [
 export async function refreshWinter(): Promise<void> {
   if (!isWinter() || !game.playing) return;
   WINTER.treeAt = Date.now(); WINTER.treeDirty = false;
-  try { WINTER.presents = new Set(await game.net.presentsToday()); } catch { /* later */ }
-  try { WINTER.advent = await game.net.adventDoors(); } catch { /* later */ }
+  try { WINTER.presents = new Set(await game.net.api.winter.presentsToday()); } catch { /* later */ }
+  try { WINTER.advent = await game.net.api.winter.adventDoors(); } catch { /* later */ }
   await refreshTree();
 }
 async function refreshTree(): Promise<void> {
-  try { WINTER.ornaments = await game.net.ornaments(); } catch { /* later */ }
+  try { WINTER.ornaments = await game.net.api.winter.ornaments(); } catch { /* later */ }
   try {
-    WINTER.gifts = await game.net.treeGifts(); const mine = WINTER.gifts.filter((g) => g.mine).length;
+    WINTER.gifts = await game.net.api.winter.treeGifts(); const mine = WINTER.gifts.filter((g) => g.mine).length;
     if (giftsMine >= 0 && mine > giftsMine) { toast('A present for you is waiting under the tree in the Square!', 5000); SFX.bells(); }
     giftsMine = mine;
   } catch { /* later */ }
@@ -41,27 +41,27 @@ const prizeName = (p: string): string => (p.startsWith('tokens:') ? '+' + p.slic
 /** The present hunt: open present n. */
 export function openPresent(n: number): void {
   if (WINTER.presents.has(n)) { toast('You already opened this one today. More tomorrow!', 2500); return; }
-  game.net.findPresent(n).then((r) => {
+  game.net.api.winter.findPresent(n).then((r) => {
     WINTER.presents.add(n); game.setTokens(r.tokens); SFX.chime(); game.floatText('+1', PRESENTS[n].x, PRESENTS[n].y - 30);
     toast('A PRESENT! +1 token (' + r.found + '/12 found today)', 3000);
     game.seasonPrize(r.prize, 'ALL 12 PRESENTS!', 'winter prize');
   }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(cap(m), 3000); });
 }
 export function adventMenu(): void {
-  SFX.blip(); void game.net.adventDoors().then((d) => { WINTER.advent = d; }).catch(() => {});
-  openAdvent({ open: (d) => game.net.openAdvent(d).then((r) => { game.setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); game.celebrate(); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => game.input.clear());
+  SFX.blip(); void game.net.api.winter.adventDoors().then((d) => { WINTER.advent = d; }).catch(() => {});
+  openAdvent({ open: (d) => game.net.api.winter.openAdvent(d).then((r) => { game.setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); game.celebrate(); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => game.input.clear());
 }
 /** Everyone on the server you could send a present to. */
 const giftPeople = (): { id: string; name: string }[] => game.lobby.filter((p) => p.id !== game.net.selfId).map((p) => ({ id: p.id, name: p.name }));
 export function sendGiftTo(preset: string | null): void {
-  openSendGift(giftPeople(), preset, game.tokens, (to, tk, wrap, nt) => game.net.sendGift(to, tk, wrap, nt).then((bal) => { game.setTokens(bal); SFX.bells(); toast('Wrapped and under the tree! They\'ll find out who from when they open it', 4500); void refreshTree(); }), () => game.input.clear());
+  openSendGift(giftPeople(), preset, game.tokens, (to, tk, wrap, nt) => game.net.api.winter.sendGift(to, tk, wrap, nt).then((bal) => { game.setTokens(bal); SFX.bells(); toast('Wrapped and under the tree! They\'ll find out who from when they open it', 4500); void refreshTree(); }), () => game.input.clear());
 }
 function openTreeGift(g: TreeGift): void {
-  game.net.openGift(g.id).then((r) => { game.setTokens(r.tokens); SFX.joy(); game.celebrate(); showGift(r, g.wrap, () => game.input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
+  game.net.api.winter.openGift(g.id).then((r) => { game.setTokens(r.tokens); SFX.joy(); game.celebrate(); showGift(r, g.wrap, () => game.input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
 }
 export function treeMenu(): void {
   SFX.blip(); void refreshTree();
-  openTree({ hang: (k, x, y) => game.net.hangOrnament(k, x, y).then(() => { SFX.chime(); void refreshTree(); }), gifts: () => WINTER.gifts, openGift: openTreeGift, send: () => sendGiftTo(null) }, () => game.input.clear());
+  openTree({ hang: (k, x, y) => game.net.api.winter.hangOrnament(k, x, y).then(() => { SFX.chime(); void refreshTree(); }), gifts: () => WINTER.gifts, openGift: openTreeGift, send: () => sendGiftTo(null) }, () => game.input.clear());
 }
 /** The Park's snowman: roll it up (everyone's rolls add up), then dress it. Starts again every day. */
 export function rollSnowman(): void {
@@ -136,7 +136,7 @@ export function winterStep(): void {
   if (game.room.id === 'plaza' && sl.t < 330) for (const d of drops(sl.pass)) {
     const key = sl.pass + ':' + d.n; if (WINTER.caught.has(key) || sl.t < d.land || Math.abs(game.me.x - d.x) > 11 || Math.abs(game.me.y - d.y) > 9) continue;
     WINTER.caught.add(key); SFX.pop();
-    game.net.catchSleigh(sl.pass, d.n).then((bal) => { game.setTokens(bal); SFX.chime(); game.floatText('+1', d.x, d.y - 30); }).catch((e: unknown) => toast(errText(e), 2500));
+    game.net.api.winter.catchSleigh(sl.pass, d.n).then((bal) => { game.setTokens(bal); SFX.chime(); game.floatText('+1', d.x, d.y - 30); }).catch((e: unknown) => toast(errText(e), 2500));
   }
   const ls = lightShow(), hour = Math.floor(Date.now() / 3600000);
   if (ls >= 0 && lightHeard !== hour && game.room.id === 'plaza') { lightHeard = hour; SFX.jingle(); toast('THE TREE LIGHTING! Hang an ornament at THE TREE', 4000); }

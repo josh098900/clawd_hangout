@@ -77,13 +77,13 @@ class Quests {
   async init(net: Transport, on: QuestEvents): Promise<void> {
     this.net = net; this.on = on;
     await this.refresh();
-    try { this.mine = new Set(await net.badgesOf(net.selfId)); } catch (e) { console.warn('[badges]', e); }
+    try { this.mine = new Set(await net.api.quests.badgesOf(net.selfId)); } catch (e) { console.warn('[badges]', e); }
     this.checkBadges();
   }
   /** Fetch today's quests (after midnight UTC they change). */
   async refresh(): Promise<void> {
     if (!this.net) return;
-    try { const q = await this.net.todaysQuests(); this.day = q.day; this.today = q.quests.filter((id) => QUESTS[id]); this.done = new Set(q.done); } catch (e) { console.warn('[quests]', e); }
+    try { const q = await this.net.api.quests.today(); this.day = q.day; this.today = q.quests.filter((id) => QUESTS[id]); this.done = new Set(q.done); } catch (e) { console.warn('[quests]', e); }
     this.on?.changed();
   }
   /** Progress on quest `id` today (0..goal). */
@@ -104,13 +104,13 @@ class Quests {
     for (const b of BADGES) {
       if (this.mine.has(b.id) || this.busy.has('b:' + b.id) || Date.now() - (this.refused.get(b.id) ?? -1e12) < 60000 || !b.earned(this.tokens)) continue;
       this.busy.add('b:' + b.id);
-      this.net?.claimBadge(b.id).then((isNew) => { this.mine.add(b.id); if (isNew) this.on?.badge(b.name); this.on?.changed(); }).catch(() => { this.refused.set(b.id, Date.now()); }).finally(() => this.busy.delete('b:' + b.id));
+      this.net?.api.quests.claimBadge(b.id).then((isNew) => { this.mine.add(b.id); if (isNew) this.on?.badge(b.name); this.on?.changed(); }).catch(() => { this.refused.set(b.id, Date.now()); }).finally(() => this.busy.delete('b:' + b.id));
     }
   }
   private handIn(id: string): void {
     if (!this.net || this.busy.has(id)) return;
     this.busy.add(id);
-    this.net.completeQuest(id).then((r) => { this.done.add(id); this.stat('quests'); this.on?.done(QUESTS[id].text, r.tokens, r.bonus); this.on?.changed(); })
+    this.net.api.quests.complete(id).then((r) => { this.done.add(id); this.stat('quests'); this.on?.done(QUESTS[id].text, r.tokens, r.bonus); this.on?.changed(); })
       .catch((e: unknown) => { const m = e instanceof Error ? e.message : String(e); if (/already/.test(m)) this.done.add(id); else if (/not one of today/.test(m)) void this.refresh(); this.on?.changed(); })
       .finally(() => this.busy.delete(id));
   }
