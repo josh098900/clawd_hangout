@@ -42,6 +42,8 @@ export interface Game {
   usingOf(av: Avatar): Using;
   /** Go to another room (standing at `at`, or at its spawn point). Room changes queue up: only the newest waiting one happens. */
   enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void>;
+  /** Leave for room `to` the way a door does (the buggy parks itself, the door's sound), arriving at `at` (or its spawn). */
+  leaveTo(to: RoomId, at: { x: number; y: number } | null): void;
   /** Step off the spot you're using (back to where you stand to use it). */
   leaveSpot(): void;
   /** Emote (unless you only just did): true if it happened. */

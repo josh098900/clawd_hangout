@@ -16,6 +16,8 @@ export interface SaveData {
   sky: string[];
   /** Crops you've harvested on the Rooftop (seed names). */
   crops: string[];
+  /** Places you've been (room ids, see game/places.ts): the map's ? stickers and the EXPLORER badge. */
+  places: string[];
   /** Today's quest progress (see game/quests.ts): the day, and a count per quest. */
   q: { day: string; c: Record<string, number> };
   /** Lifetime counts for badges: commits, pongWins, rides, helped, harvests, quests, tricks. */
@@ -28,10 +30,10 @@ const strs = (v: unknown, max: number, len: number, re?: RegExp): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((s): s is string => typeof s === 'string' && s.length <= len && (!re || re.test(s))))].slice(0, max) : [];
 const n = (v: unknown, hi: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(hi, Math.floor(v))) : 0);
 
-/** A small { name: count } map, cleaned (at most 32 keys). */
+/** A small { name: count } map, cleaned (at most 64 keys). */
 function tally(v: unknown): Record<string, number> {
   const out: Record<string, number> = {};
-  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, 32)) if (/^[a-zA-Z0-9]{1,16}$/.test(k)) out[k] = n(x, 1e7);
+  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, 64)) if (/^[a-zA-Z0-9]{1,16}$/.test(k)) out[k] = n(x, 1e7);
   return out;
 }
 function counts(v: unknown): { day: string; c: Record<string, number> } {
@@ -41,7 +43,7 @@ function counts(v: unknown): { day: string; c: Record<string, number> } {
 export function clean(v: unknown): SaveData {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const friends = Array.isArray(o.friends) ? o.friends.filter((f): f is [string, string] => Array.isArray(f) && typeof f[0] === 'string' && f[0].length <= 64 && typeof f[1] === 'string').slice(0, 100).map(([id, nm]) => [id, nm.slice(0, 16)] as [string, string]) : [];
-  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), sky: strs(o.sky, 64, 24), crops: strs(o.crops, 16, 16), q: counts(o.q), stats: tally(o.stats) };
+  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), sky: strs(o.sky, 64, 24), crops: strs(o.crops, 16, 16), places: strs(o.places, 48, 12, /^[a-z]{2,12}$/), q: counts(o.q), stats: tally(o.stats) };
 }
 const maxOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = Math.max(o[k] ?? 0, v); return o; };
 export function merge(a: SaveData, b: SaveData): SaveData {
@@ -49,7 +51,7 @@ export function merge(a: SaveData, b: SaveData): SaveData {
   return {
     unlocks: [...new Set([...a.unlocks, ...b.unlocks])], friends: [...fr].slice(0, 100),
     feeds: Math.max(a.feeds, b.feeds), hi: Math.max(a.hi, b.hi),
-    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], sky: [...new Set([...a.sky, ...b.sky])], crops: [...new Set([...a.crops, ...b.crops])],
+    fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], sky: [...new Set([...a.sky, ...b.sky])], crops: [...new Set([...a.crops, ...b.crops])], places: [...new Set([...a.places, ...b.places])],
     q: a.q.day === b.q.day ? { day: a.q.day, c: maxOf(a.q.c, b.q.c) } : a.q.day > b.q.day ? a.q : b.q,
     stats: maxOf(a.stats, b.stats),
   };

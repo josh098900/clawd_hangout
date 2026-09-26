@@ -56,6 +56,15 @@ const res = await p.evaluate(async () => {
   for (const [id, room] of Object.entries(rooms)) out[id + ':winter'] = draw(room, () => { W.winterGround(room); W.winterBack(room, A); for (const pr of W.winterProps(id)) pr.draw(A); W.winterFront(room, A, { x: 0, y: 0, w: room.w, h: room.h }, false); });
   season.setSeason('halloween'); HW.installHalloween(rooms);
   for (const [id, room] of Object.entries(rooms)) out[id + ':halloween'] = draw(room, () => { HW.halloweenBack(room, A); for (const pr of HW.halloweenProps(id)) pr.draw(A); HW.halloweenFront(room, A); });
+  // the city map: the city baked by night and by day, and its live layer (people and a friend, you, a hover, a pin
+  // dropping, ? stickers, a YOU ARE HERE, a house party), plain and in both seasons
+  const mp = await import('/src/world/map.ts');
+  for (const day of [false, true]) { const c = px.mk(mp.MAP_W, mp.MAP_H); mp.paintMap(c.getContext('2d'), day); out['map:' + (day ? 'day' : 'night')] = H(c); }
+  const mapLive = { a: A, me: { col: [34, 197, 160], room: 'lab' }, hiding: false, hover: 'cinema', pin: { id: 'pier', t0: A - 0.1 }, seen: new Set(['lab', 'plaza', 'den']), board: 'plaza', flats: 3, party: true,
+    people: [{ id: 'a', name: 'SAM', col: [232, 216, 192], friend: true, room: 'pier' }, { id: 'b', name: 'ALEX', col: [90, 209, 255], friend: false, room: 'pier' }, { id: 'c', name: 'JO', col: [242, 194, 48], friend: false, room: 'train' }, { id: 'd', name: 'MO', col: [230, 86, 79], friend: true, room: 'moonbase' }, { id: 'e', name: 'KIT', col: [150, 210, 70], friend: false, room: 'flat' }] };
+  for (const sn of [null, 'halloween', 'winter']) { season.setSeason(sn); out['map:live' + (sn ? ':' + sn : '')] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => mp.drawMapLive(mapLive)); }
+  out['map:hiding'] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => mp.drawMapLive({ ...mapLive, hiding: true, hover: 'spacewalk', pin: null, board: null }));
+  season.setSeason('halloween');
   // pure maths
   const wx = await import('/src/world/weather.ts'), dn = await import('/src/game/diner.ts'), kt = await import('/src/game/kart.ts'), sp = await import('/src/world/space.ts'), ct = await import('/src/world/contest.ts'), gd = await import('/src/world/garden.ts'), fm = await import('/src/engine/format.ts');
   out.roll = Array.from({ length: 3000 }, (_, i) => wx.roll(i)).join(',').length + ':' + H(Object.assign(document.createElement('canvas'), { width: 1, height: 1 }));

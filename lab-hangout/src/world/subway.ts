@@ -12,6 +12,7 @@ import { K, CONFETTI, type RGB } from '../engine/palette';
 import { PX, mk, r, line, txt, tw, lit, G, Gd, M, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
+import { boardGlow } from './boards';
 import type { Door, Prop, Room, RoomId, Spot } from './room';
 
 /** The stops. `room` = its station room (null = OPENING SOON), `exit` = where its stairs go up to, `tile` = wall tiles. */
@@ -61,6 +62,9 @@ function buildStation(this: Room, n: number): void {
     r(360, 330, 200, 50, [30, 34, 40]); r(362, 332, 196, 46, [245, 242, 230]); txt('LAB HANGOUT LINE', 460 - tw('LAB HANGOUT LINE') / 2, 336, [30, 34, 40]);
     line(390, 356, 530, 356, BAND); line(390, 357, 530, 357, BAND);
     STATIONS.forEach((s, i) => { const x = 390 + i * 140 / (STATIONS.length - 1); r(x - 3, 353, 7, 7, s.room ? BAND : [150, 150, 150]); r(x - 1, 355, 3, 3, K.WHITE); txt(s.name, x - tw(s.name) / 2, 364, s.room ? [30, 34, 40] : [150, 150, 150]); });
+    // YOU ARE HERE: a red ring round this stop (the poster is a map board: E opens the city map)
+    { const x = 390 + n * 140 / (STATIONS.length - 1); for (const [dx, dy] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) r(x + (dx > 0 ? 3 : -5), 356 + (dy > 0 ? 3 : -5), 3, 3, [214, 50, 60]); r(x - 5, 351, 11, 1, [214, 50, 60]); r(x - 5, 361, 11, 1, [214, 50, 60]); r(x - 5, 351, 1, 11, [214, 50, 60]); r(x + 5, 351, 1, 11, [214, 50, 60]);
+      r(549 - tw('YOU ARE HERE'), 371, 3, 3, [214, 50, 60]); txt('YOU ARE HERE', 553 - tw('YOU ARE HERE'), 371, [214, 50, 60]); }
     // the track pit behind the platform edge: dark tunnel wall with cables
     r(0, TRAIN_TOP, SW, PLAT - TRAIN_TOP, [34, 36, 42]); for (let x = 0; x < SW; x += 40) r(x, TRAIN_TOP, 2, PLAT - TRAIN_TOP, [28, 30, 36]);
     for (const y of [TRAIN_TOP + 8, TRAIN_TOP + 14, TRAIN_TOP + 20]) r(0, y, SW, 1, [50, 46, 40]);
@@ -105,6 +109,8 @@ function drawTrain(dx: number, open: number, a: number): void {
   if (Math.abs(dx) > 1) for (let k = 0; k < 6; k++) r(x0 + ((k * 211 + Math.floor(a * 900)) % TRAIN_W), bot - 3, 6, 1, [255, 220, 150]); // sparks at the wheels
 }
 function stationBack(a: number, s: number): void {
+  // the line map poster lights up a step when you walk up to it (it's a map board)
+  { const k = boardGlow(a); if (k > 0) { G(356, 326, 208, 58, [255, 250, 230], 0.18 * k); lit(() => { r(360, 330, 200, 1, M([30, 34, 40], [255, 214, 90], k)); r(360, 379, 200, 1, M([30, 34, 40], [255, 214, 90], k)); }); } }
   // the lights: long fluorescent tubes (one flickers)
   lit(() => { for (let x = 60, i = 0; x < SW; x += 220, i++) { const f = i === 3 && (a * 3.7) % 1 < 0.08 ? 0.3 : 1; r(x, 318, 120, 3, M([80, 90, 90], [230, 250, 245], f)); } });
   for (let x = 60; x < SW; x += 220) G(x, 320, 120, 50, [200, 240, 230], 0.08);
@@ -145,6 +151,7 @@ export const SUBWAY_SPOTS: Spot[] = [
   ...[-14, 14].map((dx): Spot => ({ kind: 'sit', x: 420 + dx, y: 591, sx: 420 + dx, sy: 602, lift: 8, label: 'SIT', area: { x0: 390, y0: 566, x1: 450, y1: 590 } })),
   ...[-14, 14].map((dx): Spot => ({ kind: 'sit', x: 980 + dx, y: 591, sx: 980 + dx, sy: 602, lift: 8, label: 'SIT', area: { x0: 950, y0: 566, x1: 1010, y1: 590 } })),
   { kind: 'soda', x: 1230, y: 564, sx: 1230, sy: 564, lift: 0, label: 'SNACKS', area: { x0: 1208, y0: 482, x1: 1252, y1: 552 } },
+  { kind: 'map', x: 460, y: 514, sx: 460, sy: 514, lift: 0, label: 'MAP', area: { x0: 360, y0: 330, x1: 560, y1: 380 } }, // 5: the line map poster
 ];
 const boardDoor = (x: number, i: number, n: number): Door => ({
   trigger: { x0: x - 18, y0: PLAT + 4, x1: x + 18, y1: PLAT + 12 }, to: 'train', arrive: { x: CAR_DOOR_X[i % CAR_DOOR_X.length], y: 530 }, label: 'BOARD',

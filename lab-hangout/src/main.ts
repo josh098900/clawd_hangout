@@ -88,6 +88,8 @@ import { button, flash, modalOpen, openModal, row, type Modal } from './ui/modal
 import { $, cap, errText, narrow, now, setGame } from './app/game';
 import { hs, hsFrame, hsFrozen, hsOn, onWorld, startHide } from './features/hideseek';
 import { flatStep, goHome, initDecoButton, knockOn, onFlatMsg, recheckFlat, visitFlat } from './features/flats';
+import { goToRoom, mapArrive, mapStep, openCityMap, preview as mapPreview, routeTo as mapRoute, travel, zoneNow } from './features/map';
+import { mapOpen } from './ui/map';
 import { raceNews, raceUI, runsRace, useKart } from './features/karts';
 import { clockIn, cook, dinerEntered, dinerLine, dinerStep, drawTourArrow, endTour, initTourButton, leaveKitchen, settled, startTour, tour, tourStepNow } from './features/diner';
 import { endArcade, openClawMachine, pong, roomHi, startPong, startTank, tank } from './features/arcade';
@@ -317,7 +319,7 @@ function peopleCard(): void {
     const hiding = !!hsOn(); // no peeking during hide and seek
     const where = document.createElement('span'); where.textContent = hiding ? '???' : ROOMS[p.room].title; where.style.color = '#9FEFFF';
     line.append(star, name, where);
-    if (p.room !== room.id && !hiding) line.appendChild(button('GO', () => { m.close(); SFX.door(); void enterRoom(p.room, null); }));
+    if (p.room !== room.id && !hiding) line.appendChild(button('GO', () => { m.close(); following = null; goToRoom(p.room); }));
     list.appendChild(line);
   }
   const where = document.createElement('div'); where.textContent = 'You are on ' + (serverName || 'a server') + '. Friends on other servers can\'t see you.';
@@ -328,6 +330,7 @@ $('#count').addEventListener('click', peopleCard);
 const questBtn = $<HTMLButtonElement>('#quests');
 function syncQuestPill(): void { const d = quests.today.filter((q) => quests.done.has(q)).length; questBtn.style.display = quests.today.length ? '' : 'none'; questBtn.textContent = (narrow() ? '★ ' : 'QUESTS ') + d + '/' + quests.today.length; questBtn.classList.toggle('allDone', quests.today.length > 0 && d >= quests.today.length); }
 questBtn.addEventListener('click', () => { if (playing && !editing) { SFX.blip(); openQuests(() => input.clear()); } });
+$('#mapBtn').addEventListener('click', () => openMap());
 
 // ---------- servers ----------
 async function chooseServer(mustPick: boolean): Promise<string | null> {
@@ -447,15 +450,21 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   await fade(false);
   switching = false;
   if (id === 'diner' && !shiftLive(DINER.g)) toast('Want to cook? CLOCK IN at the time clock by the kitchen', 4000);
-  spaceArrive(from, id); moonArrive(from, id);
+  spaceArrive(from, id); moonArrive(from, id); mapArrive(id);
 }
 function goThrough(d: Door): void {
   const dest = doorDest(d);
   if (switching || doorCooldown > 0 || !dest) return;
+  leaveTo(dest.to, dest.arrive);
+}
+/** Leave the way a door does (also the map's way out). */
+function leaveTo(to: RoomId, at: { x: number; y: number } | null): void {
   if (me.pose === POSE_BUGGY) parkBuggy(); // (it drives itself back to the garage)
   SFX.door();
-  void enterRoom(dest.to, dest.arrive);
+  void enterRoom(to, at);
 }
+/** The city map (features/map.ts): `board` = the map board you're at, if any. */
+const openMap = (board: RoomId | null = null): void => { markActive(); openCityMap(board, friends, serverName); };
 
 // ---------- chat + emotes ----------
 const chatEl = $<HTMLInputElement>('#chat');
@@ -552,6 +561,7 @@ function useSpot(i: number): void {
   }
   if (s.kind === 'treat') { knock(s.n ?? 0); return; }
   if (s.kind === 'shift') { clockIn(); return; }
+  if (s.kind === 'map') { openMap(room.id); return; }
   if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.api.flats.doors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.api.flats.mine().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.api.flats.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
   if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
   if (s.kind === 'flatparty') {
@@ -990,11 +1000,13 @@ const poseBtns: [number, HTMLButtonElement][] = ([[POSE_DANCE, '6', 'DANCE'], [P
 const floatBtn = document.createElement('button'); floatBtn.type = 'button'; floatBtn.className = 'pill float'; floatBtn.style.display = 'none';
 floatBtn.addEventListener('click', () => (room.zeroG?.() ? spaceKey() : moonKey())); emoteBar.appendChild(floatBtn);
 let floatShown = '';
+emoteBar.appendChild(pillButton('pill mapb', 'M', 'MAP', () => openMap())); // (phones: the top bar has no room for it)
 { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill more'; const k = document.createElement('kbd'); k.textContent = 'R'; const l = document.createElement('span'); l.className = 'lbl-more'; b.append(k, l); b.addEventListener('click', openWheel); emoteBar.appendChild(b); }
 input.onKey = (e) => {
   if (!playing || editing || modalOpen() || isTyping(e)) return;
   if (wheel.classList.contains('on')) { if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') closeWheel(); else if (e.key >= '1' && e.key <= '8') { closeWheel(); emote(WHEEL[Number(e.key) - 1]); } return; }
   if (e.key === 'r' || e.key === 'R') { openWheel(); return; }
+  if (e.key === 'm' || e.key === 'M') { openMap(); return; }
   if (e.key === ' ' && room.zeroG?.()) { e.preventDefault(); spaceKey(); return; }
   if (e.key === ' ' && room.lowG?.()) { e.preventDefault(); moonKey(); return; }
   if (e.key === 'Enter') { e.preventDefault(); chatEl.focus(); return; }
@@ -1399,7 +1411,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); karaokeStep(dt); winterStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -1547,7 +1559,7 @@ async function boot(): Promise<void> {
   net.api.photos.isAdmin().then((a) => { setAdmin(a); void checkQueue(); }).catch(() => {});
   void checkMyPhotos(); setInterval(() => { void checkMyPhotos(); void checkQueue(); }, 90000);
   net.api.tokens.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
-  logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
+  logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · M for the map · Enter to chat · 1-7 to emote');
 }
 addEventListener('pagehide', () => { void net.leaveRoom(); net.leaveSeat(); });
 addEventListener('resize', () => { updateCount(); syncQuestPill(); });
@@ -1577,6 +1589,8 @@ if (import.meta.env.DEV && params.has('debug')) {
     floaters: () => floatersNow().filter((f) => !WALK.got.has(f.id)), sky: () => skyThings(), spotted: (name: string) => { const th = skyThings().find((q) => q.name === name || q.id === name); if (th) spotted(th); },
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
+    map: (b?: RoomId) => openMap(b ?? null), mapOpen: () => mapOpen(), mapRoute: (id: RoomId, pod?: boolean) => mapRoute(id, pod), zone: () => zoneNow(), places: () => save.data.places,
+    mapGo: (id: RoomId, pod?: boolean) => { const rt = mapRoute(id, pod); if (rt.ok) travel(rt); return rt; }, goTo: (r: RoomId) => goToRoom(r), mapPreview: (id: RoomId) => mapPreview(id)?.toDataURL() ?? null,
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };
 }
@@ -1587,5 +1601,6 @@ setGame({
   get editing() { return editing; }, rooms: ROOMS, enterRoom, get switching() { return switching; }, isTouch, zv, R, usingOf,
   sendMe: () => { forceSend = true; }, setState, setTokens, celebrate, floatText, everyone, hidden: hiddenAv, seasonPrize,
   leaveSpot, clearTap: () => { tapTarget = null; }, serverDo, emote, wear: wearItem, closeSpot,
+  leaveTo: (to, at) => { following = null; leaveTo(to, at); },
 });
 void boot();

@@ -33,7 +33,7 @@ export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number 
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */

@@ -7,6 +7,7 @@ import { h1, clamp } from '../engine/math';
 import type { Room, Prop, Spot } from './room';
 import { FILMS, currentFilm } from './cinema';
 import { CASTLE, COASTER, DRAGON, dragonState, placeCreation, VS } from './voxels';
+import { boardGlow } from './boards';
 
 const W = 1400, H = 780, GROUND = 560;
 /** THE LOFTS, the apartment block at the right end (its door leads to the lobby, world/lofts.ts). */
@@ -212,7 +213,8 @@ const benchSeats = (x: number, y: number): Spot[] => [-14, 14].map((dx) => ({ ki
 export const COINS: [number, number][] = [[330, 640], [512, 700], [1110, 610], [690, 668], [250, 600], [880, 700]];
 export const PLAZA_SPOTS: Spot[] = [...benchSeats(422, 642), ...benchSeats(902, 654),
   { kind: 'party', game: 'tag', x: 660, y: 600, sx: 660, sy: 600, lift: 0, label: 'PLAY TAG', area: { x0: 646, y0: 548, x1: 674, y1: 590 } }, // 4
-  { kind: 'party', game: 'hide', x: 112, y: 624, sx: 112, sy: 624, lift: 0, label: 'HIDE & SEEK', area: { x0: 90, y0: 572, x1: 134, y1: 612 } }]; // 5
+  { kind: 'party', game: 'hide', x: 112, y: 624, sx: 112, sy: 624, lift: 0, label: 'HIDE & SEEK', area: { x0: 90, y0: 572, x1: 134, y1: 612 } }, // 5
+  { kind: 'map', x: 842, y: 640, sx: 842, sy: 640, lift: 0, label: 'MAP', area: { x0: 818, y0: 546, x1: 866, y1: 626 } }]; // 6: the city map kiosk
 
 // ---- standing props ----
 const lampPost = (x: number, y: number): Prop => ({
@@ -259,6 +261,56 @@ const bin = (x: number, y: number): Prop => ({
   draw() { r(x - 6, y - 16, 12, 16, [46, 90, 70]); r(x - 7, y - 18, 14, 3, [60, 110, 86]); for (let k = 0; k < 3; k++) r(x - 4 + k * 4, y - 13, 1, 11, [36, 70, 56]); },
 });
 
+/**
+ * THE CITY MAP kiosk by the Subway steps: a dark green steel frame on two legs under a little peaked roof, the
+ * painted map lit from inside at night (moths about it), old flyers taped to a leg, and now and then a pigeon
+ * on the roof. It brightens a step when you walk up (world/boards.ts); E opens the map (features/map.ts).
+ */
+export const KIOSK = { x: 842, y: 628 };
+const kiosk: Prop = {
+  y: KIOSK.y,
+  draw(a: number) {
+    const x = KIOSK.x, y = KIOSK.y, day = dayness(), night = 1 - day, near = boardGlow(a);
+    const Gr: RGB = [34, 96, 70], GrH: RGB = [70, 150, 110], GrD: RGB = [22, 62, 46];
+    // the legs (feet bolted down), the flyers taped to the left one, a sticker on the right
+    for (const lx of [x - 17, x + 14]) { r(lx, y - 32, 3, 32, Gr); r(lx, y - 32, 1, 32, GrH); r(lx + 2, y - 32, 1, 32, GrD); r(lx - 1, y - 2, 5, 2, GrD); r(lx - 1, y - 2, 5, 1, Gr); }
+    r(x - 17, y - 16, 3, 1, GrD); r(x + 14, y - 16, 3, 1, GrD); r(x - 14, y - 17, 28, 2, Gr); r(x - 14, y - 17, 28, 1, GrH); // the crossbar
+    r(x - 21, y - 30, 7, 9, [255, 150, 200]); txt('K', x - 19, y - 28, [150, 40, 100]); r(x - 20, y - 22, 5, 1, [200, 90, 150]); r(x - 18, y - 31, 1, 1, [230, 230, 220]); // KARAOKE NIGHT
+    r(x - 21, y - 14, 7, 9, [250, 240, 190]); r(x - 19, y - 11, 3, 3, [60, 50, 40]); r(x - 19, y - 12, 1, 1, [60, 50, 40]); r(x - 17, y - 12, 1, 1, [60, 50, 40]); r(x - 20, y - 7, 5, 1, [120, 110, 90]); r(x - 18, y - 15, 1, 1, [230, 230, 220]); // LOST CAT
+    r(x - 20, y - 4, 5, 3, [120, 170, 240]); r(x - 19, y - 3, 2, 1, K.WHITE); // what's left of a KART CUP flyer
+    r(x + 15, y - 12, 2, 2, K.MAG); r(x + 15, y - 24, 2, 3, [255, 214, 90]);
+    // the panel: its frame, the header, the painted city (sea and pier, beach, the Square's blocks, the Park and its pond,
+    // the Subway's loop, the kart oval, the diner), and YOU ARE HERE on the Square
+    const px = x - 21, py = y - 78, pw = 42, ph = 46;
+    r(px, py, pw, ph, Gr); r(px, py, pw, 1, GrH); r(px, py, 1, ph, GrH); r(px + pw - 1, py, 1, ph, GrD); r(px, py + ph - 1, pw, 1, GrD);
+    r(px + 2, py + 2, pw - 4, 7, GrD); txt('CITY MAP', x - tw('CITY MAP') / 2, py + 3, [240, 250, 240]);
+    const k = clamp(0.4 * night + 0.6 * near, 0, 1), paper: RGB = M([200, 196, 170], [255, 248, 222], k), ink = (c: RGB): RGB => M(c, shade(c, 1.12), k);
+    const fx = px + 3, fy = py + 11;
+    const face = () => {
+      r(fx, fy, 36, 32, paper);
+      r(fx + 27, fy, 9, 20, ink([110, 170, 220])); r(fx + 26, fy, 1, 20, ink([214, 190, 140])); r(fx + 27, fy + 9, 7, 1, ink([150, 110, 70])); r(fx + 33, fy + 3, 1, 4, ink([240, 240, 240])); // the sea, the beach, the pier, the lighthouse
+      for (const [bx, bh, c] of [[1, 6, [190, 110, 90]], [5, 4, [180, 60, 70]], [9, 8, [80, 90, 130]], [13, 4, [150, 140, 170]], [17, 5, [120, 110, 150]], [21, 8, [170, 90, 80]]] as [number, number, RGB][]) r(fx + bx, fy + 10 - bh, 3, bh, ink(c)); // the Square's buildings
+      r(fx + 1, fy + 10, 25, 4, ink([160, 160, 176])); r(fx + 1, fy + 14, 25, 1, ink([90, 90, 104])); // the Square, and the road
+      r(fx + 1, fy + 17, 10, 13, ink([120, 190, 110])); r(fx + 3, fy + 21, 5, 3, ink([90, 150, 210])); r(fx + 2, fy + 18, 1, 1, ink([60, 130, 70])); r(fx + 9, fy + 27, 1, 1, ink([60, 130, 70])); // the Park
+      for (let i = 0; i < 12; i++) { const q = i / 12 * Math.PI * 2; if (i % 2 === 0) r(Math.round(fx + 17 + Math.cos(q) * 4), Math.round(fy + 20 + Math.sin(q) * 3), 1, 1, ink([40, 120, 90])); } // the Subway's loop
+      r(fx + 14, fy + 25, 6, 3, ink([150, 156, 166])); r(fx + 14, fy + 26, 6, 1, ink([40, 160, 160])); // the diner
+      for (let i = 0; i < 16; i++) { const q = i / 16 * Math.PI * 2; r(Math.round(fx + 29 + Math.cos(q) * 5), Math.round(fy + 26 + Math.sin(q) * 3), 1, 1, ink([70, 72, 84])); } // the kart track
+    };
+    if (night > 0.3 || near > 0) lit(face); else face();
+    lit(() => { const on = (a % 1) < 0.6, c: RGB = on ? [230, 50, 70] : [150, 30, 50], sx = fx + 18, sy = fy + 11; r(sx - 1, sy - 1, 3, 3, c); r(sx, sy - 3, 1, 7, c); r(sx - 3, sy, 7, 1, c); });
+    // its little peaked roof, and a lamp tucked under it
+    for (let i = 0; i < 4; i++) r(px - 3 + i * 3, py - 2 - i * 2, pw + 6 - i * 6, 2, i ? Gr : GrD); r(px - 3, py - 2, pw + 6, 1, GrH); r(x - 1, py - 10, 2, 2, GrH);
+    // light: the panel lit from inside at night (and a step brighter when you're close), and the moths it draws
+    const glow = 0.2 * night + 0.25 * near;
+    if (glow > 0.01) { G(fx, fy, 36, 32, [255, 244, 200], glow); Gd(x, fy + 16, 26, [255, 240, 200], glow * 0.3); }
+    if (night > 0.5) lit(() => { for (let i = 0; i < 2; i++) { const an = a * (3 + i) + i * 2; r(Math.round(x + Math.cos(an) * (14 + i * 4)), Math.round(fy + 12 + Math.sin(an * 1.3) * 9), 1, 1, [230, 226, 200]); } });
+    // now and then a pigeon lands on the roof, looks about, and flies off
+    const u = (a * 0.03 + 0.4) % 1;
+    if (u < 0.22) { const land = Math.min(1, u / 0.03), off = u > 0.2 ? (u - 0.2) / 0.02 : 0, bx = x - 4 + off * 30 - (1 - land) * 30, by = py - 13 - (1 - land) * 20 - off * 24, bob = off || land < 1 ? 0 : (Math.floor(a * 2) % 5 === 0 ? 1 : 0);
+      r(bx, by + bob, 6, 3, K.PIGEON); r(bx + 5, by - 2 + bob, 3, 3, K.PIGEON_DK); r(bx + 5, by, 2, 1, K.PIGEON_NECK); r(bx + 8, by - 1 + bob, 1, 1, K.BEAK); r(bx - 1, by + 1 + bob, 2, 2, K.PIGEON_DK); if (land >= 1 && !off) { r(bx + 2, by + 3, 1, 1, K.FEET); r(bx + 4, by + 3, 1, 1, K.FEET); } else r(bx + 1, by - 2, 4, 2, K.PIGEON_LT); }
+  },
+};
+
 export function makePlaza(): Room {
   const room: Room = {
     id: 'plaza', title: 'THE SQUARE', sub: 'OUTSIDE',
@@ -270,6 +322,7 @@ export function makePlaza(): Room {
       { x0: 604, y0: 598, x1: 616, y1: 606 },
       { x0: 654, y0: 582, x1: 666, y1: 590 }, // tag sign
       { x0: 106, y0: 606, x1: 118, y1: 614 }, // hide & seek sign
+      { x0: 824, y0: 622, x1: 860, y1: 630 }, // the map kiosk
       { x0: 730, y0: 668, x1: 736, y1: 712 }, { x0: 784, y0: 668, x1: 790, y1: 712 }, { x0: 798, y0: 666, x1: 804, y1: 674 }, // subway railings + sign post
       { x0: 156, y0: 668, x1: 162, y1: 712 }, { x0: 210, y0: 668, x1: 216, y1: 712 }, { x0: 224, y0: 668, x1: 230, y1: 676 }, // stairwell railings + sign post
     ],
@@ -293,7 +346,7 @@ export function makePlaza(): Room {
     altAlpha: dayness,
     glowMul: () => 1 - 0.75 * dayness(),
     drawBack,
-    props: [lampPost(161, 574), lampPost(521, 574), lampPost(701, 574), lampPost(1061, 574), bench(422, 642), bench(902, 654), bin(610, 604), tagSign, hideSign],
+    props: [lampPost(161, 574), lampPost(521, 574), lampPost(701, 574), lampPost(1061, 574), bench(422, 642), bench(902, 654), bin(610, 604), tagSign, hideSign, kiosk],
   };
   return room;
 }

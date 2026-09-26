@@ -63,6 +63,7 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 |---|---|---|
 | Walk | WASD / arrow keys, or click the floor | tap the floor |
 | Go through a door | walk up into it, or click it | tap the door |
+| The city map: see where everyone is, go anywhere (the Station and the Moon still need their ride) | M, or the **MAP** button; E at a map board (the Square's kiosk, a Subway poster, the Station's chart) | **MAP** button (bottom), tap a place, then GO |
 | Chat | Enter, type, Enter | tap the chat bar |
 | Use things (sit, coffee, popcorn, arcade, whiteboard, jukebox, photo booth, talk to NPCs, feed pigeons) | walk up and press E, or click it | tap it |
 | Sip / eat what you're holding | Q | SIP / EAT button |
@@ -127,6 +128,8 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
     `select public.set_season('winter');` and switch back to the date with `select public.set_season(null);`
 19. `supabase/migrations/0019_moon.sql`: THE MOON: the Moon Base's ASSAY machine (moon rocks pay 1, MOON CRYSTALS 3, capped;
     the 5th crystal brings the MOON ROVER pet), the Moon quests and the MOONWALKER badge
+20. `supabase/migrations/0020_map.sql`: THE CITY MAP's EXPLORER badge (visit every place on the map). The map
+    itself needs nothing from the server
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

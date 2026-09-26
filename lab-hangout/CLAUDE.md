@@ -75,7 +75,8 @@ src/
                        helpers ($, now, errText, cap). main.ts fills it in (setGame) with getters. Features never import main.ts
   features/            the playing side of the bigger features, moved out of main.ts: winter, space, photos, karaoke,
                        garden, halloween, arcade (claw, pong, tanks, hi score), diner (+ COOKIE's tour), karts, flats,
-                       hideseek, moon (the lander's news, mining + assaying moon rocks, the buggy race). Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
+                       hideseek, moon (the lander's news, mining + assaying moon rocks, the buggy race), map (THE CITY MAP's travel rules: routeTo /
+                       travel / goToRoom, zoneNow, the places you've been, openCityMap). Each owns its state; main calls what it exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
     palette.ts         all colour tokens (K, LK, BODY, CONFETTI)
@@ -148,6 +149,11 @@ src/
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
+    map.ts             THE CITY MAP (480x300): the whole world as a pixel diorama (PLACES: each place's hit rects, where people
+                       stand, its zone earth/orbit/moon, its ? sticker), baked by night and by day (paintMap), and the live layer
+                       (drawMapLive: signs, the train / rocket / lander on their timetables, weather, seasons, people, friends' tags,
+                       YOU, stickers, hover brackets, the pin); spotOf(room) is where someone in that room is drawn
+    boards.ts          BOARD.near: you're at this room's map board (the Square's kiosk, a platform's line map, the station's chart)
   entities/
     critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;
                        what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)
@@ -163,6 +169,7 @@ src/
     localapi.ts        net.api in LOCAL mode: a pretend database in localStorage with the SQL functions' rules
   game/save.ts         your save (unlocks, friends, fish log, stars, hi score): cached per player id, synced to
                        the `saves` table; merging is a union so nothing earned is ever lost
+  game/places.ts       the places on the map the EXPLORER badge counts (EXPLORE), and placeOfRoom (flats are THE LOFTS; rides are no place)
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
                        quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
   game/karaoke.ts      KARAOKE: the 5 songs as charts (12 lines x 16 eighth-note steps; 'P:syl' = pad P on a syllable), the
@@ -202,6 +209,8 @@ src/
     quests.ts          the QUESTS panel (today's quests, badges) and badge chips for player cards
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
+    map.ts             the CITY MAP panel: its two canvases (crisp + glow), the card for a place (live look inside, who's there,
+                       how you'd get there), the pin + zoom when you pick one; 30 fps while open. Phones: the card goes under the map
   audio/sfx.ts         synthesized blips (no audio files)
   audio/music.ts       chiptune tracks as note strings; MusicPlayer schedules against the wall clock; the Stage's
                        instrument synth (playPad, all C pentatonic); the Den's rain loop
@@ -243,8 +252,10 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        a winter prize); open_advent / advent_doors; ornaments table + hang_ornament (5 a day); catch_sleigh(pass, n)
                        (3 a pass); gifts table + send_gift (3/5/10 tokens, preset messages) / tree_gifts / open_gift; winter furniture) ·
                        0019 moon (moon_assay: the server decides, 1 in 6 a MOON CRYSTAL, 1 or 3 tokens, 15 a day, one per 20 s; the 5th crystal
-                       = the MOON ROVER pet 'pet:8'; moon_crystals; the moonwalk / moonrock / buggy quests + MOONWALKER badge)
-docs/ART_STYLE.md      the style bible
+                       = the MOON ROVER pet 'pet:8'; moon_crystals; the moonwalk / moonrock / buggy quests + MOONWALKER badge) ·
+                       0020 map (the EXPLORER badge: nothing else, the map needs no server)
+docs/ART_STYLE.md      the style bible (§9: the polish standard every new room follows)
+docs/briefs/           each step's design brief (written and agreed before any code)
 ```
 
 ### Frame order (main.ts `render`)

@@ -9,6 +9,7 @@
 
 import { save } from './save';
 import { COLLECTABLES } from '../entities/critter';
+import { EXPLORE } from './places';
 import type { Transport } from '../net/transport';
 
 export const QUESTS: Record<string, { text: string; goal: number }> = {
@@ -67,6 +68,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'storm', name: 'STORM CHASER', hint: 'Catch a fish in a thunderstorm', earned: () => stat('stormFish') >= 1 },
   { id: 'astronaut', name: 'ASTRONAUT', hint: 'Fly to the Space Station 5 times', earned: () => stat('flights') >= 5 },
   { id: 'moonwalker', name: 'MOONWALKER', hint: 'Assay 20 moon rocks', earned: () => stat('moonrocks') >= 20 },
+  { id: 'explorer', name: 'EXPLORER', hint: 'Visit every place on the map', earned: () => EXPLORE.every((p) => save.data.places.includes(p)) },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

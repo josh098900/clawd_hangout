@@ -101,6 +101,18 @@ export const MN = table({
   BUGGY: '#F2F0EA', BUGGY_SH: '#C0BCB2', TYRE: '#3A3A46', TYRE_HI: '#5A5A6A',
 });
 
+/** The city map (world/map.ts, ui/map.ts): the ground, the park, the sea and the sand, the roads, by night and by day. */
+export const MP = table({
+  GROUND: '#1A2238', GROUND2: '#1F2843', GROUND_D: '#6F8A6A', GROUND2_D: '#7C976F',
+  GRASS: '#1E3A2E', GRASS2: '#244536', GRASS_HI: '#2E5A42', GRASS_D: '#5FA05A', GRASS2_D: '#6DB064', GRASS_HI_D: '#86C474',
+  TREE: '#173A2A', TREE_HI: '#2A5A3E', TREE_D: '#2F7A48', TREE_HI_D: '#4E9E5C', TRUNK: '#4A3424',
+  ROAD: '#15192A', ROAD_D: '#4A4E62', ROAD_LN: '#8C8250', ROAD_LN_D: '#F2E6A0', KERB: '#3A4262', KERB_D: '#A8ACBE',
+  POND: '#12295A', POND_HI: '#2A4C8A', POND_D: '#3F8AD0', POND_HI_D: '#8CC8F0',
+  SEA_D: '#2F7CC8', SEA2_D: '#4A96DA', SEA_HI_D: '#A8DCFA', SAND_D: '#E8CE98', SAND2_D: '#D8B880',
+  LINE: '#28785A', LINE_HI: '#7CF29C', FRAME: '#0C0E1A', FRAME_HI: '#3A4266', TAG: '#141828',
+  PIN: '#E6414F', PIN_HI: '#FF8A94', STICKER: '#F2C230', STICKER_DK: '#8C6A10',
+});
+
 /** The lab's own palette (pale tile, teal wainscot, steel). */
 export const LK = table({
   CEIL: '#27333A', BEAM: '#1C252A', BEAM_HI: '#33424A', DUCT: '#5C6C73', DUCT_HI: '#77888F', DUCT_DK: '#44525A', PIPEB: '#4A5B63', CABLE: '#141B1F', SOFFIT: '#3C4A51',

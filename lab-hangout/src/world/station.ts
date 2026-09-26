@@ -18,6 +18,7 @@ import { LANDER_CABIN_ARRIVE, L_TRIP, lander } from './moon';
 import { skyThings, skyView } from './sky';
 import type { ScopeState, StateMsg, Tray } from '../net/transport';
 import type { Door, Prop, Room, Spot } from './room';
+import { boardGlow } from './boards';
 
 const W = 1720, H = 700, WALL = 280, FL = 470;
 export const TRAY_X = [240, 302, 364, 426, 488, 550];
@@ -87,7 +88,33 @@ function build(this: Room): void {
     r(BAY_X - 40, 362, 80, 108, SK.TRIM); r(BAY_X - 36, 366, 72, 104, SK.HULL_DK);
     r(BAY_X - 62, 290, 124, 38, SK.TRIM); r(BAY_X - 59, 293, 118, 32, SK.SCREEN); // the departures board
     r(BAY_X - 50, 334, 100, 12, [40, 46, 70]); txt('TO THE MOON', BAY_X - tw('TO THE MOON') / 2, 337, [200, 200, 212]);
+    // ---- the ORBITAL CHART: a round nav screen in a heavy bezel on a wall arm (a city map board: E opens the map) ----
+    r(CH.x - 3, CH.y + CH.r + 2, 6, 10, SK.TRIM); r(CH.x - 10, CH.y + CH.r + 10, 20, 3, SK.TRIM_HI); // the arm, bolted to the wall
+    disc(CH.x, CH.y, CH.r + 4, SK.TRIM); disc(CH.x, CH.y, CH.r + 3, SK.HULL_DK); disc(CH.x, CH.y, CH.r + 1, SK.TRIM); ring(CH.x, CH.y, CH.r + 3, CH.r + 3, SK.HULL_SH);
+    for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2 + 0.2; r(Math.round(CH.x + Math.cos(an) * (CH.r + 2)), Math.round(CH.y + Math.sin(an) * (CH.r + 2)), 1, 1, SK.HULL_HI); } // bolts round the bezel
+    r(CH.x - 30, CH.y + CH.r + 14, 60, 10, [40, 46, 70]); r(CH.x - 30, CH.y + CH.r + 14, 60, 1, SK.TRIM_HI); txt('ORBITAL CHART', CH.x - tw('ORBITAL CHART') / 2, CH.y + CH.r + 17, [200, 200, 212]);
   });
+}
+/** The ORBITAL CHART (a map board) on the wall between the escape pod and the lander bay. */
+const CH = { x: 1522, y: 392, r: 20 };
+function chartBits(a: number): void {
+  const { x, y, r: R } = CH, near = boardGlow(a), sweep = a * 1.4;
+  disc(x, y, R, SK.SCREEN);
+  lit(() => {
+    for (let yy = y - R + 1; yy < y + R; yy += 3) { const w = Math.floor(Math.sqrt(R * R - (yy - y) * (yy - y))); r(x - w, yy, w * 2 + 1, 1, [12, 34, 40]); } // scan lines
+    for (let k = 0; k < 18; k++) { const an = sweep - k * 0.05, L = R - 2; r(Math.round(x + Math.cos(an) * L * (k / 18 + 0.1)), Math.round(y + Math.sin(an) * L * (k / 18 + 0.1)), 1, 1, M(SK.LED, [12, 34, 40], k / 18)); } // the radar sweep
+    for (let k = 0; k < 20; k++) { const an = k / 20 * Math.PI * 2; if (k % 2) r(Math.round(x - 7 + Math.cos(an) * 10), Math.round(y + 4 + Math.sin(an) * 6), 1, 1, [60, 140, 110]); } // the station's orbit
+    disc(x - 7, y + 4, 4, [40, 110, 200]); r(x - 9, y + 2, 2, 1, [80, 190, 110]); r(x - 6, y + 5, 2, 1, [80, 190, 110]); // Earth
+    disc(x + 12, y - 9, 2, [180, 180, 190]); r(x + 11, y - 10, 1, 1, K.WHITE); // the Moon
+    const st = a * 0.25, sx = Math.round(x - 7 + Math.cos(st) * 10), sy = Math.round(y + 4 + Math.sin(st) * 6);
+    r(sx - 1, sy, 3, 1, K.WHITE); r(sx, sy - 1, 1, 3, K.WHITE); // the station, going round
+    const f = lander(), u = f.phase === 'docked' ? 0 : f.phase === 'landed' ? 1 : f.phase === 'down' ? f.d / L_TRIP : 1 - f.d / L_TRIP;
+    for (let k = 1; k < 8; k++) { const q = k / 8; if (k % 2) r(Math.round(sx + (x + 12 - sx) * q), Math.round(sy + (y - 9 - sy) * q), 1, 1, [120, 110, 70]); } // the lander's route
+    if ((a % 0.8) < 0.5) { const lx = Math.round(sx + (x + 12 - sx) * u), ly = Math.round(sy + (y - 9 - sy) * u); r(lx - 1, ly - 1, 3, 3, K.GOLD); }
+    txt('NAV', x - tw('NAV') / 2, y - R + 4, M(SK.LED, K.GOLD, near));
+  });
+  G(x - R, y - R, R * 2, R * 2, [120, 255, 170], 0.07 + 0.12 * near);
+  if (near > 0) lit(() => { for (let k = 0; k < 40; k++) { const an = k / 40 * Math.PI * 2; r(Math.round(x + Math.cos(an) * (R + 1)), Math.round(y + Math.sin(an) * (R + 1)), 1, 1, M(SK.TRIM, K.GOLD, near)); } });
 }
 /** A spacesuit hanging on the wall (the spacewalk's), helmet on a hook above it. */
 function suit(x: number, y: number): void {
@@ -206,7 +233,7 @@ function drifters(): void {
 }
 function drawBack(a: number): void {
   for (let x = 60; x < W; x += 180) G(x, WALL - 12, 90, 30, [230, 240, 255], 0.06);
-  windowView(a); dockBits(a); growLights(a); missionScreen(a); airlockBits(a); bayBits(a); drifters();
+  windowView(a); dockBits(a); growLights(a); missionScreen(a); airlockBits(a); bayBits(a); chartBits(a); drifters();
 }
 
 // ---------- props ----------
@@ -224,6 +251,7 @@ export const STATION_SPOTS: Spot[] = [
   ...TRAY_X.map((x, n): Spot => ({ kind: 'tray', n, x, y: 494, sx: x, sy: 494, lift: 0, label: 'TRAY', area: { x0: x - 26, y0: 404, x1: x + 26, y1: 470 } })), // 0..5
   ...[760, 810, 860].map((x): Spot => ({ kind: 'sit', x, y: 569, sx: x, sy: 586, lift: 8, label: 'GAZE', area: { x0: x - 24, y0: 540, x1: x + 24, y1: 566 } })), // 6..8
   ...[1090, 1170].map((x): Spot => ({ kind: 'mission', x, y: 490, sx: x, sy: 494, lift: 0, label: 'TELESCOPE', area: { x0: x - 36, y0: 416, x1: x + 36, y1: 470 } })), // 9, 10
+  { kind: 'map', x: 1522, y: 494, sx: 1522, sy: 494, lift: 0, label: 'MAP', area: { x0: 1494, y0: 364, x1: 1550, y1: 446 } }, // 11: the orbital chart
 ];
 const dockDoor: Door = { trigger: { x0: DOCK_X - 20, y0: 480, x1: DOCK_X + 20, y1: 488 }, to: 'rocket', arrive: CAPSULE_ARRIVE, label: 'ROCKET', area: { x0: DOCK_X - 46, y0: 362, x1: DOCK_X + 46, y1: 480 }, route: () => (flight().phase === 'docked' ? { to: 'rocket', arrive: CAPSULE_ARRIVE, label: 'ROCKET HOME' } : null) };
 export const SPACEWALK_ARRIVE = { x: 200, y: 420 };

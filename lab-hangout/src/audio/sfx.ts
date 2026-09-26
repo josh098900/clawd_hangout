@@ -117,4 +117,10 @@ export const SFX = {
   clap: () => { for (let i = 0; i < 6; i++) noise(1500, 1.5, 0.05, 0.12, i * 0.17); },
   wow: () => { tone('sine', 400, 1200, 0.35, 0.05); tone('triangle', 800, 1600, 0.3, 0.02, 0.05); },
   idea: () => [1319, 1760, 2637].forEach((f, i) => tone('sine', f, f, 0.25, 0.05, i * 0.06)),
+  /** The city map: paper unfolding (and folding up again), a tick as you run across it (pitched left to right), the pin, and "no". */
+  mapOpen: () => { noise(2600, 1.1, 0.16, 0.05); noise(1700, 1.4, 0.12, 0.045, 0.11); noise(3200, 1.2, 0.08, 0.03, 0.2); tone('triangle', 660, 880, 0.08, 0.025, 0.24); },
+  mapClose: () => { noise(1700, 1.4, 0.1, 0.04); noise(2600, 1.1, 0.12, 0.035, 0.08); },
+  mapTick: (u = 0.5) => tone('sine', 620 + u * 700, 620 + u * 700, 0.035, 0.018),
+  pin: () => { tone('triangle', 1500, 900, 0.07, 0.035); noise(3000, 3, 0.03, 0.05, 0.08); },
+  nope: () => { tone('square', 220, 190, 0.08, 0.03); tone('square', 180, 150, 0.12, 0.03, 0.1); },
 };
