@@ -13,7 +13,7 @@ import { mmss } from '../engine/format';
 import { save } from '../game/save';
 import { itemName } from '../entities/critter';
 import { ENV, HOLD_SNOWBALL, type Avatar } from '../entities/avatar';
-import { type SnowballMsg, type TreeGift } from '../net/transport';
+import type { SnowballMsg, TreeGift } from '../net/transport';
 import { toast } from '../ui/overlay';
 import { SFX } from '../audio/sfx';
 

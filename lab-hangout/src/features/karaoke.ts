@@ -14,7 +14,7 @@ import { save } from '../game/save';
 import { POSE_DANCE, type EmoteKind } from '../entities/avatar';
 import { toast } from '../ui/overlay';
 import { SFX } from '../audio/sfx';
-import { type Track } from '../audio/music';
+import type { Track } from '../audio/music';
 
 /** The backing track while a song is on. */
 const karaokeMusic = new MusicPlayer();

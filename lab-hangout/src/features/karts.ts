@@ -7,7 +7,7 @@ import { quests } from '../game/quests';
 import { KARTS } from '../world/karts';
 import { openRace, type RaceHandle } from '../ui/race';
 import { LOBBY_S, MAX_RACERS, RACE_MAX_S, TRACKS, ordinal, raceTime, trackOf } from '../game/kart';
-import { type RaceState } from '../net/transport';
+import type { RaceState } from '../net/transport';
 import { toast } from '../ui/overlay';
 import { SFX } from '../audio/sfx';
 

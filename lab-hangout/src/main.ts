@@ -47,7 +47,7 @@ import { setSeason, isHalloween, isWinter, season } from './world/season';
 import { WINTER, installWinter, onIce, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, candleOrder } from './world/halloween';
 import { GARDEN } from './world/garden';
-import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
+import { hsBanner, hsLive } from './game/hideseek';
 import { fishNamed, logFish } from './game/fish';
 import { CONTEST, contestClock } from './world/contest';
 import { mmss } from './engine/format';
@@ -65,7 +65,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -83,6 +83,7 @@ import { openTyping } from './ui/typing';
 import { openKanban } from './ui/kanban';
 import { button, flash, modalOpen, openModal, row, type Modal } from './ui/modal';
 import { $, cap, errText, narrow, now, setGame } from './app/game';
+import { hs, hsFrame, hsFrozen, hsOn, onWorld, startHide } from './features/hideseek';
 import { flatStep, goHome, initDecoButton, knockOn, onFlatMsg, recheckFlat, visitFlat } from './features/flats';
 import { raceNews, raceUI, runsRace, useKart } from './features/karts';
 import { clockIn, cook, dinerEntered, dinerLine, dinerStep, drawTourArrow, endTour, initTourButton, leaveKitchen, settled, startTour, tour, tourStepNow } from './features/diner';
@@ -483,7 +484,7 @@ function emote(kind: EmoteKind): boolean {
   return true;
 }
 
-// ---------- spots (seats, coffee, arcade), NPCs and the action button ----------
+// ---------- spots: what kind someone's using, and things you fill and carry (FILL) ----------
 const usingOf = (av: Avatar): Using => (av.use >= 0 ? room.spots[av.use]?.kind ?? null : null);
 const liftOf = (av: Avatar): number => (av.use >= 0 ? room.spots[av.use]?.lift ?? 0 : 0);
 
@@ -500,55 +501,6 @@ function hostView(): HostView {
   return { using: (id) => (id === net.selfId ? me.use : others.get(id)?.use ?? null), seatSpots: room.spots.map((s, i) => (s.kind === 'sit' ? i : -1)).filter((i) => i >= 0), pos: posOf };
 }
 const imIn = (g: GameState): boolean => { const i = g.ids.indexOf(net.selfId); return i >= 0 && (g.kind !== 'chairs' || g.alive.includes(i)); };
-// ---------- hide and seek (server-wide, see game/hideseek.ts) ----------
-let hs: HideSeek | null = null, hsSent = 0, hsKey = '';
-function setHS(h: HideSeek): void { const prev = hs; hs = h; hsSent = now(); net.sendWorld(h); onHS(prev, h); }
-function onWorld(e: NetEvent): void {
-  if (e.type === 'flat') { onFlatMsg(e.id, e.f); return; }
-  if (e.type !== 'world' || !allow(e.id, 'world', 3, 6)) return;
-  const w = e.w, live = hsLive(hs, net.selfId);
-  // during a round only the seeker's browser speaks for it; between rounds anyone can start one
-  // (and a seeker's update also catches up someone who missed the start)
-  const ok = live && live.phase !== 'over' ? e.id === live.seeker && w.seeker === live.seeker && w.ts > live.ts : w.phase === 'hide' || e.id === w.seeker;
-  if (!ok) return;
-  const prev = hs; hs = w; onHS(prev, w);
-}
-/** Local reactions: sounds, toasts, the seeker being walked back to the Lab. */
-function onHS(prev: HideSeek | null, h: HideSeek): void {
-  const key = h.seeker + h.phase + h.t0 + ':' + h.found.length;
-  if (key === hsKey) return; hsKey = key;
-  const seeker = h.seeker === net.selfId, sName = nameIn(h, h.seeker), fresh = !prev || prev.t0 !== h.t0 && prev.phase === 'over' || prev.seeker !== h.seeker;
-  if (h.phase === 'hide' && (fresh || prev?.phase !== 'hide')) {
-    SFX.join();
-    if (seeker) { toast("You're IT! Count to 30 in the Lab, then find everyone", 4500); if (room.id !== 'lab') void enterRoom('lab', null); }
-    else toast('HIDE AND SEEK! ' + sName + ' is seeking. Hide anywhere, in any room!', 4500);
-  } else if (h.phase === 'seek' && prev?.phase === 'hide') { SFX.siren(); toast(seeker ? 'Ready or not, here you come!' : sName + ' is coming...', 3000); }
-  else if (h.phase === 'seek' && prev && h.found.length > prev.found.length) {
-    const who = h.ids[h.found[h.found.length - 1]];
-    if (who === net.selfId) { SFX.hurt(); toast('You were found!', 3000); } else { SFX.pop(); toast('FOUND: ' + nameIn(h, who), 2000); }
-  } else if (h.phase === 'over' && prev?.phase !== 'over') { SFX.score(); if (seeker && h.found.length >= h.ids.length - 1) { celebrate(); } }
-}
-/** A hide-and-seek round that's still being played (not just finished). */
-const hsOn = (): HideSeek | null => { const h = hsLive(hs, net.selfId); return h && h.phase !== 'over' ? h : null; };
-/** The seeker is frozen in the Lab while everyone hides. */
-const hsFrozen = (): boolean => { const h = hsLive(hs, net.selfId); return !!h && h.phase === 'hide' && h.seeker === net.selfId; };
-function hsFrame(): void {
-  const h = hsLive(hs, net.selfId);
-  const seeking = !!h && h.seeker === net.selfId && h.phase !== 'over';
-  for (const o of others.values()) o.hideName = seeking;
-  if (!h || h.seeker !== net.selfId) return;
-  let next = hsTick(h);
-  if (!next && h.phase === 'seek') for (const o of others.values()) if (Math.hypot(o.x - me.x, o.y - me.y) < TAG_DIST) { next = hsFound(h, o.id); if (next) break; }
-  if (next) setHS(next);
-  else if (h.phase !== 'over' && now() - hsSent > 3) setHS({ ...h, ts: Date.now() }); // keep everyone (and newcomers) in sync
-}
-function startHide(): void {
-  if (hsOn()) { toast('A round is already on!'); return; }
-  const people = [{ id: net.selfId, name: me.name }, ...lobby.map((p) => ({ id: p.id, name: p.name }))];
-  if (people.length < 2) { toast('Need at least 2 people on this server', 3500); return; }
-  setHS(startHS(people));
-}
-
 function startGame(kind: 'chairs' | 'tag' | 'hide'): void {
   if (kind === 'hide') { startHide(); return; }
   if (gameNow()) { toast('A game is already on!'); return; }
@@ -575,6 +527,7 @@ function syncGameBar(text: string): void {
   const el = $('#gamebar'); if (el.textContent !== text) { el.textContent = text; el.classList.toggle('on', !!text); }
 }
 
+// ---------- E at a spot: every kind is handled here (or handed to its feature) ----------
 function useSpot(i: number): void {
   const s = room.spots[i], t = now();
   if (!s) return;
@@ -802,6 +755,7 @@ function highFive(a: Avatar): void {
     SFX.clap(); if (a === me || b === me) { SFX.score(); quests.bump('high5'); }
   }
 }
+// ---------- the slop invasion (game/slop.ts): throwing mugs at the blobs ----------
 /** The live slop blob nearest to (x, y), if the invasion is on and we're in the Square. */
 function slopTarget(x: number, y: number, maxD: number): { i: number; x: number; y: number } | null {
   const sw = room.id === 'plaza' ? slopWave() : null; if (!sw) return null;
@@ -822,6 +776,7 @@ function throwAt(tg: { i: number; x: number; y: number }): void {
   setState({ k: 'slop', v: { w: sw.w, dead: [...new Set([...dead, tg.i])] } });
   SFX.zap(); setTimeout(() => SFX.pop(), 350);
 }
+// ---------- the Stage's instruments: playing a note, its spark, the on-screen pad ----------
 /** Play pad n on the instrument you're at: hear it now, send it to the room. */
 function playNote(n: number): void {
   const s = room.spots[me.use]; if (!s || s.kind !== 'instrument') return;
@@ -845,6 +800,7 @@ function syncPad(): void {
   pad.replaceChildren(...PAD_LABELS[i].map((lab, n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; keyLabel(b, String(n + 1), lab); b.style.boxShadow = '0 0 0 2px ' + ['#5FE7FF', '#FFD65A', '#FF5FD2', '#7CF29C'][i]; b.addEventListener('pointerdown', (e) => { e.preventDefault(); playNote(n); }); return b; }));
   const t = document.createElement('span'); t.className = 'pill quiet'; t.textContent = INSTRUMENTS[i]; pad.prepend(t);
 }
+// ---------- fishing at the Pier (game/fish.ts: the server rolls every catch) ----------
 /** Fish bite about twice as fast in the rain. */
 const biteK = (): number => (raining() ? 0.5 : 1);
 function reel(): void {
@@ -888,6 +844,7 @@ function contestTick(): void {
   const every = room.id === 'pier' ? (cl.live ? 8000 : 60000) : 0, justEnded = !cl.live && cl.next > 3000 && cl.next < 3590;
   if ((every && Date.now() - CONTEST.fetchedAt > every) || (justEnded && Date.now() - CONTEST.fetchedAt > 20000)) refreshContest();
 }
+// ---------- small things E does: rowing back, feeding ducks and pigeons, poses, talking to NPCs ----------
 /** Rowing: get out at the dock. */
 function land(): void {
   if (Math.hypot(me.x - DOCK.launch.x, me.y - DOCK.launch.y) > 44) { toast('Row back to the dock to get out', 2500); return; }
@@ -933,6 +890,7 @@ function nearestSpot(maxD: number): number {
   return best;
 }
 
+// ---------- the action button (E), the emote bar and wheel, and the keys ----------
 interface Action { label: string; run: () => void; at: [number, number] | null }
 /** The one thing E / the action button does right now, and where to float its hint. */
 function currentAction(): Action | null {
@@ -1542,7 +1500,7 @@ async function boot(): Promise<void> {
   }
   net.onSeatLost(onSeatLost);
   net.watchLobby(onLobby);
-  net.watchWorld(onWorld);
+  net.watchWorld((e) => { if (e.type === 'flat') onFlatMsg(e.id, e.f); else onWorld(e); }); // (the lobby channel: flat knocks + hide and seek)
   await save.attach(net.selfId, net);
   await refreshSeason();
   void quests.init(net, {

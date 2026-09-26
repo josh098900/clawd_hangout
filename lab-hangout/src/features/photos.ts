@@ -6,7 +6,7 @@ import { $, game, narrow } from '../app/game';
 import { LAB_INFO } from '../world/lab';
 import { openModerate, thumbOf, type AlbumHooks } from '../ui/photos';
 import { FLAT } from '../world/flat';
-import { type Photo } from '../net/transport';
+import type { Photo } from '../net/transport';
 import { toast } from '../ui/overlay';
 import { SFX } from '../audio/sfx';
 import { modalOpen } from '../ui/modal';
