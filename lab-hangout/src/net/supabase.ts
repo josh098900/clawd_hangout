@@ -15,6 +15,19 @@ import type { RoomId } from '../world/room';
 import { cleanName, PROVIDERS, parseCook, parseKart, parseTank, parseJunk, parseKScore, parseSnowball, parseFlatMsg, parseLayout, parseDoor, type DoorMode, type FlatDoor, type FlatInfo, type FlatLayout, type FlatMsg, type MyFlat, parsePong, parseWorld, parseChat, parseDraw, parseEmote, parseMove, parsePeer, parseState, parseNote, parseLobby, type LobbyPerson, type DrawMsg, type MoveMsg, type NetEvent, type PeerState, type StateMsg, type Transport, type Account, type ClawResult, type ContestBoard, type HideSeek, type KartMsg, type TankMsg, type PongMsg, type Plot, type Tray, type KScore, type Photo, type MyPhoto, type SnowballMsg, type Ornament, type TreeGift, type Provider, type ServerInfo } from './transport';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Reading what the database sent back (it's ours, but a field can still be missing or null):
+/** A number, 0 if it isn't one. */
+const n0 = (v: unknown): number => Number(v) || 0;
+/** A number, or null. */
+const numOr = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+/** A string, or null. */
+const strOr = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+/** Someone's name as the database sent it, cleaned (SOMEONE if it's blank). */
+const who = (v: unknown): string => cleanName(v) || 'SOMEONE';
+/** The rows of a table read; a failed read becomes a thrown Error. */
+async function rows<T>(q: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const { data, error } = await q; if (error) throw new Error(error.message); return data ?? [];
+}
 
 export class SupabaseTransport implements Transport {
   readonly mode = 'supabase' as const;
@@ -76,6 +89,10 @@ export class SupabaseTransport implements Transport {
     this.selfId = res.data.session.user.id;
     this.acct = { kind: 'guest' };
   }
+  /** Call a database function; its error becomes a thrown Error. */
+  private async rpc(fn: string, args?: Record<string, unknown>): Promise<unknown> { const { data, error } = await this.sb.rpc(fn, args); if (error) throw new Error(error.message); return data; }
+  /** Call a database function that answers with a JSON object. */
+  private async rpcJson(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>> { return ((await this.rpc(fn, args)) ?? {}) as Record<string, unknown>; }
   private back(): string { return location.origin + location.pathname; }
   async loginWith(p: Provider): Promise<void> {
     if (!PROVIDERS.includes(p)) return;
@@ -92,12 +109,10 @@ export class SupabaseTransport implements Transport {
     await new Promise(() => {});
   }
   async logout(): Promise<void> { this.leaveSeat(); await this.sb.auth.signOut(); }
-  async startMerge(): Promise<string> { const { data, error } = await this.sb.rpc('start_merge'); if (error) throw new Error(error.message); return String(data); }
+  async startMerge(): Promise<string> { return String(await this.rpc('start_merge')); }
   async finishMerge(ticket: string): Promise<{ tokens: number; save: unknown }> {
-    const { data, error } = await this.sb.rpc('finish_merge', { ticket });
-    if (error) throw new Error(error.message);
-    const o = (data ?? {}) as { tokens?: unknown; save?: unknown };
-    return { tokens: typeof o.tokens === 'number' ? o.tokens : 0, save: o.save ?? null };
+    const o = await this.rpcJson('finish_merge', { ticket });
+    return { tokens: numOr(o.tokens) ?? 0, save: o.save ?? null };
   }
   async loadSave(): Promise<unknown> {
     const { data, error } = await this.sb.from('saves').select('data').eq('user_id', this.selfId).maybeSingle();
@@ -109,100 +124,92 @@ export class SupabaseTransport implements Transport {
     if (error) throw new Error(error.message);
   }
   async inventory(): Promise<string[]> {
-    const { data, error } = await this.sb.from('inventory').select('item').eq('user_id', this.selfId);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => String(r.item));
+    return (await rows(this.sb.from('inventory').select('item').eq('user_id', this.selfId))).map((r) => String(r.item));
   }
-  async season(): Promise<string | null> { const { data, error } = await this.sb.rpc('current_season'); if (error) throw new Error(error.message); return typeof data === 'string' ? data : null; }
+  async season(): Promise<string | null> { return strOr(await this.rpc('current_season')); }
   async trickOrTreat(door: number): Promise<{ tokens: number; trick: boolean; visited: number; prize: string | null }> {
-    const { data, error } = await this.sb.rpc('trick_or_treat', { door });
-    if (error) throw new Error(error.message);
-    const o = (data ?? {}) as Record<string, unknown>;
-    return { tokens: Number(o.tokens) || 0, trick: o.trick === true, visited: Number(o.visited) || 0, prize: typeof o.prize === 'string' ? o.prize : null };
+    const o = await this.rpcJson('trick_or_treat', { door });
+    return { tokens: n0(o.tokens), trick: o.trick === true, visited: n0(o.visited), prize: strOr(o.prize) };
   }
   // ---- the Rooftop garden (supabase/migrations/0008_gardens.sql) ----
   async plots(): Promise<Plot[]> {
     if (!this.server) return [];
-    const { data, error } = await this.sb.from('plots').select('bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at').eq('server', this.server);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((p) => ({ bed: Number(p.bed), owner: String(p.owner), ownerName: cleanName(p.owner_name) || 'SOMEONE', seed: Number(p.seed), plantedAt: Date.parse(p.planted_at), lastWater: Date.parse(p.last_water), grown: Number(p.grown), calcAt: Date.parse(p.calc_at) }));
+    return (await rows(this.sb.from('plots').select('bed, owner, owner_name, seed, planted_at, last_water, grown, calc_at').eq('server', this.server)))
+      .map((p) => ({ bed: Number(p.bed), owner: String(p.owner), ownerName: who(p.owner_name), seed: Number(p.seed), plantedAt: Date.parse(p.planted_at), lastWater: Date.parse(p.last_water), grown: Number(p.grown), calcAt: Date.parse(p.calc_at) }));
   }
-  private async rpcJson(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>> { const { data, error } = await this.sb.rpc(fn, args); if (error) throw new Error(error.message); return (data ?? {}) as Record<string, unknown>; }
-  async plant(bed: number, seed: number): Promise<number> { const { data, error } = await this.sb.rpc('plant', { bed, seed }); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: Number(o.tokens) || 0, thanked: o.thanked === true }; }
-  async rainWater(): Promise<number> { const { data, error } = await this.sb.rpc('rain_water'); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: Number(o.tokens) || 0, seed: Number(o.seed) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null }; }
-  async digUp(bed: number): Promise<void> { const { error } = await this.sb.rpc('dig_up', { bed }); if (error) throw new Error(error.message); }
+  async plant(bed: number, seed: number): Promise<number> { return n0(await this.rpc('plant', { bed, seed })); }
+  async water(bed: number): Promise<{ tokens: number; thanked: boolean }> { const o = await this.rpcJson('water', { bed }); return { tokens: n0(o.tokens), thanked: o.thanked === true }; }
+  async rainWater(): Promise<number> { return n0(await this.rpc('rain_water')); }
+  async harvest(bed: number): Promise<{ tokens: number; seed: number; bonus: string | null }> { const o = await this.rpcJson('harvest', { bed }); return { tokens: n0(o.tokens), seed: n0(o.seed), bonus: strOr(o.bonus) }; }
+  async digUp(bed: number): Promise<void> { await this.rpc('dig_up', { bed }); }
   // ---- the fishing contest (0010_fishing.sql) ----
   async catchFish(): Promise<{ fish: string; rarity: string; cm: number; contest: boolean; rank: number | null }> {
     const o = await this.rpcJson('catch_fish', {});
-    return { fish: String(o.fish ?? ''), rarity: String(o.rarity ?? 'COMMON'), cm: Number(o.cm) || 0, contest: o.contest === true, rank: typeof o.rank === 'number' ? o.rank : null };
+    return { fish: String(o.fish ?? ''), rarity: String(o.rarity ?? 'COMMON'), cm: n0(o.cm), contest: o.contest === true, rank: numOr(o.rank) };
   }
   async myFlat(): Promise<MyFlat> {
     const o = await this.rpcJson('my_flat', {}), owned: Record<string, number> = {};
     if (o.owned && typeof o.owned === 'object') for (const [k, v] of Object.entries(o.owned as Record<string, unknown>)) if (typeof v === 'number' && v > 0) owned[k] = v;
-    return { name: '', layout: parseLayout(o.layout), door: parseDoor(o.door), party: typeof o.party === 'number' ? o.party : null, owned, tokens: Number(o.tokens) || 0 };
+    return { name: '', layout: parseLayout(o.layout), door: parseDoor(o.door), party: numOr(o.party), owned, tokens: n0(o.tokens) };
   }
-  async getFlat(owner: string): Promise<FlatInfo> { const o = await this.rpcJson('get_flat', { owner }); return { name: cleanName(o.name) || '?', layout: parseLayout(o.layout), door: parseDoor(o.door), party: typeof o.party === 'number' ? o.party : null }; }
+  async getFlat(owner: string): Promise<FlatInfo> { const o = await this.rpcJson('get_flat', { owner }); return { name: cleanName(o.name) || '?', layout: parseLayout(o.layout), door: parseDoor(o.door), party: numOr(o.party) }; }
   async flatDoors(ids: string[]): Promise<FlatDoor[]> {
     if (!ids.length) return [];
-    const { data, error } = await this.sb.rpc('flat_doors', { ids }); if (error) throw new Error(error.message);
-    return (Array.isArray(data) ? data : []).map((d: Record<string, unknown>) => ({ owner: String(d.owner), name: cleanName(d.name) || '?', door: parseDoor(d.door), party: typeof d.party === 'number' ? d.party : null, can: d.can === true }));
+    const data = await this.rpc('flat_doors', { ids });
+    return (Array.isArray(data) ? data : []).map((d: Record<string, unknown>) => ({ owner: String(d.owner), name: cleanName(d.name) || '?', door: parseDoor(d.door), party: numOr(d.party), can: d.can === true }));
   }
-  async buyFurniture(what: string): Promise<{ tokens: number; n: number }> { const o = await this.rpcJson('buy_furniture', { what }); return { tokens: Number(o.tokens) || 0, n: Number(o.n) || 0 }; }
-  async saveFlat(layout: FlatLayout): Promise<void> { const { error } = await this.sb.rpc('save_flat', { layout }); if (error) throw new Error(error.message); }
-  async setDoor(door: DoorMode): Promise<void> { const { error } = await this.sb.rpc('set_door', { door }); if (error) throw new Error(error.message); }
-  async flatParty(on: boolean): Promise<number | null> { const { data, error } = await this.sb.rpc('flat_party', { on_: on }); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
-  async letIn(who: string): Promise<void> { const { error } = await this.sb.rpc('let_in', { who }); if (error) throw new Error(error.message); }
+  async buyFurniture(what: string): Promise<{ tokens: number; n: number }> { const o = await this.rpcJson('buy_furniture', { what }); return { tokens: n0(o.tokens), n: n0(o.n) }; }
+  async saveFlat(layout: FlatLayout): Promise<void> { await this.rpc('save_flat', { layout }); }
+  async setDoor(door: DoorMode): Promise<void> { await this.rpc('set_door', { door }); }
+  async flatParty(on: boolean): Promise<number | null> { return numOr(await this.rpc('flat_party', { on_: on })); }
+  async letIn(id: string): Promise<void> { await this.rpc('let_in', { who: id }); }
   async trays(): Promise<Tray[]> {
     if (!this.server) return [];
-    const { data, error } = await this.sb.from('space_trays').select('tray, owner, owner_name, planted_at').eq('server', this.server);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((p) => ({ tray: Number(p.tray), owner: String(p.owner), ownerName: cleanName(p.owner_name) || 'SOMEONE', plantedAt: Date.parse(p.planted_at) }));
+    return (await rows(this.sb.from('space_trays').select('tray, owner, owner_name, planted_at').eq('server', this.server)))
+      .map((p) => ({ tray: Number(p.tray), owner: String(p.owner), ownerName: who(p.owner_name), plantedAt: Date.parse(p.planted_at) }));
   }
-  async spacePlant(tray: number): Promise<number> { const { data, error } = await this.sb.rpc('space_plant', { tray }); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> { const o = await this.rpcJson('space_harvest', { tray }); return { tokens: Number(o.tokens) || 0, bonus: typeof o.bonus === 'string' ? o.bonus : null, rotten: o.rotten === true }; }
-  async spaceDigUp(tray: number): Promise<void> { const { error } = await this.sb.rpc('space_dig_up', { tray }); if (error) throw new Error(error.message); }
+  async spacePlant(tray: number): Promise<number> { return n0(await this.rpc('space_plant', { tray })); }
+  async spaceHarvest(tray: number): Promise<{ tokens: number; bonus: string | null; rotten: boolean }> { const o = await this.rpcJson('space_harvest', { tray }); return { tokens: n0(o.tokens), bonus: strOr(o.bonus), rotten: o.rotten === true }; }
+  async spaceDigUp(tray: number): Promise<void> { await this.rpc('space_dig_up', { tray }); }
   async spacewalkPay(pts: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('spacewalk_pay', { pts: Math.max(0, Math.round(pts)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
   // ---- winter ----
-  async findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }> { const o = await this.rpcJson('find_present', { n }); return { tokens: Number(o.tokens) || 0, found: Number(o.found) || 0, prize: typeof o.prize === 'string' ? o.prize : null }; }
-  async presentsToday(): Promise<number[]> { const { data, error } = await this.sb.rpc('presents_today'); if (error) throw new Error(error.message); return Array.isArray(data) ? (data as unknown[]).map(Number).filter((n) => n >= 0 && n < 12) : []; }
-  async openAdvent(door: number): Promise<{ tokens: number; prize: string }> { const o = await this.rpcJson('open_advent', { door }); return { tokens: Number(o.tokens) || 0, prize: String(o.prize ?? '') }; }
-  async adventDoors(): Promise<{ opened: number[]; upto: number }> { const o = await this.rpcJson('advent_doors', {}); return { opened: Array.isArray(o.opened) ? (o.opened as unknown[]).map(Number) : [], upto: Number(o.upto) || 0 }; }
+  async findPresent(n: number): Promise<{ tokens: number; found: number; prize: string | null }> { const o = await this.rpcJson('find_present', { n }); return { tokens: n0(o.tokens), found: n0(o.found), prize: strOr(o.prize) }; }
+  async presentsToday(): Promise<number[]> { const data = await this.rpc('presents_today'); return Array.isArray(data) ? (data as unknown[]).map(Number).filter((n) => n >= 0 && n < 12) : []; }
+  async openAdvent(door: number): Promise<{ tokens: number; prize: string }> { const o = await this.rpcJson('open_advent', { door }); return { tokens: n0(o.tokens), prize: String(o.prize ?? '') }; }
+  async adventDoors(): Promise<{ opened: number[]; upto: number }> { const o = await this.rpcJson('advent_doors', {}); return { opened: Array.isArray(o.opened) ? (o.opened as unknown[]).map(Number) : [], upto: n0(o.upto) }; }
   async ornaments(): Promise<Ornament[]> {
     if (!this.server) return [];
-    const { data, error } = await this.sb.from('ornaments').select('id, kind, x, y, owner_name').eq('server', this.server).gte('placed_at', new Date(Date.now() - 45 * 86400000).toISOString()).order('id', { ascending: true }).limit(240);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((o) => ({ id: Number(o.id), kind: Number(o.kind), x: Number(o.x), y: Number(o.y), ownerName: cleanName(o.owner_name) || 'SOMEONE' }));
+    return (await rows(this.sb.from('ornaments').select('id, kind, x, y, owner_name').eq('server', this.server).gte('placed_at', new Date(Date.now() - 45 * 86400000).toISOString()).order('id', { ascending: true }).limit(240)))
+      .map((o) => ({ id: Number(o.id), kind: Number(o.kind), x: Number(o.x), y: Number(o.y), ownerName: who(o.owner_name) }));
   }
-  async hangOrnament(kind: number, x: number, y: number): Promise<number> { const { data, error } = await this.sb.rpc('hang_ornament', { kind, x: Math.round(x), y: Math.round(y) }); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async catchSleigh(pass: number, n: number): Promise<number> { const { data, error } = await this.sb.rpc('catch_sleigh', { pass, n }); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number> { const { data, error } = await this.sb.rpc('send_gift', { recipient: to, tokens, wrap, note }); if (error) throw new Error(error.message); return Number(data) || 0; }
-  async treeGifts(): Promise<TreeGift[]> { const { data, error } = await this.sb.rpc('tree_gifts'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((g) => ({ id: Number(g.id), to: String(g.to ?? ''), toName: cleanName(g.to_name) || 'SOMEONE', wrap: Number(g.wrap) || 0, mine: g.mine === true })); }
-  async openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }> { const o = await this.rpcJson('open_gift', { gift: id }); return { tokens: Number(o.tokens) || 0, got: Number(o.got) || 0, from: cleanName(o.from) || 'SOMEONE', note: Number(o.note) || 0 }; }
+  async hangOrnament(kind: number, x: number, y: number): Promise<number> { return n0(await this.rpc('hang_ornament', { kind, x: Math.round(x), y: Math.round(y) })); }
+  async catchSleigh(pass: number, n: number): Promise<number> { return n0(await this.rpc('catch_sleigh', { pass, n })); }
+  async sendGift(to: string, tokens: number, wrap: number, note: number): Promise<number> { return n0(await this.rpc('send_gift', { recipient: to, tokens, wrap, note })); }
+  async treeGifts(): Promise<TreeGift[]> { return (((await this.rpc('tree_gifts')) ?? []) as Record<string, unknown>[]).map((g) => ({ id: Number(g.id), to: String(g.to ?? ''), toName: who(g.to_name), wrap: n0(g.wrap), mine: g.mine === true })); }
+  async openGift(id: number): Promise<{ tokens: number; got: number; from: string; note: number }> { const o = await this.rpcJson('open_gift', { gift: id }); return { tokens: n0(o.tokens), got: n0(o.got), from: who(o.from), note: n0(o.note) }; }
   // ---- the photo wall ----
-  private photoOf(o: Record<string, unknown>): Photo { return { id: Number(o.id), owner: String(o.owner ?? ''), ownerName: cleanName(o.owner_name) || 'SOMEONE', png: typeof o.png === 'string' && o.png.startsWith('data:image/png;base64,') ? o.png : '', at: Number(o.at) || 0, hearts: Number(o.hearts) || 0, mine: o.mine === true }; }
+  private photoOf(o: Record<string, unknown>): Photo { return { id: Number(o.id), owner: String(o.owner ?? ''), ownerName: who(o.owner_name), png: typeof o.png === 'string' && o.png.startsWith('data:image/png;base64,') ? o.png : '', at: n0(o.at), hearts: n0(o.hearts), mine: o.mine === true }; }
   async isAdmin(): Promise<boolean> { const { data, error } = await this.sb.rpc('is_admin'); if (error) return false; return data === true; }
-  async pinPhoto(png: string): Promise<number> { const { data, error } = await this.sb.rpc('pin_photo', { png }); if (error) throw new Error(error.message); return Number(data) || 0; }
+  async pinPhoto(png: string): Promise<number> { return n0(await this.rpc('pin_photo', { png })); }
   async wallPhotos(n: number, before: number | null): Promise<{ week: number | null; photos: Photo[] }> {
     const o = await this.rpcJson('wall_photos', { n, before }); const ps = Array.isArray(o.photos) ? o.photos as Record<string, unknown>[] : [];
     return { week: o.week == null ? null : Number(o.week), photos: ps.map((p) => this.photoOf(p)).filter((p) => p.png) };
   }
-  async photoById(id: number): Promise<Photo | null> { const { data, error } = await this.sb.rpc('photo_by_id', { photo: id }); if (error) throw new Error(error.message); return data ? this.photoOf(data as Record<string, unknown>) : null; }
-  async heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }> { const o = await this.rpcJson('heart_photo', { photo: id }); return { hearts: Number(o.hearts) || 0, mine: o.mine === true }; }
-  async myPhotos(): Promise<MyPhoto[]> { const { data, error } = await this.sb.rpc('my_photos'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((p) => ({ id: Number(p.id), status: (['pending', 'approved', 'rejected'].includes(String(p.status)) ? p.status : 'pending') as MyPhoto['status'], featured: p.featured === true, at: Number(p.at) || 0 })); }
-  async featurePhoto(id: number): Promise<void> { const { error } = await this.sb.rpc('feature_photo', { photo: id }); if (error) throw new Error(error.message); }
-  async deletePhoto(id: number): Promise<void> { const { error } = await this.sb.rpc('delete_photo', { photo: id }); if (error) throw new Error(error.message); }
-  async flatPhoto(owner: string): Promise<string | null> { const { data, error } = await this.sb.rpc('flat_photo', { owner }); if (error) throw new Error(error.message); return typeof data === 'string' && data.startsWith('data:image/png;base64,') ? data : null; }
-  async pendingPhotos(): Promise<Photo[]> { const { data, error } = await this.sb.rpc('pending_photos'); if (error) throw new Error(error.message); return ((data ?? []) as Record<string, unknown>[]).map((p) => this.photoOf(p)).filter((p) => p.png); }
-  async reviewPhoto(id: number, ok: boolean): Promise<void> { const { error } = await this.sb.rpc('review_photo', { photo: id, ok }); if (error) throw new Error(error.message); }
-  async karaokeTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
-  async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: Number(o.tokens) || 0, paid: Number(o.paid) || 0 }; }
+  async photoById(id: number): Promise<Photo | null> { const data = await this.rpc('photo_by_id', { photo: id }); return data ? this.photoOf(data as Record<string, unknown>) : null; }
+  async heartPhoto(id: number): Promise<{ hearts: number; mine: boolean }> { const o = await this.rpcJson('heart_photo', { photo: id }); return { hearts: n0(o.hearts), mine: o.mine === true }; }
+  async myPhotos(): Promise<MyPhoto[]> { return (((await this.rpc('my_photos')) ?? []) as Record<string, unknown>[]).map((p) => ({ id: Number(p.id), status: (['pending', 'approved', 'rejected'].includes(String(p.status)) ? p.status : 'pending') as MyPhoto['status'], featured: p.featured === true, at: n0(p.at) })); }
+  async featurePhoto(id: number): Promise<void> { await this.rpc('feature_photo', { photo: id }); }
+  async deletePhoto(id: number): Promise<void> { await this.rpc('delete_photo', { photo: id }); }
+  async flatPhoto(owner: string): Promise<string | null> { const data = await this.rpc('flat_photo', { owner }); return typeof data === 'string' && data.startsWith('data:image/png;base64,') ? data : null; }
+  async pendingPhotos(): Promise<Photo[]> { return (((await this.rpc('pending_photos')) ?? []) as Record<string, unknown>[]).map((p) => this.photoOf(p)).filter((p) => p.png); }
+  async reviewPhoto(id: number, ok: boolean): Promise<void> { await this.rpc('review_photo', { photo: id, ok }); }
+  async karaokeTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; }
+  async dinerTip(score: number): Promise<{ tokens: number; paid: number }> { const o = await this.rpcJson('diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; }
   async contestBoard(): Promise<ContestBoard> {
     const o = await this.rpcJson('contest_board', {});
-    const top = Array.isArray(o.top) ? (o.top as Record<string, unknown>[]).map((e) => ({ name: cleanName(e.name) || 'SOMEONE', fish: String(e.fish ?? '').slice(0, 16), cm: Number(e.cm) || 0 })) : [];
+    const top = Array.isArray(o.top) ? (o.top as Record<string, unknown>[]).map((e) => ({ name: who(e.name), fish: String(e.fish ?? '').slice(0, 16), cm: n0(e.cm) })) : [];
     const l = o.last as Record<string, unknown> | null;
-    return { live: o.live === true, top, won: o.won === true, last: l ? { name: cleanName(l.name) || 'SOMEONE', fish: String(l.fish ?? '').slice(0, 16), cm: Number(l.cm) || 0, prize: Number(l.prize) || 0, anglers: Number(l.anglers) || 0, at: Number(l.at) || 0 } : null };
+    return { live: o.live === true, top, won: o.won === true, last: l ? { name: who(l.name), fish: String(l.fish ?? '').slice(0, 16), cm: n0(l.cm), prize: n0(l.prize), anglers: n0(l.anglers), at: n0(l.at) } : null };
   }
   // ---- daily quests and badges (0009_quests.sql) ----
   async todaysQuests(): Promise<{ day: string; quests: string[]; done: string[] }> {
@@ -210,31 +217,25 @@ export class SupabaseTransport implements Transport {
     const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
     return { day: String(o.day ?? ''), quests: arr(o.quests), done: arr(o.done) };
   }
-  async completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }> { const o = await this.rpcJson('complete_quest', { q }); return { tokens: Number(o.tokens) || 0, bonus: o.bonus === true }; }
-  async claimBadge(b: string): Promise<boolean> { const { data, error } = await this.sb.rpc('claim_badge', { b }); if (error) throw new Error(error.message); return data === true; }
+  async completeQuest(q: string): Promise<{ tokens: number; bonus: boolean }> { const o = await this.rpcJson('complete_quest', { q }); return { tokens: n0(o.tokens), bonus: o.bonus === true }; }
+  async claimBadge(b: string): Promise<boolean> { return (await this.rpc('claim_badge', { b })) === true; }
   async badgesOf(id: string): Promise<string[]> {
     if (!UUID.test(id)) return [];
-    const { data, error } = await this.sb.from('badges').select('badge').eq('user_id', id);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => String(r.badge));
+    return (await rows(this.sb.from('badges').select('badge').eq('user_id', id))).map((r) => String(r.badge));
   }
   async playClaw(): Promise<ClawResult> {
-    const { data, error } = await this.sb.rpc('play_claw');
-    if (error) throw new Error(error.message);
-    const o = (data ?? {}) as { item?: unknown; dupe?: unknown; tokens?: unknown };
-    return { item: String(o.item ?? ''), dupe: o.dupe === true, tokens: typeof o.tokens === 'number' ? o.tokens : 0 };
+    const o = await this.rpcJson('play_claw', {});
+    return { item: String(o.item ?? ''), dupe: o.dupe === true, tokens: numOr(o.tokens) ?? 0 };
   }
 
   // ---- servers ----
   async servers(friendIds: string[]): Promise<ServerInfo[]> {
-    const { data, error } = await this.sb.rpc('list_servers', { friends: friendIds.filter((id) => UUID.test(id)).slice(0, 50) });
-    if (error) throw new Error(error.message);
+    const data = await this.rpc('list_servers', { friends: friendIds.filter((id) => UUID.test(id)).slice(0, 50) });
     return ((data ?? []) as { id: string; name: string; players: number; cap: number; here: string[] | null }[])
       .map((v) => ({ id: String(v.id), name: String(v.name).slice(0, 16), players: Number(v.players) || 0, cap: Number(v.cap) || 0, friends: v.here ?? [] }));
   }
   async claimSeat(id: string): Promise<void> {
-    const { error } = await this.sb.rpc('claim_seat', { server: id });
-    if (error) throw new Error(error.message);
+    await this.rpc('claim_seat', { server: id });
     if (this.server !== id && this.lobbyCh) { const ch = this.lobbyCh; this.lobbyCh = null; void this.sb.removeChannel(ch); }
     this.server = id;
     clearInterval(this.pingTimer);
@@ -386,27 +387,14 @@ export class SupabaseTransport implements Transport {
   /** Chat goes through the database: it filters, rate-limits, logs and then broadcasts it with our real id. */
   async sendChat(text: string): Promise<string | null> {
     if (!this.room) return null;
-    const { data, error } = await this.sb.rpc('send_chat', { room: this.room, body: text });
-    if (error) throw new Error(error.message);
-    return (data as string | null) ?? null;
+    return ((await this.rpc('send_chat', { room: this.room, body: text })) as string | null) ?? null;
   }
-  async needsInvite(): Promise<boolean> {
-    const { data, error } = await this.sb.rpc('is_member');
-    if (error) throw new Error(error.message);
-    return data !== true;
-  }
-  async joinWorld(code: string): Promise<boolean> {
-    const { data, error } = await this.sb.rpc('join_world', { code });
-    if (error) throw new Error(error.message);
-    return data === true;
-  }
-  async report(id: string, reason: string): Promise<void> {
-    const { error } = await this.sb.rpc('report_player', { who: id, reason });
-    if (error) throw new Error(error.message);
-  }
-  async tokens(): Promise<number> { const { data, error } = await this.sb.rpc('my_tokens'); if (error) throw new Error(error.message); return typeof data === 'number' ? data : 0; }
-  async claimCoin(i: number): Promise<number | null> { const { data, error } = await this.sb.rpc('claim_coin', { coin: i }); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
-  async claimDaily(): Promise<number | null> { const { data, error } = await this.sb.rpc('claim_daily'); if (error) throw new Error(error.message); return typeof data === 'number' ? data : null; }
+  async needsInvite(): Promise<boolean> { return (await this.rpc('is_member')) !== true; }
+  async joinWorld(code: string): Promise<boolean> { return (await this.rpc('join_world', { code })) === true; }
+  async report(id: string, reason: string): Promise<void> { await this.rpc('report_player', { who: id, reason }); }
+  async tokens(): Promise<number> { return numOr(await this.rpc('my_tokens')) ?? 0; }
+  async claimCoin(i: number): Promise<number | null> { return numOr(await this.rpc('claim_coin', { coin: i })); }
+  async claimDaily(): Promise<number | null> { return numOr(await this.rpc('claim_daily')); }
   sendEmote(kind: EmoteKind): void { void this.ch?.send({ type: 'broadcast', event: 'emote', payload: { id: this.selfId, kind } }); }
   sendState(s: StateMsg): void { void this.ch?.send({ type: 'broadcast', event: 'state', payload: { id: this.selfId, ...s } }); }
   sendNote(i: number, n: number): void { void this.ch?.send({ type: 'broadcast', event: 'note', payload: { id: this.selfId, i, n } }); }
