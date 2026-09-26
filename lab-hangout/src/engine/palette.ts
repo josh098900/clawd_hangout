@@ -101,6 +101,22 @@ export const MN = table({
   BUGGY: '#F2F0EA', BUGGY_SH: '#C0BCB2', TYRE: '#3A3A46', TYRE_HI: '#5A5A6A',
 });
 
+/** THE SCIENCE WING (world/wing.ts) and THE REACTOR (world/reactor.ts): clean white panels and the Lab's teal, hazard
+ * yellow, the control room's dark teal consoles, the pool's Cherenkov blue (and the meltdown's acid green), pipes, the turbine. */
+export const RX = table({
+  WALL: '#E6EBEA', WALL2: '#DCE3E2', WALL_HI: '#F6F8F8', SEAM: '#C4CDCC', SCREW: '#A8B4B3', BAND: '#2F7A82', BAND_HI: '#4E9AA2', SKIRT: '#33454B',
+  CEIL: '#27333A', CEIL2: '#1F2A30', TUBE: '#F4FBFF', TUBE_OFF: '#5C6C73', VENT: '#4A5B63',
+  TILE: '#BCC5C8', TILE2: '#B2BBBF', GROUT: '#9CA7AB', LINE: '#F2C230', LINE_DK: '#C9981A',
+  LOCKER: '#6F8A9A', LOCKER_HI: '#8FA8B6', LOCKER_DK: '#526A78', STEEL: '#9AA8AF', STEEL_HI: '#C8D2D7', STEEL_DK: '#6C7A82', STEEL_DK2: '#4B5860',
+  CTRL: '#1C3338', CTRL2: '#22404A', CTRL_HI: '#2E5660', CONSOLE: '#3A4D55', CONSOLE_HI: '#557079', CONSOLE_DK: '#26363C', RUBBER: '#2A3034', RUBBER2: '#30373C',
+  SCREEN: '#07161A', SCREEN_LN: '#0E2A30', LED_G: '#7CF29C', LED_A: '#FFB040', LED_R: '#FF5A5A',
+  POOL0: '#06205A', POOL1: '#0F4AA8', POOL2: '#3FA8FF', POOL_HI: '#A8E4FF', CORE: '#1A2A44', CORE_HI: '#5FE7FF',
+  MELT0: '#0F3A14', MELT1: '#2E9A2A', MELT2: '#7CFF6A', GOO: '#6AE85A', GOO_HI: '#C8FFB0', GOO_DK: '#2F9A2A',
+  PIPE: '#C8C2B0', PIPE_HI: '#E4DFD0', PIPE_DK: '#948E7E', PIPE_BAND: '#8A6A3A', GRATE: '#4A5058', GRATE_HI: '#6A727C',
+  TURB: '#3F8A5E', TURB_HI: '#5FB07E', TURB_DK: '#2A5E40', GLASS: '#8FD8D0', GLASS_HI: '#DFFBF6',
+  CRANE: '#F2C230', CRANE_DK: '#B8902A', HAZ: '#F2C230', HAZ_DK: '#202226', RED_BTN: '#E6414F', RED_HI: '#FF8A94',
+});
+
 /** The city map (world/map.ts, ui/map.ts): the ground, the park, the sea and the sand, the roads, by night and by day. */
 export const MP = table({
   GROUND: '#1A2238', GROUND2: '#1F2843', GROUND_D: '#6F8A6A', GROUND2_D: '#7C976F',

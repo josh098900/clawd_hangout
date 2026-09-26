@@ -17,14 +17,14 @@ export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
 export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT'] as const;
 export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE'] as const;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER'] as const;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
  * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS', 'fit:10': 'GRID 80%+ IN A REACTOR SHIFT' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
 export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
@@ -195,6 +195,16 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     } else if (look.fit === 3) { // bow tie
       const bc: RGB = [123, 97, 255];
       R(-4, -13, 3, 3, bc); R(2, -13, 3, 3, bc); R(-1, -12, 3, 2, shade(bc, 0.75)); R(-4, -13, 1, 1, M(bc, [255, 255, 255], 0.4));
+    } else if (look.fit === 10) { // HAZMAT SUIT: yellow all over, the hood up round a clear visor, a zip, a trefoil badge, black boots
+      for (let y = TOP; y <= -4; y++) { const hw = hwAt(y) + (y > -14 ? 1 : 0); R(-hw, y, hw * 2, 1, y === -4 ? HZ_DK : HZ); R(-hw, y, 1, 1, HZ_HI); R(hw - 1, y, 1, 1, HZ_DK); }
+      for (let y = TOP + 1; y < -14; y += 4) R(-hwAt(y) + 1, y, 2, 1, HZ_DK); // creases in the hood
+      R(-10, -25, 20, 11, M(body, [190, 236, 255], 0.5)); R(-10, -25, 20, 1, [255, 255, 255]); R(-9, -24, 3, 1, [255, 255, 255]);
+      R(-11, -26, 22, 1, HZ_DK); R(-11, -14, 22, 1, HZ_DK); R(-11, -26, 1, 13, HZ_DK); R(10, -26, 1, 13, HZ_DK);
+      R(0, -13, 1, 9, HZ_DK); R(4, -11, 5, 5, [40, 40, 44]); R(5, -10, 3, 3, HZ); R(6, -9, 1, 1, [40, 40, 44]);
+      for (const [fx, k] of [[-6, 1], [5, 2]] as [number, number][]) { const up = P.lift === k ? 2 : 0; R(fx - 3, -3 - up, 7, 3, BOOT); R(fx - 2, -4 - up, 5, 1, BOOT); R(fx - 2, -3 - up, 3, 1, [70, 70, 80]); }
+    } else if (look.fit === 11) { // HI-VIS VEST: orange, open down the front, two reflective stripes
+      for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, y === -4 ? VIS_DK : VIS); R(hw - 1, y, 1, 1, VIS_DK); R(-2, y, 4, 1, y < -11 ? body : belly); }
+      for (const y of [-10, -7]) { R(-hwAt(y) - 1, y, hwAt(y) - 1, 1, STRIPE); R(3, y, hwAt(y) - 2, 1, STRIPE); }
     }
     // face
     const ey = -20, ex = [-7 + d, 3 + d];
@@ -252,7 +262,9 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 /** Hats that hide the critter's antenna. */
 const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
-const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]] };
+/** The HAZMAT SUIT's yellows, its boots, the HI-VIS VEST's orange and its reflective stripes. */
+const HZ: RGB = [242, 194, 48], HZ_DK: RGB = [196, 146, 28], HZ_HI: RGB = [255, 226, 120], BOOT: RGB = [34, 34, 40], VIS: RGB = [255, 122, 34], VIS_DK: RGB = [210, 90, 20], STRIPE: RGB = [226, 230, 236];
+const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]], 10: [HZ, HZ_DK] };
 /** The ROCK STAR jacket's gold sequins and the twinkles on them (they catch the light as you move). */
 const SEQ: RGB = [236, 190, 60], SEQ_DK: RGB = [184, 136, 30], SEQ_HI: RGB = [255, 236, 150];
 function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void, x0: number, x1: number, y0: number, y1: number, P: Pose): void {
@@ -446,6 +458,13 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
     } else if (look.fit === 3) { // bow tie
       const bc: RGB = [123, 97, 255];
       R(-4, -16, 3, 3, bc); R(2, -16, 3, 3, bc); R(-1, -15, 3, 2, shade(bc, 0.75)); R(-4, -16, 1, 1, M(bc, [255, 255, 255], 0.4));
+    } else if (look.fit === 10) { // HAZMAT SUIT: the whole block in yellow, a visor over the eyes, a zip and a badge, boots on every leg
+      R(-13, -25, 26, 20, HZ); R(-13, -25, 26, 1, HZ_HI); R(-13, -24, 1, 18, HZ_HI); R(11, -24, 2, 18, HZ_DK); R(-12, -6, 24, 1, HZ_DK);
+      R(-11, -24, 22, 8, M(body, [190, 236, 255], 0.5)); R(-11, -24, 22, 1, [255, 255, 255]); R(-12, -25, 24, 1, HZ_DK); R(-12, -16, 24, 1, HZ_DK); R(-12, -25, 1, 10, HZ_DK); R(11, -25, 1, 10, HZ_DK);
+      R(0, -15, 1, 9, HZ_DK); R(4, -13, 5, 5, [40, 40, 44]); R(5, -12, 3, 3, HZ); R(6, -11, 1, 1, [40, 40, 44]);
+      [-12, -6, 3, 9].forEach((lx, i) => { const up = P.lift === (i % 2 ? 2 : 1) ? 2 : 0; R(lx, -3 - up, 3, 3, BOOT); });
+    } else if (look.fit === 11) { // HI-VIS VEST
+      R(-13, -15, 26, 11, VIS); R(-13, -5, 26, 1, VIS_DK); R(12, -15, 1, 11, VIS_DK); R(-2, -15, 4, 10, body); for (const y of [-12, -8]) { R(-13, y, 10, 1, STRIPE); R(3, y, 10, 1, STRIPE); }
     }
     const sleeve = SLEEVES[look.fit] ?? null;
     const arm2 = (side: -1 | 1, raised: boolean, sway: number) => {

@@ -80,7 +80,11 @@ export const ENV = {
   zeroG: false, free: false, g: 0, /** winter: is (x, y) on ice (the Park's frozen pond)? then walking is skating */ ice: null as ((x: number, y: number) => boolean) | null,
   /** moon gravity (walking bounds, jumps are big and slow), no air (helmets on), and how high the buggy bounces at (x, y) */
   lowG: false, airless: false, bump: null as ((x: number, y: number) => number) | null,
+  /** THE REACTOR: past this x (the glass wall) everyone's in a hazmat suit; and how green everyone glows after a meltdown (0..1) */
+  suitX: null as number | null, glow: 0,
 };
+/** The HAZMAT SUIT's place in FITS (earned), and what the reactor hall dresses everyone in. */
+export const FIT_HAZMAT = 10;
 const MUG_COLS: RGB[] = [[232, 106, 146], [90, 209, 255], [242, 194, 48], [34, 197, 160], [123, 97, 255], [247, 247, 243]];
 
 interface Snap { t: number; x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
@@ -498,7 +502,8 @@ function drawSheet(x: number, y: number, a: number, seed: number): void {
 export function drawAvatar(av: Avatar, a: number, now: number, dim: number, using: Using = null, lift = 0, brolly = false): { headX: number; headY: number } {
   if (av.look.pet && !ENV.free && (!ENV.airless || av.look.pet === PET_ROVER)) drawPet(av, a, now, av.look.pet); // (pets wait inside during a spacewalk, and on the Moon: except the robot)
   const { P, hopY } = poseFor(av, a, now, using);
-  const look = (ENV.free || ENV.airless) && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside
+  const suited = ENV.suitX !== null && av.x > ENV.suitX;
+  const look = suited ? { ...av.look, fit: FIT_HAZMAT, hat: 0 } : (ENV.free || ENV.airless) && av.look.hat !== 14 ? { ...av.look, hat: 14 } : av.look; // helmets on outside; suits on past the reactor's glass
   // contact shadow shrinks while airborne (none when seated: the seat is the ground; none out in space)
   const sk = Math.max(0.4, 1 - hopY / 30);
   if (!lift && !ENV.free) alpha(0.3 * sk * (av.pose === POSE_FLOOR ? 1.3 : 1), () => oval(Math.round(av.x), Math.round(av.y), Math.round(11 * sk), 2, [10, 10, 24]));
@@ -509,6 +514,10 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
   if (boat) drawBoat(av.x, av.y, a, true, av.moving, av.seed);
   if (buggy) drawBuggy(av.x, av.y, a, av.dir, true, av.moving, hopY);
   if (av.pose === POSE_GHOST) drawSheet(av.x, av.y - lift - hopY, a, av.seed);
+  if (ENV.glow > 0) { // after a meltdown: glowing green, a few motes fizzing off
+    const gy = av.y - lift - hopY - 16; Gd(av.x, gy, 18, [120, 255, 110], 0.4 * ENV.glow); Gd(av.x, gy, 9, [200, 255, 170], 0.3 * ENV.glow);
+    lit(() => { for (let k = 0; k < 3; k++) { const u = ((a * 0.8) + k / 3 + av.seed) % 1; alpha(ENV.glow * (1 - u), () => r(Math.round(av.x - 10 + ((k * 9 + av.seed * 20) % 20)), Math.round(gy + 10 - u * 28), 1, 1, [170, 255, 140])); } });
+  }
   if (av.hold) {
     let [lx, ly] = c.hand;
     const em = av.emote;

@@ -203,7 +203,8 @@ lander bay); the city by day and night with the train, rocket and lander on thei
 everyone's dot, friends' name tags, YOU; a card per place with a live look inside; Earth is free, space keeps its rides
 (the escape pod is a way home); ? stickers + the EXPLORER badge; WHO'S ONLINE's GO follows the same rules.
 
-## 17. The Science Wing  ← next
+## 17. The Science Wing  ← push 1 (the corridor + THE REACTOR) built, waiting for Josh's check; push 2 = the chem lab
+Brief: docs/briefs/17-science-wing.md (with an "as built" section). Migration `0021_reactor.sql`.
 Off the Lab. The centrepiece is the **reactor control room**: stations for the rods, the coolant
 pumps, the turbine and the gauge wall, one player each; the reactor drifts, alarms go off, and you
 keep it in the green together. A **meltdown** is cartoon, not scary: the room goes green and

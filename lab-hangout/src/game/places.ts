@@ -4,7 +4,7 @@
 import type { RoomId } from '../world/room';
 
 /** Every place the EXPLORER badge wants you to have been: the map shows a ? sticker on the ones you haven't. */
-export const EXPLORE: RoomId[] = ['lab', 'den', 'roof', 'plaza', 'arcade', 'cinema', 'stage', 'subway', 'crypt', 'lofts', 'pier', 'park', 'diner', 'karts', 'station', 'spacewalk', 'moon', 'moonbase'];
+export const EXPLORE: RoomId[] = ['lab', 'den', 'roof', 'plaza', 'arcade', 'cinema', 'stage', 'subway', 'crypt', 'lofts', 'pier', 'park', 'diner', 'karts', 'station', 'spacewalk', 'moon', 'moonbase', 'wing', 'reactor'];
 
 /**
  * Which place on the map a room is (the room itself for most). A flat is at THE LOFTS; the rides (the train, the

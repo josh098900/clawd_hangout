@@ -42,7 +42,7 @@ export type Route = { ok: true; to: RoomId; at: At | null; note: string; ride: b
 /** Which room's door leads into each place: you arrive where walking through it would put you. */
 const VIA: Partial<Record<RoomId, RoomId>> = {
   lab: 'plaza', den: 'lab', roof: 'den', plaza: 'lab', arcade: 'plaza', cinema: 'plaza', stage: 'plaza', subway: 'plaza', crypt: 'plaza', lofts: 'plaza', pier: 'plaza',
-  park: 'parkstn', parkstn: 'park', diner: 'dinerstn', dinerstn: 'diner', karts: 'kartstn', kartstn: 'karts', station: 'spacewalk', moon: 'moonbase', moonbase: 'moon',
+  park: 'parkstn', parkstn: 'park', diner: 'dinerstn', dinerstn: 'diner', karts: 'kartstn', kartstn: 'karts', station: 'spacewalk', moon: 'moonbase', moonbase: 'moon', wing: 'lab', reactor: 'wing',
 };
 function frontDoor(id: RoomId): At | null {
   const from = VIA[id], d = from ? game.rooms[from].doors.find((x) => x.to === id) : undefined;
@@ -158,7 +158,7 @@ const seenCol = new Map<string, RGB>();
 const CREAM: RGB = [232, 216, 192];
 const previews = new Map<string, HTMLCanvasElement>();
 /** Where each place's little look inside is centred (x), when the middle of the room isn't its best side. */
-const LOOK_X: Partial<Record<RoomId, number>> = { plaza: 560, roof: 1500, station: 900, lofts: 495, pier: 700, park: 700, karts: 600, moon: 700, diner: 500, subway: 600, parkstn: 600, dinerstn: 600, kartstn: 600 };
+const LOOK_X: Partial<Record<RoomId, number>> = { plaza: 560, roof: 1500, station: 900, lofts: 495, pier: 700, park: 700, karts: 600, moon: 700, diner: 500, reactor: 1000, subway: 600, parkstn: 600, dinerstn: 600, kartstn: 600 };
 /** ...and how much higher than usual, where a room's best bits are up on the wall (a platform's name board, the Lofts' directory). */
 const LOOK_UP: Partial<Record<RoomId, number>> = { subway: 44, parkstn: 44, dinerstn: 44, kartstn: 44, lofts: 44 };
 /** A little look inside a place, as it is right now: its wall and floor edge (the detailed part) with everything

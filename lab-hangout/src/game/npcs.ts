@@ -217,6 +217,20 @@ const DEFS: NpcDef[] = [
     chat: ['welcome to the MOON BASE! i am LUNA, i grow things', 'mine a glowing rock outside, then bring it to the ASSAY machine', 'one in six rocks is a MOON CRYSTAL. five crystals and you get a robot friend', 'the buggy garage is past the big dome. try the course!', 'SPACE for a moon jump. boing, but slowly', 'the lander goes home every 10 minutes. do not get stranded. well, you can always wait'],
   },
   {
+    // THE REACTOR's chief engineer: paces the control room, taps gauges, sips coffee, stares proudly at the pool
+    id: 'npc-rod', name: 'CHIEF ROD', room: 'reactor', speed: 34,
+    look: { c: 8, hat: 1, face: 0, fit: 11, sp: 0 },
+    stops: [
+      { x: 300, y: 522, wait: 14, say: ['rods look good', 'tap tap. that needle sticks sometimes'] },
+      { x: 450, y: 534, wait: 10, say: ['coolant: fine. probably', 'three pumps. three wishes'] },
+      { x: 626, y: 546, wait: 16, say: ['look at that glow. beautiful', 'Cherenkov blue. never gets old'] },
+      { x: 176, y: 520, wait: 8, holdAfter: 1, say: ['coffee. for science', 'the mug says WORLD\'S OKAYEST ENGINEER'] },
+      { x: 572, y: 522, wait: 12, say: ['so many binders', 'volume seven is my favourite'] },
+      { x: 380, y: 566, wait: 10, holdAfter: 0, say: ['the big board never lies', 'the city wants more at night'] },
+    ],
+    chat: ['rods out, more power. and more heat. mostly heat', 'the city wants more at night. everyone\'s streaming cat videos', 'big red button\'s the SCRAM. only when it\'s really, really bad', 'if the pool turns green, that\'s... fine. probably fine', 'there was a pigeon in the vent last week. i named him Gerald', 'suits on past the glass. house rules', 'clock in on the clipboard by the door. 4 minutes a shift', 'at a station: 1 turns it down, 2 turns it up'],
+  },
+  {
     id: 'npc-sage', name: 'SAGE', room: 'den', speed: 38, cycle: 1800, // one pomodoro: code for the focus, break for the break
     look: { c: 1, hat: 3, face: 1, fit: 0, sp: 0 },
     stops: [

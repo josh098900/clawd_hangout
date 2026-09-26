@@ -8,6 +8,7 @@ import type { Room, Prop, Spot } from './room';
 import { FILMS, currentFilm } from './cinema';
 import { CASTLE, COASTER, DRAGON, dragonState, placeCreation, VS } from './voxels';
 import { boardGlow } from './boards';
+import { gridOn, meltAgo } from './grid';
 
 const W = 1400, H = 780, GROUND = 560;
 /** THE LOFTS, the apartment block at the right end (its door leads to the lobby, world/lofts.ts). */
@@ -28,8 +29,10 @@ const SUB = { x: 760, y: 682 };
  * 0 = night (the film's look), 1 = full day. Night and day each hold for ~8 min, with
  * ~1.6 min of dawn and dusk between.
  */
-export function dayness(): number {
-  const p = (Date.now() / 1000 / 1200) % 1, ss = (u: number) => { const x = clamp(u, 0, 1); return x * x * (3 - 2 * x); };
+export function dayness(): number { return daynessAt(Date.now()); } // (a declaration, so it's there even mid-import)
+/** dayness() at wall time `ms` (the reactor's city demand follows it). */
+export function daynessAt(ms: number): number {
+  const p = (ms / 1000 / 1200) % 1, ss = (u: number) => { const x = clamp(u, 0, 1); return x * x * (3 - 2 * x); };
   if (p < 0.42) return 0;
   if (p < 0.5) return ss((p - 0.42) / 0.08);
   if (p < 0.92) return 1;
@@ -181,6 +184,10 @@ function drawBack(a: number): void {
   // tower beacon + warm window
   lit(() => { r(592, 0, 2, 2, a % 1.2 < 0.5 ? [255, 70, 80] : [90, 20, 30]); for (let y = 85; y < 103; y++) r(579, y, 22, 1, M([255, 214, 140], [255, 160, 90], (y - 85) / 18)); });
   G(574, 80, 32, 28, [255, 200, 120], 0.28);
+  // POWERED BY THE LAB REACTOR: a little sign on the Lab's wall, lit (with a bolt) while a reactor shift is running
+  { const on = gridOn(), x = 96, y = 492; r(x, y, 42, 22, [24, 26, 34]); r(x + 1, y + 1, 40, 20, on ? [30, 40, 60] : [34, 36, 44]);
+    lit(() => { const c: RGB = on ? [124, 242, 208] : [60, 70, 76]; txt('POWERED', x + 4, y + 3, c); txt('BY LAB', x + 4, y + 9, c); txt('REACTOR', x + 4, y + 15, on ? K.GOLD : [70, 70, 60]); if (on && (a % 1.2) < 0.9) { r(x + 34, y + 3, 3, 4, K.GOLD); r(x + 33, y + 7, 3, 1, K.GOLD); r(x + 32, y + 8, 3, 4, K.GOLD); } });
+    if (on) G(x, y, 42, 22, [124, 242, 208], 0.22); }
   // LAB neon over the door (it flickers, like the original sign)
   const fl = (a * 7) % 1 < 0.06 || ((a * 0.37) % 1 < 0.03);
   lit(() => { txt('THE LAB', 62 - tw('THE LAB', 2) / 2, 458, fl ? [120, 70, 50] : [255, 158, 100], 2); });
@@ -311,6 +318,11 @@ const kiosk: Prop = {
   },
 };
 
+/** A meltdown at the reactor: the Square's lamps and signs flicker for a few seconds (1 = normal, 0 = out). */
+export function brownout(a: number): number { const s = meltAgo(); if (s < 0 || s > 4) return 1; return (a * 13) % 1 < 0.45 ? 0.15 : (a * 5) % 1 < 0.3 ? 0.5 : 1; }
+/** Over everything during a brownout: the whole Square dims and blinks. */
+function drawFront(a: number): void { const k = brownout(a); if (k < 1) alpha((1 - k) * 0.45, () => r(0, 0, W, H, [6, 9, 20])); }
+
 export function makePlaza(): Room {
   const room: Room = {
     id: 'plaza', title: 'THE SQUARE', sub: 'OUTSIDE',
@@ -344,7 +356,8 @@ export function makePlaza(): Room {
     build: () => build.call(room),
     dimNow: () => 0.1 * (1 - dayness()),
     altAlpha: dayness,
-    glowMul: () => 1 - 0.75 * dayness(),
+    glowMul: () => (1 - 0.75 * dayness()) * brownout(performance.now() / 1000),
+    drawFront,
     drawBack,
     props: [lampPost(161, 574), lampPost(521, 574), lampPost(701, 574), lampPost(1061, 574), bench(422, 642), bench(902, 654), bin(610, 604), tagSign, hideSign, kiosk],
   };

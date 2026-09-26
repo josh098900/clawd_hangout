@@ -44,6 +44,7 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   moonwalk: { text: 'Take the lander down to the Moon', goal: 1 },
   moonrock: { text: 'Assay 3 moon rocks at the Moon Base', goal: 3 },
   buggy: { text: 'Drive a full lap in a moon buggy', goal: 1 },
+  reactor: { text: 'Run a shift at the reactor (the Science Wing)', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -69,6 +70,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'astronaut', name: 'ASTRONAUT', hint: 'Fly to the Space Station 5 times', earned: () => stat('flights') >= 5 },
   { id: 'moonwalker', name: 'MOONWALKER', hint: 'Assay 20 moon rocks', earned: () => stat('moonrocks') >= 20 },
   { id: 'explorer', name: 'EXPLORER', hint: 'Visit every place on the map', earned: () => EXPLORE.every((p) => save.data.places.includes(p)) },
+  { id: 'engineer', name: 'CHIEF ENGINEER', hint: 'Keep the city 90% powered in a reactor shift', earned: () => stat('reactorBest') >= 90 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

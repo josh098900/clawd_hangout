@@ -256,6 +256,21 @@ export const MOON_TRACK: Track = {
   bass: 'A2 . . . E2 . . . C2 . . . G2 . . . F2 . . . C2 . . . E2 . . . A2 . . .',
   drums: 'k . . . . . h . s . . . . . h . k . . . . . h . s . . . h . . .',
 };
+/** THE REACTOR's music: a slow pulsing synth that picks up the pace as the core heats up (calm, warm, critical). */
+export const CRITICAL_MASS: Track[] = [
+  { name: 'CRITICAL MASS', bpm: 84, wave: 'triangle', leadVol: 0.03,
+    lead: 'E4 . . . G4 . . . B4 . A4 . G4 . . . E4 . . . D4 . . . E4 - - - . . . .',
+    bass: 'E2 . E2 . E2 . E2 . C2 . C2 . C2 . C2 . D2 . D2 . D2 . D2 . E2 . E2 . B1 . B1 .',
+    drums: 'k . . . h . . . k . . . h . . . k . . . h . . . k . k . h . . .' },
+  { name: 'CRITICAL MASS (WARM)', bpm: 104, wave: 'triangle', leadVol: 0.035,
+    lead: 'E4 . G4 . B4 . A4 . G4 . E4 . D4 . E4 . G4 . B4 . D5 . B4 . A4 . G4 . E4 - . .',
+    bass: 'E2 E2 . E2 E2 . E2 . C2 C2 . C2 C2 . C2 . D2 D2 . D2 D2 . D2 . B1 B1 . B1 B1 . B1 .',
+    drums: 'k . h . s . h . k . h . s . h h k . h . s . h . k k h . s . h h' },
+  { name: 'CRITICAL MASS (CRITICAL)', bpm: 138, wave: 'square', leadVol: 0.03,
+    lead: 'E5 . E5 . D#5 . E5 . B4 . B4 . A4 . B4 . E5 . E5 . F5 . E5 . D#5 - B4 - E5 . . .',
+    bass: 'E2 E2 E2 E2 E2 E2 E2 E2 F2 F2 F2 F2 F2 F2 F2 F2 E2 E2 E2 E2 E2 E2 E2 E2 B1 B1 B1 B1 C2 C2 D#2 D#2',
+    drums: 'k h s h k h s h k h s h k k s h k h s h k h s h k k s s k k s s' },
+];
 /** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
 class NoiseLoop {
   private g: GainNode | null = null;

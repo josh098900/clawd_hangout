@@ -71,6 +71,7 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Dance / sit on the floor (until you move) | 6 / 7 | DANCE / SIT buttons |
 | Emote wheel (8 more emotes) | R, then 1-8 | MORE button |
 | Play an instrument at the Stage | 1-8 while at it | pads |
+| Work a reactor station (Science Wing) | E at RODS / COOLANT / TURBINE, then 1 down · 2 up; E twice at SCRAM (the cover, then the button) | ▼ ▲ buttons |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
@@ -130,6 +131,8 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
     the 5th crystal brings the MOON ROVER pet), the Moon quests and the MOONWALKER badge
 20. `supabase/migrations/0020_map.sql`: THE CITY MAP's EXPLORER badge (visit every place on the map). The map
     itself needs nothing from the server
+21. `supabase/migrations/0021_reactor.sql`: THE REACTOR's pay for a shift (capped), the reactor quest and the
+    CHIEF ENGINEER badge
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

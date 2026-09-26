@@ -11,6 +11,7 @@ import { ROOM_IDS, type RoomId } from '../world/room';
 import { scrub } from './filter';
 import { COOKS_MAX, type DinerState } from '../game/diner';
 import { SONGS, type KaraokeState } from '../game/karaoke';
+import { CREW_MAX, SHIFT_S as REACTOR_S, faults as reactorFaults, type ReactorState } from '../game/reactor';
 
 export interface PeerState { id: string; name: string; look: Look; x: number; y: number; dir: 1 | -1; moving: boolean }
 /**
@@ -56,7 +57,8 @@ export type StateVal =
   | { k: 'scope'; v: ScopeState } | { k: 'trays'; v: { n: number } }
   | { k: 'karaoke'; v: KaraokeState }
   | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } }
-  | { k: 'moonbest'; v: { name: string; ms: number } };
+  | { k: 'moonbest'; v: { name: string; ms: number } }
+  | { k: 'reactor'; v: ReactorState } | { k: 'reactbest'; v: { name: string; score: number } };
 /**
  * Mission Control's telescope (the Space Station's big screen shows it): where it's pointed on the
  * sky panorama (world/sky.ts), who's at it, and the last thing someone spotted + when (epoch s).
@@ -86,7 +88,13 @@ export type MsgEvent = { [K in MsgType]: { type: K } & NonNullable<ReturnType<(t
 export interface Outgoing {
   emote: { kind: EmoteKind }; state: StateMsg; draw: DrawMsg; note: { i: number; n: number }; pong: PongMsg; cook: { st: number };
   kart: KartMsg; tank: TankMsg; junk: { n: number }; kscore: KScore; snowball: SnowballMsg; flat: FlatMsg; world: HideSeek;
+  rx: { st: number; d: number }; grid: GridMsg;
 }
+/**
+ * THE REACTOR and the city (on the lobby channel, from the shift's host): a shift is on until `until` (epoch ms),
+ * it melted down at `at`, or it's over.
+ */
+export interface GridMsg { k: 'on' | 'melt' | 'off'; until?: number; at?: number }
 
 /** Flats: whose door is how open, and the layout (all from the database). */
 export type DoorMode = 'locked' | 'friends' | 'open';
@@ -335,6 +343,8 @@ export interface Api {
     karaoke(score: number): Promise<{ tokens: number; paid: number }>;
     /** The Diner: tips for a finished shift (the server caps them). Returns { tokens: balance, paid }. */
     diner(score: number): Promise<{ tokens: number; paid: number }>;
+    /** THE REACTOR: pay for a shift (its GRID %, 0..100; the server caps it). */
+    reactor(score: number): Promise<{ tokens: number; paid: number }>;
   };
 }
 
@@ -512,6 +522,8 @@ const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>
   dinerbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 99999); return name && score !== null ? { name, score } : null; },
   board: (x) => (typeof x === 'string' && x.length <= 20000 && /^[A-Za-z0-9+/=]*$/.test(x) ? x : null),
   moonbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), ms = num(v.ms, 1000, 1e6); return name && ms !== null ? { name, ms } : null; },
+  reactor: (x) => { const v = obj(x); return v && parseReactor(v); },
+  reactbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 100); return name && score !== null ? { name, score } : null; },
 };
 export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   const o = obj(p);
@@ -550,6 +562,30 @@ function parseDiner(v: Record<string, unknown>): DinerState | null {
   const grill = times(v.grill, 2), fry = times(v.fry, 2), served = ints(v.served, 32, 0, 7);
   if (t0 === null || shake === null || seed === null || lvl === null || pts === null || done === null || !grill || !fry || !served) return null;
   return { host: v.host, t0, seed, lvl, ids, names: names(nm), hands, grill, fry, shake, served, pts, done };
+}
+function parseReactor(v: Record<string, unknown>): ReactorState | null {
+  if (!isId(v.host)) return null;
+  const ids = v.ids, nm = v.names, n = Array.isArray(ids) ? ids.length : -1;
+  if (!Array.isArray(ids) || n < 1 || n > CREW_MAX || !ids.every(isId) || !Array.isArray(nm) || nm.length !== n) return null;
+  const t0 = num(v.t0, 0, 1e14), seed = int(v.seed, 0, 1e6), lvl = int(v.lvl, 1, 4), rods = int(v.rods, 0, 10), pumps = int(v.pumps, 0, 3), turb = int(v.turb, 0, 10);
+  const scram = num(v.scram, 0, 1e14), at = num(v.at, 0, 1e14), heat = num(v.heat, 0, 110), sat = num(v.sat, 0, REACTOR_S + 1), secs = num(v.secs, 0, REACTOR_S + 1), hot = num(v.hot, 0, 10), melt = num(v.melt, 0, 1e14);
+  const mops = int(v.mops, 0, 99), fixes = int(v.fixes, 0, 99);
+  if (t0 === null || seed === null || lvl === null || rods === null || pumps === null || turb === null || scram === null || at === null || heat === null || sat === null || secs === null || hot === null || melt === null || mops === null || fixes === null) return null;
+  const want = reactorFaults({ t0, seed, lvl }).length, fx = v.fixed;
+  if (!Array.isArray(fx) || fx.length !== want || !fx.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t < 1e14)) return null;
+  return { host: v.host, t0, seed, lvl, ids, names: names(nm), rods, pumps, turb, scram, fixed: fx as number[], at, heat, sat: Math.min(sat, secs), secs, hot, melt, mops, fixes };
+}
+export function parseRx(p: unknown): { id: string; st: number; d: number } | null {
+  const o = obj(p), st = int(o?.st, 0, 14), d = int(o?.d, -1, 1);
+  return o && isId(o.id) && st !== null && d !== null && (st <= 3 || st >= 10) ? { id: o.id, st, d } : null;
+}
+export function parseGrid(p: unknown): { id: string; g: GridMsg } | null {
+  const o = obj(p), k = oneOf(o?.k, ['on', 'melt', 'off'] as const);
+  if (!o || !isId(o.id) || !k) return null;
+  const g: GridMsg = { k };
+  if (o.until !== undefined) { const u = num(o.until, 0, 1e14); if (u === null) return null; g.until = u; }
+  if (o.at !== undefined) { const a = num(o.at, 0, 1e14); if (a === null) return null; g.at = a; }
+  return { id: o.id, g };
 }
 export function parseKart(p: unknown): { id: string; k: KartMsg } | null {
   const o = obj(p);
@@ -652,6 +688,8 @@ export function parseLobby(p: unknown): LobbyPerson | null {
  *   snowball SnowballMsg                 winter: a snowball you threw (you decide what it hit)
  *   world   HideSeek                     hide and seek, to the whole server
  *   flat    FlatMsg                      a knock, an answer, a HOUSE PARTY, to the whole server
+ *   rx      { st, d }                    THE REACTOR: "I worked station st (d -1/+1)" or fixed a fault (st 10+kind); the host applies it
+ *   grid    GridMsg                      THE REACTOR's host to the whole server: a shift is on / melted down / over
  */
 export const MESSAGES = {
   move: { parse: parseMove, on: 'room' },
@@ -669,6 +707,8 @@ export const MESSAGES = {
   snowball: { parse: parseSnowball, on: 'room' },
   world: { parse: parseWorld, on: 'lobby' },
   flat: { parse: parseFlatMsg, on: 'lobby' },
+  rx: { parse: parseRx, on: 'room' },
+  grid: { parse: parseGrid, on: 'lobby' },
 } as const satisfies Record<string, { parse: (p: unknown) => { id: string } | null; on: 'room' | 'srv' | 'lobby' }>;
 export type MsgType = keyof typeof MESSAGES;
 export const MSG_TYPES = Object.keys(MESSAGES) as MsgType[];

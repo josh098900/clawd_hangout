@@ -175,5 +175,6 @@ export class SupabaseApi implements Api {
   readonly tips: Api['tips'] = {
     karaoke: async (score) => { const o = await rpcJson(this.sb, 'karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },
     diner: async (score) => { const o = await rpcJson(this.sb, 'diner_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },
+    reactor: async (score) => { const o = await rpcJson(this.sb, 'reactor_pay', { score: Math.max(0, Math.min(100, Math.round(score))) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },
   };
 }

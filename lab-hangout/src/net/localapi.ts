@@ -390,5 +390,11 @@ export class LocalApi implements Api {
       if (score <= 0) return { tokens: this.wallet(), paid: 0 };
       return this.payCapped('Tips', Math.min(5, 1 + Math.floor(score / 40)), 15, 150000, 'tips come once a shift');
     },
+    /** Same rules as reactor_pay() in 0021_reactor.sql: nothing under 40% grid, 1 + grid/25 (max 5), 15 a day, one per 200 s. */
+    reactor: async (score) => {
+      if (score <= 0) return { tokens: this.wallet(), paid: 0 };
+      const sc = Math.min(100, Math.round(score));
+      return this.payCapped('Grid', sc < 40 ? 0 : Math.min(5, 1 + Math.floor(sc / 25)), 15, 200000, 'pay comes once a shift');
+    },
   };
 }

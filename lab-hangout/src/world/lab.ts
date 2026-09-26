@@ -107,6 +107,13 @@ function build(this: Room): void {
     r(ax + 2, 336, 32, 10, [20, 12, 36]); r(ax + 4, 360, 28, 22, [10, 12, 24]); r(ax, 386, 36, 10, [44, 30, 84]); r(ax + 8, 388, 2, 4, K.BLACK); r(ax + 7, 386, 4, 2, K.RED); r(ax + 20, 389, 3, 3, K.GOLD); r(ax + 26, 389, 3, 3, K.CYAN);
     for (let y = 400; y < 426; y += 6) r(ax + 4, y, 26, 1, [44, 30, 84]);
 
+    // the way into THE SCIENCE WING: an opening past the arcade cabinet (the corridor's white panels and teal band beyond),
+    // a steel frame with hazard tape round it, and a painted arrow on the floor
+    r(934, 300, 26, LF - 300, [230, 235, 234]); for (let y = 306; y < LF; y += 24) r(934, y, 26, 1, [196, 205, 204]); r(934, 372, 26, 8, [47, 122, 130]); r(934, 372, 26, 1, [78, 154, 162]); r(934, LF - 8, 26, 8, [51, 69, 75]);
+    r(930, 296, 6, LF - 296, [75, 88, 96]); r(930, 296, 2, LF - 296, [154, 168, 175]); r(930, 294, 30, 6, [75, 88, 96]);
+    for (let y = 300; y < LF; y += 1) if (((y >> 2) % 2) === 0) r(936, y, 2, 1, [242, 194, 48]); else r(936, y, 2, 1, [32, 34, 38]);
+    for (let x = 900; x < 946; x += 1) if (x % 12 < 8) r(x, 478, 1, 3, [242, 194, 48]);
+    r(920, 474, 10, 3, [242, 194, 48]); r(930, 472, 2, 7, [242, 194, 48]); r(932, 473, 2, 5, [242, 194, 48]); r(934, 474, 2, 3, [242, 194, 48]);
     // rug under the lounge corner
     oval(600, 520, 118, 34, C.RUG_EDGE); oval(600, 520, 114, 31, C.RUG); for (let k = -2; k <= 2; k++) r(600 - 100 + Math.abs(k) * 12, 520 + k * 10, 200 - Math.abs(k) * 24, 2, C.RUG2);
 
@@ -129,6 +136,10 @@ function lamp(lx: number, a: number): void {
 }
 
 function drawBack(a: number): void {
+  // the SCIENCE WING sign, hanging on two little chains over the way in (lit)
+  { const x = 912, y = 300, w = 46; line(x + 6, y - 6, x + 6, y, [90, 96, 104]); line(x + w - 6, y - 6, x + w - 6, y, [90, 96, 104]);
+    r(x, y, w, 18, [30, 40, 46]); r(x, y, w, 1, [70, 90, 96]); lit(() => { txt('SCIENCE', x + 3, y + 3, [124, 242, 208]); txt('WING', x + 3, y + 10, [124, 242, 208]); r(x + 22, y + 12, 12, 1, [255, 214, 90]); r(x + 32, y + 11, 1, 3, [255, 214, 90]); r(x + 33, y + 12, 1, 1, [255, 214, 90]); });
+    G(x, y, w, 18, [124, 242, 208], 0.2); }
   // real-time clock hands
   const d = new Date(), mins = d.getMinutes() + d.getSeconds() / 60, hrs = (d.getHours() % 12) + mins / 60;
   const a1 = (mins / 60) * 6.2832 - 1.5708, a2 = (hrs / 12) * 6.2832 - 1.5708;
@@ -274,6 +285,7 @@ export function makeLab(): Room {
     doors: [
       { trigger: { x0: 10, y0: 440, x1: 46, y1: 448 }, to: 'plaza', arrive: { x: 62, y: 580 }, label: 'OUTSIDE', area: { x0: 4, y0: 306, x1: 52, y1: 446 } },
       { trigger: { x0: 824, y0: 440, x1: 860, y1: 448 }, to: 'den', arrive: { x: 30, y: 458 }, label: 'UPSTAIRS', area: { x0: 816, y0: 306, x1: 868, y1: 446 } },
+      { trigger: { x0: 938, y0: 450, x1: 946, y1: 590 }, edge: true, to: 'wing', arrive: { x: 44, y: 540 }, label: 'SCIENCE WING', area: { x0: 930, y0: 294, x1: 960, y1: 590 } },
     ],
     music: { x: JUKE.x + 19, tracks: TRACKS, current: () => ({ n: LAB_INFO.juke, t0: LAB_INFO.jukeT0 }) },
     onState(s) {
