@@ -8,7 +8,7 @@ import type { Npcs } from '../game/npcs';
 import type { Renderer } from '../engine/renderer';
 import type { Using } from '../entities/avatar';
 import type { LobbyPerson, StateVal, Transport } from '../net/transport';
-import type { Room } from '../world/room';
+import type { Room, RoomId } from '../world/room';
 
 export interface Game {
   readonly net: Transport;
@@ -16,6 +16,8 @@ export interface Game {
   readonly me: Avatar;
   /** The room you're in. */
   readonly room: Room;
+  /** Every room, by id. */
+  readonly rooms: Record<RoomId, Room>;
   /** Everyone else in this room (players and bots), by id. */
   readonly others: Map<string, Avatar>;
   /** In the world (past the start screen). */
@@ -38,6 +40,8 @@ export interface Game {
   readonly R: Renderer;
   /** What kind of spot someone is using right now (null = none). */
   usingOf(av: Avatar): Using;
+  /** Go to another room (standing at `at`, or at its spawn point). Room changes queue up: only the newest waiting one happens. */
+  enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void>;
   /** Step off the spot you're using (back to where you stand to use it). */
   leaveSpot(): void;
   /** Emote (unless you only just did): true if it happened. */
