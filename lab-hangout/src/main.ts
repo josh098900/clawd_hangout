@@ -12,18 +12,16 @@ import { PX, lit, r, txt, txtOutlined, tw, ring, Gd, mk, alpha, puff, bake, arro
 import { K, SK } from './engine/palette';
 import { clamp, seg } from './engine/math';
 import { makeLab, LAB_INFO } from './world/lab';
-import { openAlbum, openModerate, openPinEditor, thumbOf, type AlbumHooks } from './ui/photos';
+import { openAlbum, openPinEditor } from './ui/photos';
 import { makeDen, DEN_INFO, lightning, pomodoro } from './world/den';
 import { makeRoof, rocketTop, showStart } from './world/roof';
 import { makeRocket } from './world/rocket';
-import { makeSpaceStation, STATION, TRAY_SPEED, trayLine, trayState } from './world/station';
-import { makeSpacewalk, WALK, JUNK, floatersNow } from './world/spacewalk';
-import { CYCLE, DEPART, FLIGHT, LAND, MECO, PAD_X, UP_S, flight } from './world/space';
-import { skyThings, type SkyThing } from './world/sky';
-import { openMission } from './ui/mission';
-import { makeStage, stageNote, INST_COL, STAGE_INFO, bandTotal } from './world/stage';
-import { COUNT_IN, SONGS, Performance, backing, hypeBonus, kLive, kTime, kWhere, lane, stepS, type KaraokeState } from './game/karaoke';
-import { KaraokeHud, openSongs, resultLine } from './ui/karaoke';
+import { makeSpaceStation, STATION, TRAY_SPEED } from './world/station';
+import { makeSpacewalk, WALK, floatersNow } from './world/spacewalk';
+import { FLIGHT, PAD_X, flight } from './world/space';
+import { skyThings } from './world/sky';
+import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
+import { COUNT_IN, SONGS, kLive, kTime, lane, stepS } from './game/karaoke';
 import { playPad, INSTRUMENTS } from './audio/music';
 import { makePier, PIER_FIRE } from './world/pier';
 import { makeArcade, ARCADE_INFO, PONG_SPOTS, TANK_SPOTS, pongSeen, tankSeen } from './world/arcade';
@@ -51,11 +49,9 @@ import { openPong, type PongHandle } from './ui/pong';
 import { openPrizes } from './ui/prizes';
 import { openDesk } from './ui/desk';
 import { setSeason, isHalloween, isWinter, season } from './world/season';
-import { WINTER, PRESENTS, SNOWMAN_ROLLS, SNOW_DECO, drops, installWinter, nye, onIce, sleigh, lightShow, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
-import { openAdvent, openSendGift, openTree, showGift } from './ui/winter';
+import { WINTER, installWinter, onIce, onSnow, winterBack, winterFront, winterGround, winterProps } from './world/winter';
 import { installHalloween, halloweenProps, halloweenBack, halloweenFront, markKnocked, lightCandle, candleOrder, TREAT_DOORS } from './world/halloween';
-import { GARDEN, SEEDS, plantLine, plantState } from './world/garden';
-import { openFreeTray, openMyPlant, openMyTray, openSeeds } from './ui/garden';
+import { GARDEN } from './world/garden';
 import { hsBanner, hsFound, hsLive, hsTick, nameIn, startHS, TAG_DIST } from './game/hideseek';
 import { fishNamed, logFish } from './game/fish';
 import { CONTEST, contestClock } from './world/contest';
@@ -74,7 +70,7 @@ import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, 
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
-import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type Photo, type SnowballMsg, type TreeGift, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
+import { cleanChat, GAME_MAX, PROVIDERS, type HideSeek, type RaceState, type FlatItem, type Provider, type LobbyPerson, type GameState, type NetEvent, type PeerState, type StateMsg, type StateVal, type Transport } from './net/transport';
 import { StartScreen } from './ui/start';
 import { animatePlate, clearBubbles, dropBubble, fade, layoutBubbles, logLine, say, showPlate, toast } from './ui/overlay';
 import { SFX, setSound, soundOn } from './audio/sfx';
@@ -82,7 +78,7 @@ import { Bots } from './game/bots';
 import { Npcs, type Npc } from './game/npcs';
 import { Ambient } from './game/ambient';
 import { BOARD } from './game/board';
-import { MusicPlayer, Rain, Rumble, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK, TRACKS as LAB_TRACKS, WINTER_TRACKS, type Track } from './audio/music';
+import { MusicPlayer, Rain, FILM_TRACK, PARTY_TRACK, ORBIT_TRACK, TRACKS as LAB_TRACKS, WINTER_TRACKS } from './audio/music';
 import { banner, hostStep, live, partyMusic, startChairs, startTag, tagTouch, winner, type HostView } from './game/party';
 import { SLOP_DUR, SLOP_N, blob, drawBlob, drawSplat, drawThrow, slopWave } from './game/slop';
 import type { BotGame } from './game/bots';
@@ -91,9 +87,13 @@ import { openArcade } from './ui/arcade';
 import { openTyping } from './ui/typing';
 import { openKanban } from './ui/kanban';
 import { button, flash, modalOpen, openModal, row, type Modal } from './ui/modal';
+import { $, cap, errText, narrow, now, setGame } from './app/game';
+import { refreshGarden, tendBed } from './features/garden';
+import { crowdEmote, initKaraokeHud, karaokeStep, openKaraoke, perf } from './features/karaoke';
+import { albumHooks, checkMyPhotos, checkQueue, loadFlatPhoto, photosAt, photosStale, refreshPhotos, setAdmin } from './features/photos';
+import { drawTethers, jets, openScope, payWalk, setFlight, shakeNow, spaceArrive, spaceKey, spaceLine, spaceStep, spotted, tendTray } from './features/space';
+import { adventMenu, drawBalls, fightHits, flyBall, openPresent, refreshWinter, rollSnowman, scoopSnow, sendGiftTo, snowTarget, startSnowfight, throwSnowball, treeMenu, winterLine, winterStep } from './features/winter';
 
-const $ = <T extends HTMLElement>(q: string) => document.querySelector(q) as T;
-const now = () => performance.now() / 1000;
 
 // ---------- tuning ----------
 const SPEED_X = 80, SPEED_Y = 54;         // world px / s (depth moves slower, like the film's floor)
@@ -134,7 +134,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), rumble = new Rumble(), karaokeMusic = new MusicPlayer();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -144,9 +144,6 @@ let myTokens = 0, danceT = 0;
 let crews: Crew[] = [], crewT = 0, crewCounted = false, crewToastAt = -99;
 /** Weather: the last kind you were told about, the last thunder heard, and when to make the rain water the gardens. */
 let wxSeen = '', thunderId = -1, rainSlot = -1, rainAt = 0;
-/** Error -> readable text, and with a capital letter for a toast. */
-const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-const cap = (m: string): string => (m ? m[0].toUpperCase() + m.slice(1) : m);
 /** A little "+1" (or "HIT!") floating up from (x, y), over your head by default. */
 function floatText(text: string, x = me.x, y = me.y - 50, t0 = now()): void { floaters.push({ x, y, t0, text }); }
 /** Everyone in this room: you (when playing), the other players and bots, and the NPCs here. */
@@ -288,7 +285,6 @@ function onNet(e: NetEvent): void {
     case 'status': toast(e.text); break;
   }
 }
-const narrow = () => innerWidth < 560;
 let serverName = '';
 function updateCount(): void { $('#count').textContent = narrow() ? (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ON' : (serverName ? serverName + ' · ' : '') + (others.size + 1) + ' HERE · ' + (lobby.length + 1) + ' ONLINE' + (net.mode === 'local' ? ' · LOCAL' : ''); }
 
@@ -420,7 +416,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   room = ROOMS[id];
   zv.x = zv.y = 0;
   if (id === 'station') STATION.dirty = true;
-  if (id === 'lab') photosAt = 0;
+  if (id === 'lab') photosStale();
   if (id === 'diner') dinerSince = now();
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
@@ -685,466 +681,6 @@ function serverDo<T>(what: string, act: () => Promise<T>, ok: (r: T) => void, re
   if (serverBusy.has(what)) return; serverBusy.add(what);
   act().then((r) => { ok(r); refresh(true); }).catch((e: unknown) => { toast(cap(errText(e)), 3500); SFX.hurt(); refresh(); }).finally(() => { serverBusy.delete(what); });
 }
-// ---------- the Rooftop garden (world/garden.ts) ----------
-function refreshGarden(bump = false): void {
-  GARDEN.dirty = false; GARDEN.fetchedAt = Date.now();
-  net.plots().then((ps) => { GARDEN.plots = ps; }).catch((e) => console.warn('[garden]', e));
-  if (bump) setState({ k: 'garden', v: { n: Date.now() } }); // tell everyone else on the roof to look again
-}
-const gardenDo = <T,>(act: () => Promise<T>, ok: (r: T) => void): void => serverDo('garden', act, ok, refreshGarden);
-function waterBed(n: number): void {
-  const other = GARDEN.plots.find((q) => q.bed === n)?.owner !== net.selfId;
-  gardenDo(() => net.water(n), (r) => { if (other) quests.bump('water'); if (r.thanked) quests.stat('helped'); setTokens(r.tokens); GARDEN.splash.set(n, now()); SFX.pour(); toast(r.thanked ? 'Watered! +1 token for helping out' : 'Watered! It grows faster for 3 hours', 3000); if (r.thanked) floatText('+1'); });
-}
-function tendBed(n: number): void {
-  const p = GARDEN.plots.find((q) => q.bed === n), mine = GARDEN.plots.find((q) => q.owner === net.selfId && !plantState(q).dead);
-  if (!p || plantState(p).dead) {
-    if (mine) { toast('You already have a ' + SEEDS[mine.seed].name + ' growing (bed ' + (mine.bed + 1) + ')', 3500); return; }
-    SFX.blip();
-    openSeeds(n, myTokens, (i) => save.has('seed:' + i), (seed) => gardenDo(() => net.plant(n, seed), (bal) => {
-      setTokens(bal); if (SEEDS[seed].find) save.inv.delete('seed:' + seed);
-      SFX.pop(); toast('Planted a ' + SEEDS[seed].name + '! Ask friends to water it', 3500);
-    }), () => input.clear());
-    return;
-  }
-  if (p.owner === net.selfId) {
-    openMyPlant(p, {
-      water: () => waterBed(n),
-      harvest: () => gardenDo(() => net.harvest(n), (r) => {
-        quests.bump('harvest'); quests.stat('harvests');
-        setTokens(r.tokens); SFX.score(); celebrate();
-        const s = SEEDS[r.seed]; floatText('+' + s.pays);
-        const first = !save.data.crops.includes(s.name); if (first) save.update((d) => { d.crops.push(s.name); });
-        toast('Harvested your ' + s.name + '! +' + s.pays + ' tokens' + (first ? ' · NEW CROP ' + save.data.crops.length + '/' + SEEDS.length : ''), 4000);
-        if (r.bonus) { save.addPrize(r.bonus); setTimeout(() => { toast('You found a rare MOONFLOWER seed in the soil! Plant it in any free bed', 5000); SFX.chime(); }, 1800); }
-      }),
-      digUp: () => gardenDo(() => net.digUp(n), () => toast('Dug up. The bed is free again', 2500)),
-    }, () => input.clear());
-    return;
-  }
-  if (plantState(p).wet) { toast(plantLine(p, false), 3500); return; }
-  waterBed(n);
-}
-
-// ---------- THE PHOTO WALL (ui/photos.ts, the Lab's corkboard, 0017_photos.sql) ----------
-let photosAt = 0, isAdmin = false;
-const thumbCache = new Map<number, HTMLCanvasElement>();
-/** A strip's corkboard polaroid (made once per photo). */
-function thumb(p: Photo): Promise<HTMLCanvasElement> {
-  const hit = thumbCache.get(p.id); if (hit) return Promise.resolve(hit);
-  return new Promise((res, rej) => { const im = new Image(); im.onload = () => { const t = thumbOf(im); thumbCache.set(p.id, t); res(t); }; im.onerror = rej; im.src = p.png; });
-}
-/** The newest approved strips for the Lab's corkboard, with the photo of the week in the first spot. */
-function refreshPhotos(): void {
-  photosAt = Date.now();
-  net.wallPhotos(10, null).then(async (w) => {
-    let list = w.photos;
-    if (w.week !== null && !list.some((p) => p.id === w.week)) { const wk = await net.photoById(w.week).catch(() => null); if (wk) list = [wk, ...list.slice(0, 9)]; }
-    else if (w.week !== null) list = [...list.filter((p) => p.id === w.week), ...list.filter((p) => p.id !== w.week)];
-    const out: typeof LAB_INFO.photos = [];
-    for (const p of list) { try { out.push({ id: p.id, name: p.ownerName, thumb: await thumb(p), week: p.id === w.week }); } catch { /* a broken image: skip it */ } }
-    LAB_INFO.photos = out;
-  }).catch((e) => console.warn('[photos]', e));
-}
-function albumHooks(): AlbumHooks {
-  return {
-    page: (before) => net.wallPhotos(12, before), heart: (p) => net.heartPhoto(p.id).then((r) => { photosAt = 0; return r; }),
-    feature: (p) => net.featurePhoto(p.id).then(() => { FLAT.photoOf = ''; }), remove: (p) => (p.owner === net.selfId ? net.deletePhoto(p.id) : net.reviewPhoto(p.id, false)).then(() => { photosAt = 0; thumbCache.delete(p.id); }),
-    me: net.selfId, admin: isAdmin, toast: (t) => toast(t, 4000),
-  };
-}
-/** The owner's MODERATE button (only shown to owners), with how many photos are waiting. */
-const modBtn = document.createElement('button'); modBtn.type = 'button'; modBtn.id = 'mod'; modBtn.className = 'pill'; modBtn.style.display = 'none';
-$('#hud').insertBefore(modBtn, $('#quests').nextSibling);
-modBtn.addEventListener('click', () => { if (modalOpen()) return; openModerate({ list: () => net.pendingPhotos(), review: (p, ok) => net.reviewPhoto(p.id, ok).then(() => { photosAt = 0; }), toast: (t) => toast(t, 3000) }, () => { input.clear(); void checkQueue(); }); });
-async function checkQueue(): Promise<void> {
-  if (!isAdmin) return;
-  try { const n = (await net.pendingPhotos()).length; modBtn.style.display = ''; modBtn.textContent = (narrow() ? 'MOD' : 'MODERATE') + (n ? ' · ' + n : ''); modBtn.classList.toggle('hot', n > 0); } catch { /* try again later */ }
-}
-/** Tell the pinner when their photo's been approved or not (remembered per browser, so each news comes once). */
-async function checkMyPhotos(): Promise<void> {
-  let mine; try { mine = await net.myPhotos(); } catch { return; }
-  const key = 'labhangout.photoSeen.' + net.selfId; let seen: Record<string, string> = {}; try { seen = JSON.parse(localStorage.getItem(key) || '{}'); } catch { /* none */ }
-  for (const p of mine) {
-    const was = seen[p.id]; seen[p.id] = p.status;
-    if (was === 'pending' && p.status === 'approved') { toast('Your photo is up on the PHOTO WALL in the Lab!', 6000); SFX.score(); photosAt = 0; }
-    else if (was === 'pending' && p.status === 'rejected') toast('Your photo wasn\'t approved for the wall this time', 5000);
-  }
-  try { localStorage.setItem(key, JSON.stringify(seen)); } catch { /* full */ }
-}
-/** The flat owner's photo for their PHOTO FRAME. */
-function loadFlatPhoto(owner: string): void {
-  FLAT.photoOf = owner; FLAT.photo = null;
-  net.flatPhoto(owner).then((png) => { if (!png || FLAT.photoOf !== owner) return; const im = new Image(); im.onload = () => { if (FLAT.photoOf === owner) FLAT.photo = thumbOf(im); }; im.src = png; }).catch(() => {});
-}
-
-// ---------- KARAOKE on the Stage (game/karaoke.ts, world/stage.ts, ui/karaoke.ts) ----------
-/** Your performance in the song that's on (null = you're not at an instrument). */
-let perf: Performance | null = null, kSent = 0, kFinal = -1;
-const kTracks = new Map<number, Track>();
-const CHEERS = new Set<EmoteKind>(['joy', 'clap', 'wow', 'love', 'hop', 'wave', 'laugh', 'cool', 'idea']), BOOS = new Set<EmoteKind>(['sleep', 'angry', 'cry']);
-/** The crowd (anyone not playing) emoted while a song is on: cheers fill the hype bar, boos drain it. */
-function crowdEmote(kind: EmoteKind): void {
-  const k = STAGE_INFO.karaoke; if (room.id !== 'stage' || !k || !kLive(k) || kTime(k) < 0 || kWhere(k).done) return;
-  STAGE_INFO.hype = clamp(STAGE_INFO.hype + (CHEERS.has(kind) ? 0.07 : BOOS.has(kind) ? -0.05 : 0), 0, 1);
-}
-function openKaraoke(): void {
-  const k = STAGE_INFO.karaoke, on = kLive(k) && !!k && !kWhere(k).done;
-  SFX.blip();
-  openSongs({
-    pick: (n) => { setState({ k: 'karaoke', v: { song: n, t0: Date.now() + COUNT_IN, by: me.name } }); SFX.chime(); toast(usingOf(me) === 'instrument' ? 'Here it comes!' : 'Get up to the MIC to sing, or grab an instrument! Everyone else: cheer to fill the HYPE bar', 4500); },
-    stop: on ? () => { setState({ k: 'karaoke', v: { song: -1, t0: Date.now(), by: me.name } }); toast('Song stopped'); } : null,
-    season: season(),
-  }, () => input.clear());
-}
-function karaokeStep(dt: number): void {
-  const k = STAGE_INFO.karaoke, live = room.id === 'stage' && playing && kLive(k) && !!k;
-  let tr: Track | null = null;
-  if (live) { tr = kTracks.get(k!.song) ?? null; if (!tr) { tr = backing(k!.song); kTracks.set(k!.song, tr); } }
-  karaokeMusic.set(tr, live ? k!.t0 / 1000 : 0); karaokeMusic.volume(live && !kWhere(k!).done ? 0.75 : 0); karaokeMusic.tick();
-  if (!live || !k) { khud.hide(); perf = null; return; }
-  const tt = kTime(k), wh = kWhere(k);
-  // the dancers keep the hype up; it cools off by itself
-  if (tt > 0 && !wh.done) { const dancers = [me, ...others.values(), ...npcs.inRoom('stage').map((n) => n.av)].filter((av) => av.pose === POSE_DANCE && usingOf(av) !== 'instrument').length; STAGE_INFO.hype = clamp(STAGE_INFO.hype + dt * (dancers * 0.02 - 0.02), 0, 1); }
-  // are you performing? (a new instrument mid-song starts a new performance)
-  const sp = me.use >= 0 ? room.spots[me.use] : undefined, inst = sp?.kind === 'instrument' ? sp.inst ?? -1 : -1;
-  if (!wh.done) { if (inst < 0) perf = null; else if (!perf || perf.t0 !== k.t0 || perf.inst !== inst) perf = new Performance(k.song, inst, k.t0); }
-  if (perf && tt > 0 && !wh.done) {
-    perf.sweep(tt);
-    if (now() - kSent > 1) { kSent = now(); const sc = perf.score(true); STAGE_INFO.scores.set(net.selfId, { name: me.name, i: perf.inst, s: sc, c: perf.combo, f: false }); net.sendKScore({ r: k.t0, i: perf.inst, s: sc, c: perf.combo, f: 0 }); }
-  }
-  if (wh.done && kFinal !== k.t0) { kFinal = k.t0; songOver(k); }
-  const [lx0, ly] = R.toScreen(410, 292), [lx1] = R.toScreen(690, 292), onScreen = ly > 56 && ly < R.cssH - 170 && lx0 > 0 && lx1 < R.cssW; // can you see the whole lyric line on the big screen?
-  khud.update(k, STAGE_INFO.hype, bandTotal(), perf && !wh.done ? perf : null, !onScreen);
-}
-/** The song's finished: your score (plus the crowd's hype), the band's, tips, and maybe the ROCK STAR jacket. */
-function songOver(k: KaraokeState): void {
-  const bonus = hypeBonus(STAGE_INFO.hype); let mine: number | null = null;
-  if (perf && perf.t0 === k.t0) {
-    perf.sweep(1e9); const raw = perf.score(); mine = Math.min(100, raw + bonus);
-    STAGE_INFO.scores.set(net.selfId, { name: me.name, i: perf.inst, s: raw, c: perf.best, f: true });
-    net.sendKScore({ r: k.t0, i: perf.inst, s: raw, c: perf.best, f: 1 });
-  }
-  const band = bandTotal(), top = [...STAGE_INFO.scores.values()].sort((p, q) => q.s - p.s)[0];
-  STAGE_INFO.result = { song: k.song, band, hype: STAGE_INFO.hype, at: Date.now() / 1000, top: top ? top.name + ' ' + top.s : '' };
-  if (STAGE_INFO.scores.size && band >= 80) SFX.joy(); else SFX.score();
-  perf = null;
-  if (mine === null) return;
-  const score = mine, line = resultLine(SONGS[k.song].name, score, band);
-  if (score >= 90 && save.unlock('fit:8')) setTimeout(() => { toast('ROCK STAR! You earned the ROCK STAR jacket. Wear it from Look', 5500); SFX.score(); }, 3000);
-  net.karaokeTip(score).then((r) => { setTokens(r.tokens); toast(line + (r.paid ? ' · +' + r.paid + ' in tips' : ''), 5000); if (r.paid) floatText('+' + r.paid, me.x, me.y - 60); }).catch(() => toast(line, 5000));
-}
-
-// ---------- WINTER (world/winter.ts, ui/winter.ts, 0018_winter.sql) ----------
-let giftsMine = -1, fightDone = -1, lightHeard = -1, bellsHeard = -1, nyeHeard = -1, lastThrow = -9;
-const fightHits = new Map<string, { name: string; n: number }>();
-const balls: { from: string; b: SnowballMsg; t0: number; landed: boolean }[] = [];
-/** The tree (ornaments, presents), your present hunt, the advent calendar: fetched on the Square / in the Lab, and now and then. */
-async function refreshWinter(): Promise<void> {
-  if (!isWinter() || !playing) return;
-  WINTER.treeAt = Date.now(); WINTER.treeDirty = false;
-  try { WINTER.presents = new Set(await net.presentsToday()); } catch { /* later */ }
-  try { WINTER.advent = await net.adventDoors(); } catch { /* later */ }
-  await refreshTree();
-}
-async function refreshTree(): Promise<void> {
-  try { WINTER.ornaments = await net.ornaments(); } catch { /* later */ }
-  try {
-    WINTER.gifts = await net.treeGifts(); const mine = WINTER.gifts.filter((g) => g.mine).length;
-    if (giftsMine >= 0 && mine > giftsMine) { toast('A present for you is waiting under the tree in the Square!', 5000); SFX.bells(); }
-    giftsMine = mine;
-  } catch { /* later */ }
-}
-const prizeName = (p: string): string => (p.startsWith('tokens:') ? '+' + p.slice(7) + ' TOKENS' : itemName(p));
-/** The present hunt: open present n. */
-function openPresent(n: number): void {
-  if (WINTER.presents.has(n)) { toast('You already opened this one today. More tomorrow!', 2500); return; }
-  net.findPresent(n).then((r) => {
-    WINTER.presents.add(n); setTokens(r.tokens); SFX.chime(); floatText('+1', PRESENTS[n].x, PRESENTS[n].y - 30);
-    toast('A PRESENT! +1 token (' + r.found + '/12 found today)', 3000);
-    seasonPrize(r.prize, 'ALL 12 PRESENTS!', 'winter prize');
-  }).catch((e: unknown) => { const m = errText(e); if (/already/.test(m)) WINTER.presents.add(n); toast(cap(m), 3000); });
-}
-function adventMenu(): void {
-  SFX.blip(); void net.adventDoors().then((d) => { WINTER.advent = d; }).catch(() => {});
-  openAdvent({ open: (d) => net.openAdvent(d).then((r) => { setTokens(r.tokens); if (!r.prize.startsWith('tokens:')) { save.addPrize(r.prize); SFX.score(); celebrate(); toast('Behind door ' + d + ': the ' + itemName(r.prize) + '! (Look menu)', 6000); } else SFX.chime(); return r; }), prizeName }, () => input.clear());
-}
-/** Everyone on the server you could send a present to. */
-const giftPeople = (): { id: string; name: string }[] => lobby.filter((p) => p.id !== net.selfId).map((p) => ({ id: p.id, name: p.name }));
-function sendGiftTo(preset: string | null): void {
-  openSendGift(giftPeople(), preset, myTokens, (to, tk, wrap, nt) => net.sendGift(to, tk, wrap, nt).then((bal) => { setTokens(bal); SFX.bells(); toast('Wrapped and under the tree! They\'ll find out who from when they open it', 4500); void refreshTree(); }), () => input.clear());
-}
-function openTreeGift(g: TreeGift): void {
-  net.openGift(g.id).then((r) => { setTokens(r.tokens); SFX.joy(); celebrate(); showGift(r, g.wrap, () => input.clear()); void refreshTree(); }).catch((e: unknown) => toast(errText(e), 3500));
-}
-function treeMenu(): void {
-  SFX.blip(); void refreshTree();
-  openTree({ hang: (k, x, y) => net.hangOrnament(k, x, y).then(() => { SFX.chime(); void refreshTree(); }), gifts: () => WINTER.gifts, openGift: openTreeGift, send: () => sendGiftTo(null) }, () => input.clear());
-}
-/** The Park's snowman: roll it up (everyone's rolls add up), then dress it. Starts again every day. */
-function rollSnowman(): void {
-  const day = Math.floor(Date.now() / 86400000), cur = WINTER.snowman.day === day ? WINTER.snowman : { day, rolls: 0, deco: 0 };
-  if (cur.rolls < SNOWMAN_ROLLS) {
-    const rolls = cur.rolls + 1; setState({ k: 'snowman', v: { day, rolls, deco: cur.deco } }); SFX.scoop();
-    if (rolls === SNOWMAN_ROLLS) { SFX.score(); toast('The snowman is built! Now dress him up (E)', 4000); }
-    else toast(rolls < 12 ? 'Rolling the big ball...' : rolls < 22 ? 'Rolling the middle...' : 'Rolling his head...', 1200);
-    return;
-  }
-  if (cur.deco < 31) { let i = 0; while (cur.deco & (1 << i)) i++; const deco = cur.deco | (1 << i); setState({ k: 'snowman', v: { day, rolls: cur.rolls, deco } }); SFX.pop(); toast('You gave him ' + SNOW_DECO[i] + (deco === 31 ? '. He\'s perfect!' : ''), 2500); if (deco === 31) { celebrate(); } return; }
-  toast('Isn\'t he lovely? He melts at midnight (a new one tomorrow)', 3000);
-}
-function startSnowfight(): void {
-  const f = WINTER.snowfight; if (f && Date.now() - f.t0 < 90000) { toast('A snowball fight is on! Scoop snow (E) and throw it at people', 3000); return; }
-  setState({ k: 'snowfight', v: { t0: Date.now(), by: me.name } }); SFX.bells(); toast('SNOWBALL FIGHT! 90 seconds: most hits wins. Scoop snow (E), then throw (E)', 5000);
-}
-function scoopSnow(): void { if (me.hold) return; me.hold = HOLD_SNOWBALL; me.sips = 0; forceSend = true; SFX.scoop(); }
-/** Who you'd throw at: the nearest person (player, NPC or bot) in front of you, within range. */
-function snowTarget(): Avatar | null {
-  let best: Avatar | null = null, bd = 1e9;
-  for (const av of [...others.values(), ...npcs.inRoom(room.id).map((n) => n.av)]) {
-    if (hiddenAv(av, now())) continue; const dx = av.x - me.x, dy = av.y - me.y, d = Math.hypot(dx, dy * 1.5);
-    if (d > 240 || d < 6) continue; const facing = Math.sign(dx) === me.dir ? 0 : 60; if (d + facing < bd) { bd = d + facing; best = av; }
-  }
-  return best;
-}
-function throwSnowball(): void {
-  const t = now(); if (me.hold !== HOLD_SNOWBALL || t - lastThrow < 0.5) return; lastThrow = t;
-  const tg = snowTarget(), miss = !!tg && Math.random() < 0.15;
-  const x1 = tg ? tg.x + (miss ? (Math.random() < 0.5 ? -22 : 22) : 0) : me.x + me.dir * 140, y1 = tg ? tg.y : me.y + 4;
-  const b: SnowballMsg = { x0: me.x, y0: me.y, x1: Math.max(0, x1), y1, hit: tg && !miss && !tg.npc ? tg.id : '' };
-  if (tg) me.dir = tg.x < me.x ? -1 : 1;
-  me.hold = 0; forceSend = true; SFX.toss(); net.sendSnowball(b); flyBall(net.selfId, b);
-  if (tg && !miss && tg.npc) setTimeout(() => { tg.splat = now(); }, 450);
-}
-/** A snowball in the air (yours or someone else's): lands 0.45 s later; a hit splats whoever it was for. */
-function flyBall(from: string, b: SnowballMsg): void {
-  balls.push({ from, b, t0: now(), landed: false });
-  const f = WINTER.snowfight;
-  if (b.hit && f && Date.now() - f.t0 < 90000) { const nm = from === net.selfId ? me.name : others.get(from)?.name ?? '?', c = fightHits.get(from); fightHits.set(from, { name: nm, n: (c?.n ?? 0) + 1 }); }
-  if (from === net.selfId && b.hit) quests.stat('snowhits');
-}
-function ballStep(): void {
-  const t = now();
-  for (let k = balls.length - 1; k >= 0; k--) {
-    const bl = balls[k], u = (t - bl.t0) / 0.45;
-    if (u >= 1 && !bl.landed) {
-      bl.landed = true;
-      if (bl.b.hit === net.selfId) { me.splat = t; SFX.splat(); const nm = others.get(bl.from)?.name ?? 'Someone'; toast('SPLAT! ' + nm + ' got you!', 1800); }
-      else if (bl.b.hit) { const av = others.get(bl.b.hit); if (av) av.splat = t; if (bl.from === net.selfId) { SFX.splat(); floatText('HIT!', bl.b.x1, bl.b.y1 - 40, t); } }
-    }
-    if (u > 1.6) balls.splice(k, 1);
-  }
-}
-function drawBalls(): void {
-  const t = now();
-  for (const bl of balls) {
-    const u = (t - bl.t0) / 0.45, { x0, y0, x1, y1 } = bl.b;
-    if (u < 1) { const x = x0 + (x1 - x0) * u, y = y0 - 26 + (y1 - 22 - (y0 - 26)) * u - Math.sin(u * Math.PI) * 28; r(Math.round(x) - 2, Math.round(y) - 2, 5, 5, [22, 12, 44]); r(Math.round(x) - 1, Math.round(y) - 1, 3, 3, [240, 244, 250]); }
-    else { const v = u - 1; for (let k = 0; k < 7; k++) { const an = (k / 7) * Math.PI * 2; r(Math.round(x1 + Math.cos(an) * (3 + v * 16)), Math.round(y1 - 20 + Math.sin(an) * (2 + v * 8) + v * v * 20), 2, 2, [236, 242, 250]); } }
-  }
-}
-/** Once a frame in winter: the sleigh (bells, presents to catch), the tree lighting, a snowball fight's end, New Year. */
-function winterStep(): void {
-  ENV.ice = isWinter() && room.id === 'park' ? (x, y) => onIce('park', x, y) : null;
-  if (!isWinter() || !playing) return;
-  ballStep();
-  if (Date.now() - WINTER.treeAt > (room.id === 'plaza' ? 30000 : 120000)) void refreshWinter();
-  const sl = sleigh();
-  if (sl.t >= 0 && sl.t < 20 && bellsHeard !== sl.pass && OUTDOORS.includes(room.id)) { bellsHeard = sl.pass; SFX.bells(); toast(room.id === 'plaza' ? 'HO HO HO! Santa\'s sleigh! Catch the presents as they land' : 'Sleigh bells! Santa is dropping presents on the Square', 4500); }
-  if (room.id === 'plaza' && sl.t < 330) for (const d of drops(sl.pass)) {
-    const key = sl.pass + ':' + d.n; if (WINTER.caught.has(key) || sl.t < d.land || Math.abs(me.x - d.x) > 11 || Math.abs(me.y - d.y) > 9) continue;
-    WINTER.caught.add(key); SFX.pop();
-    net.catchSleigh(sl.pass, d.n).then((bal) => { setTokens(bal); SFX.chime(); floatText('+1', d.x, d.y - 30); }).catch((e: unknown) => toast(errText(e), 2500));
-  }
-  const ls = lightShow(), hour = Math.floor(Date.now() / 3600000);
-  if (ls >= 0 && lightHeard !== hour && room.id === 'plaza') { lightHeard = hour; SFX.jingle(); toast('THE TREE LIGHTING! Hang an ornament at THE TREE', 4000); }
-  const f = WINTER.snowfight;
-  if (f && Date.now() - f.t0 >= 90000 && fightDone !== f.t0 && room.id === 'plaza') { fightDone = f.t0; const top = [...fightHits.values()].sort((p, q) => q.n - p.n)[0]; toast(top ? 'SNOWBALL FIGHT OVER! ' + top.name + ' wins with ' + top.n + ' hits!' : 'SNOWBALL FIGHT OVER! Nobody hit anybody...', 5000); SFX.score(); }
-  const ny = nye();
-  if (ny.left > 0 && ny.left <= 10.5) { const k = Math.ceil(ny.left); if (nyeHeard !== k) { nyeHeard = k; toast(String(k) + '...', 900); SFX.tminus(); } }
-  if (ny.since >= 0 && ny.since < 3 && nyeHeard !== -100) { nyeHeard = -100; toast('HAPPY NEW YEAR ' + ny.year + '!', 6000); SFX.joy(); for (let k = 0; k < 6; k++) setTimeout(() => { SFX.boom(); SFX.pop(); }, k * 450); celebrate(); }
-}
-function winterLine(): string {
-  if (!isWinter()) return '';
-  const ny = nye(); if (ny.left > 0 && ny.left < 600) return 'NEW YEAR IN ' + mmss(ny.left) + ' · GET TO THE ROOF OR THE SQUARE FOR THE FIREWORKS!';
-  const f = WINTER.snowfight;
-  if (room.id === 'plaza' && f && Date.now() - f.t0 < 90000) { const top = [...fightHits.values()].sort((p, q) => q.n - p.n).slice(0, 3).map((x) => x.name + ' ' + x.n).join(' · '); return 'SNOWBALL FIGHT · ' + mmss(90 - (Date.now() - f.t0) / 1000) + (top ? ' · ' + top : ' · SCOOP SNOW (E) AND THROW!'); }
-  return '';
-}
-
-// ---------- SPACE: the rocket (world/space.ts, rocket.ts), the station (station.ts), the spacewalk (spacewalk.ts) ----------
-/** Your drift velocity while weightless (world px / s). */
-const zv = { x: 0, y: 0 };
-let bonkAt = 0, jetAt = 0, walkOwed = 0, scopeSent = 0, scopeKey = '', scopeNews = 0, firedN = -1;
-const jets: { x: number; y: number; vx: number; vy: number; t0: number }[] = [];
-const fired = new Set<string>();
-const fire = (k: string, fn: () => void): void => { if (!fired.has(k)) { fired.add(k); fn(); } };
-/** Dev/tests: put this browser's rocket clock `k` seconds into its loop. */
-function setFlight(k: number): void { FLIGHT.skew = 0; FLIGHT.skew = k - (Date.now() / 1000) % CYCLE; }
-/** Weightless moving: you speed up and slow down gently, keep drifting when you let go, and bounce off walls. */
-function drift(dt: number, vx: number, vy: number, skate = false): number {
-  const free = !!room.freeFloat, ax = input.axis(), steer = !!tapTarget && !ax.x && !ax.y, push = !!(vx || vy);
-  const want = steer && tapTarget ? clamp(Math.hypot(tapTarget.x - me.x, tapTarget.y - me.y) / 40, 0.15, 1) : 1; // ease in to where you tapped
-  const rate = steer ? 6 : push ? (skate ? 2 : 2.4) : free ? 0.06 : skate ? 0.3 : 0.4, k = 1 - Math.exp(-dt * rate);
-  const mx = SPEED_X * (free ? 0.85 : skate ? 1.3 : 0.95), my = SPEED_Y * (free ? 1.1 : skate ? 1.2 : 0.95);
-  zv.x += (vx * mx * want - zv.x) * k; zv.y += (vy * my * want - zv.y) * k;
-  let moved = 0; const t = now(), nx = me.x + zv.x * dt, ny = me.y + zv.y * dt;
-  if (walkable(room, nx, me.y)) { moved += Math.abs(nx - me.x); me.x = nx; } else { if (Math.abs(zv.x) > 24 && t - bonkAt > 0.3) { bonkAt = t; SFX.bonk(); } zv.x *= -0.5; }
-  if (walkable(room, me.x, ny)) { moved += Math.abs(ny - me.y); me.y = ny; } else { if (Math.abs(zv.y) > 18 && t - bonkAt > 0.3) { bonkAt = t; SFX.bonk(); } zv.y *= -0.5; }
-  if (!push && Math.hypot(zv.x, zv.y) < 1.5) zv.x = zv.y = 0;
-  return moved;
-}
-/** SPACE (or the FLOAT / JETPACK pill): push off the floor and float up high; out on a spacewalk, fire the jetpack. */
-function spaceKey(): void {
-  if (!playing || editing || modalOpen() || !room.zeroG?.()) return;
-  const t = now();
-  if (room.freeFloat) {
-    if (t - jetAt < 0.35) return; jetAt = t;
-    const ax = input.axis(); let dx = ax.x, dy = ax.y; if (!dx && !dy) dx = me.dir;
-    const l = Math.hypot(dx, dy); dx /= l; dy /= l;
-    zv.x += dx * 70; zv.y += dy * 50; const sp = Math.hypot(zv.x / 1.4, zv.y); if (sp > 110) { zv.x *= 110 / sp; zv.y *= 110 / sp; }
-    tapTarget = null; if (Math.abs(dx) > 0.2) me.dir = dx > 0 ? 1 : -1;
-    for (let k = 0; k < 3; k++) jets.push({ x: me.x - dx * 8 + (k - 1) * 2, y: me.y - 20 - dy * 6, vx: -dx * (30 + k * 12), vy: -dy * (20 + k * 8) + (k - 1) * 6, t0: t + k * 0.05 });
-    SFX.jet(); return;
-  }
-  if (me.pose === POSE_FLOAT) return;
-  if (me.use >= 0) leaveSpot();
-  me.pose = POSE_FLOAT; me.poseT0 = t; forceSend = true; SFX.whoosh();
-}
-/** Everyone out on a spacewalk is clipped on to a safety line from the airlock. */
-function drawTethers(a: number, t: number): void {
-  const T0 = room.tether!, cols: [number, number, number][] = [[236, 190, 60], [200, 150, 40]];
-  for (const av of [...(playing ? [me] : []), ...others.values()]) {
-    if (hiddenAv(av, t)) continue;
-    const x1 = av.x - av.dir * 4, y1 = av.y - 30, n = Math.max(8, Math.round(Math.hypot(x1 - T0.x, y1 - T0.y) / 1.5));
-    for (let k = 0; k <= n; k++) { const u = k / n, s = Math.sin(u * Math.PI), x = T0.x + (x1 - T0.x) * u + Math.sin(u * 6 + a * 1.3 + av.seed * 9) * 12 * s, y = T0.y + (y1 - T0.y) * u + Math.sin(u * 4 + a * 0.9) * 8 * s; r(Math.round(x), Math.round(y), 1, 1, cols[Math.floor(k / 4) % 2]); }
-  }
-}
-/** How much the screen shakes right now: in the rocket, and on the roof near the pad at liftoff. */
-function shakeNow(): number {
-  if (!playing) return 0;
-  if (room.shake) return room.shake();
-  if (room.id !== 'roof') return 0;
-  const f = flight(), near = Math.max(0, 1 - Math.abs(me.x - PAD_X) / 700), hot = (f.phase === 'up' && f.k < 6) || (f.phase === 'pad' && f.left < 2) || (f.phase === 'down' && LAND - f.k < 1.5);
-  return hot ? 0.7 * near : 0;
-}
-function spaceLine(): string {
-  if (room.id === 'spacewalk') return 'SPACEWALK · HAUL ' + WALK.pts + ' · ' + WALK.dust + ' STARDUST · BACK IN AT THE AIRLOCK TO GET PAID';
-  const f = flight();
-  if (room.id === 'roof' && f.phase === 'pad' && f.left < 60) return 'ROCKET LAUNCH IN ' + mmss(f.left) + ' · BOARD AT THE PAD (FAR RIGHT)';
-  if (room.id === 'station' && f.phase === 'docked' && f.left < 60) return 'THE ROCKET HOME LEAVES IN ' + mmss(f.left) + ' · THE DOCK, FAR LEFT';
-  return '';
-}
-/** Once a frame: who floats, the countdown and its sounds, the station's trays and telescope news, grabbing stardust. */
-function spaceStep(): void {
-  ENV.zeroG = !!room.zeroG?.(); ENV.free = !!room.freeFloat; ENV.g = room.gForce?.() ?? 0;
-  const f = flight(); if (f.n !== firedN) { firedN = f.n; fired.clear(); }
-  const inRocket = room.id === 'rocket', nearPad = room.id === 'roof' && Math.abs(me.x - PAD_X) < 700;
-  if (playing && (inRocket || nearPad)) {
-    if (f.phase === 'pad' && f.left < 10.5) { const n = Math.ceil(f.left); fire('t' + n, () => { SFX.tminus(); if (inRocket && n <= 5) toast(String(n) + '...', 900); }); }
-    if (f.phase === 'up' && f.k < 2) fire('go', () => { SFX.ignite(); if (inRocket) toast('LIFTOFF!', 2200); });
-    if (f.phase === 'pad' && f.k - LAND < 2) fire('land', () => { SFX.clunk(); SFX.boom(); if (inRocket) toast('Touchdown! Welcome back to the Rooftop. The hatch is open', 4000); });
-  }
-  if (playing && inRocket) {
-    if (f.phase === 'pad' && f.left < 30 && f.left > 11) fire('strap', () => toast('Liftoff in ' + Math.ceil(f.left) + ' seconds. Strap in at a seat (or float about, your call)', 4000));
-    if (f.phase === 'up' && f.k > MECO) fire('meco', () => toast('Engines off: ZERO G! ' + (isTouch ? 'Tap FLOAT' : 'Press SPACE') + ' to push off', 4000));
-    if (f.phase === 'up' && f.k > UP_S - 1.1) fire('dock', () => SFX.clunk());
-    if (f.phase === 'docked') fire('docked', () => toast('Docked at the SPACE STATION! Out through the hatch', 4000));
-    if (f.phase === 'down' && f.k - DEPART > 15) fire('reentry', () => toast('RE-ENTRY! Hold on to something...', 3000));
-  }
-  if (playing && room.id === 'station' && f.phase === 'docked' && f.left < 60) fire('lastcall', () => toast('The rocket home leaves in 1 minute (the dock, far left)', 4000));
-  if (playing && (room.id === 'roof' || room.id === 'den') && f.phase === 'pad' && f.left < 60 && f.left > 45) fire('soon', () => toast(room.id === 'roof' ? 'The rocket to the SPACE STATION launches in 1 minute! Board it at the pad (far right)' : 'The rocket launches from the roof in 1 minute! (up the ladder)', 5000));
-  // the engines
-  const d = f.k - DEPART, burn = f.phase === 'up' && f.k < MECO ? (f.k < 3 ? 1 : 0.7) : f.phase === 'pad' && f.left < 3 ? 0.5 : f.phase === 'down' && d > 15 && d < 30 ? 0.6 : f.phase === 'down' && LAND - f.k < 12 ? 0.5 : 0;
-  const roofBurn = (f.phase === 'pad' && f.left < 3) || (f.phase === 'up' && f.k < 14) || (f.phase === 'down' && LAND - f.k < 14);
-  rumble.set(!playing ? 0 : inRocket ? burn : nearPad && roofBurn ? Math.max(burn, 0.5) * Math.max(0, 1 - Math.abs(me.x - PAD_X) / 700) : 0);
-  // the station: trays, and the telescope's news
-  if (room.id === 'station' && playing && (STATION.dirty || Date.now() - STATION.fetchedAt > 15000)) refreshTrays();
-  const sc = STATION.scope;
-  if (room.id === 'station' && sc && sc.saw && sc.at !== scopeNews && sc.by && sc.by !== me.name && Date.now() / 1000 - sc.at < 10) { scopeNews = sc.at; logLine(null, sc.by + ' spotted ' + sc.saw + ' through the telescope!'); }
-  if (room.id === 'spacewalk' && playing) grabStep();
-}
-/** Out on the spacewalk: touch a drifting thing to grab it. */
-function grabStep(): void {
-  const T = Date.now() / 1000;
-  for (const [id, at] of WALK.got) if (T - at > 150) WALK.got.delete(id);
-  for (const fl of floatersNow()) {
-    if (WALK.got.has(fl.id) || Math.abs(fl.x - me.x) > 14 || Math.abs(fl.y - me.y) > 12) continue;
-    WALK.got.set(fl.id, T); net.sendJunk(fl.id);
-    const j = JUNK[fl.kind]; WALK.pts += j.pts;
-    if (fl.kind === 0) { WALK.dust++; quests.bump('spacewalk'); SFX.pop(); if (WALK.dust % 10 === 0) { SFX.chime(); toast(WALK.dust + ' stardust!', 1500); } }
-    else { WALK.things++; SFX.chime(); toast('You caught ' + j.name + '! +' + j.pts, 2200); }
-    floatText('+' + j.pts, fl.x, fl.y - 36);
-  }
-}
-/** Back inside from a spacewalk: get paid for the haul (anything the server refuses for now is kept for next time). */
-function payWalk(): void {
-  const pts = WALK.pts + walkOwed, dust = WALK.dust, things = WALK.things; WALK.pts = 0; WALK.dust = 0; WALK.things = 0;
-  if (pts <= 0) return;
-  net.spacewalkPay(pts).then((r) => {
-    walkOwed = 0; setTokens(r.tokens);
-    const what = dust + ' stardust' + (things ? ' and ' + things + ' bit' + (things > 1 ? 's' : '') + ' of space junk' : '');
-    if (r.paid) { SFX.score(); floatText('+' + r.paid, me.x, me.y - 60); toast('SPACEWALK HAUL: ' + what + ' · +' + r.paid + ' tokens', 5000); }
-    else toast('SPACEWALK HAUL: ' + what + (pts < 8 ? ' · bring in 8 or more for a token' : ' · no more spacewalk pay today'), 4500);
-  }).catch((e: unknown) => { walkOwed = pts; toast(errText(e) === 'one spacewalk a minute' ? 'Your haul is banked: it pays out after your next spacewalk' : errText(e), 4000); });
-}
-function spaceArrive(from: RoomId, id: RoomId): void {
-  if (from === 'rocket' && id === 'station') {
-    quests.bump('launch'); quests.stat('flights');
-    if (save.unlock('hat:14')) setTimeout(() => { toast('You earned the SPACE HELMET! Wear it from Look', 5000); SFX.score(); }, 3000);
-    if (!save.data.stats.station) { quests.stat('station'); toast('Welcome to the SPACE STATION! No gravity up here: ' + (isTouch ? 'tap FLOAT' : 'press SPACE') + ' to push off the floor', 6000); }
-  }
-  if (from === 'roof' && id === 'rocket') { const f = flight(); toast('Welcome aboard! Liftoff in ' + mmss(f.left) + '. Strap in at a seat, or float about', 4500); }
-  if (id === 'spacewalk') { SFX.hiss(); if (!save.data.stats.walked) { quests.stat('walked'); toast('SPACEWALK! Grab the stardust drifting past. ' + (isTouch ? 'JETPACK' : 'SPACE') + ' fires your jetpack. Come back in through the airlock to get paid', 7000); } }
-  if (from === 'spacewalk' && id === 'station') SFX.hiss();
-  if (from === 'station' && id === 'park') { SFX.splash(); toast('SPLASHDOWN! The escape pod dropped you in the Park pond', 4500); }
-}
-// the hydroponic trays
-function refreshTrays(bump = false): void {
-  STATION.dirty = false; STATION.fetchedAt = Date.now();
-  net.trays().then((ts) => { STATION.trays = ts; }).catch((e) => console.warn('[trays]', e));
-  if (bump) setState({ k: 'trays', v: { n: Date.now() } }); // tell everyone else here to look again
-}
-const trayDo = <T,>(act: () => Promise<T>, ok: (r: T) => void): void => serverDo('trays', act, ok, refreshTrays);
-function tendTray(n: number): void {
-  const t = STATION.trays.find((q) => q.tray === n), mine = STATION.trays.find((q) => q.owner === net.selfId);
-  if (t && t.owner === net.selfId) {
-    const st = trayState(t);
-    openMyTray(trayLine(t, true), st.stage === 4, {
-      harvest: () => trayDo(() => net.spaceHarvest(n), (res) => {
-        setTokens(res.tokens);
-        if (res.rotten) { toast('It went off, sorry. The tray is free again', 3500); return; }
-        quests.stat('melons'); SFX.score(); celebrate(); floatText('+5');
-        toast('Harvested your STAR MELON! +5 tokens', 3500);
-        if (res.bonus) { save.addPrize(res.bonus); setTimeout(() => { toast('Inside it: a COMET BLOOM seed! Plant it in any free bed in the Rooftop garden', 5500); SFX.chime(); }, 1800); }
-      }),
-      digUp: () => trayDo(() => net.spaceDigUp(n), () => toast('Pulled up. The tray is free again', 2500)),
-    }, () => input.clear());
-    return;
-  }
-  if (t && !trayState(t).rotten) { toast(trayLine(t, false), 3500); return; }
-  if (mine) { toast('You already have a star melon growing (tray ' + (mine.tray + 1) + ')', 3500); return; }
-  SFX.blip();
-  openFreeTray(n, myTokens, () => trayDo(() => net.spacePlant(n), (bal) => { setTokens(bal); SFX.pop(); toast('Planted a STAR MELON! Ripe in 30 minutes', 3500); }), () => input.clear());
-}
-// mission control
-function spotted(th: SkyThing): void {
-  const first = !save.data.sky.includes(th.id);
-  if (first) save.update((d) => { d.sky.push(th.id); });
-  if (th.kind === 'comet') { quests.bump('comet'); quests.stat('comets'); }
-  toast((first ? 'NEW IN YOUR SKY LOG: ' : 'Spotted: ') + th.name + (th.kind === 'ufo' ? ' ...nobody is going to believe this' : th.kind === 'square' ? ' (wave to everyone down there!)' : ''), 4500);
-  setState({ k: 'scope', v: { x: th.x, y: th.y, by: me.name, saw: th.name.slice(0, 24), at: Date.now() / 1000 } });
-}
-function openScope(i: number): void {
-  const s = STATION.scope, start = s ? { x: s.x, y: s.y } : { x: 900, y: 300 };
-  SFX.blip();
-  openMission(start, {
-    aim: (x, y) => { const t = now(), key = Math.round(x / 4) + ',' + Math.round(y / 4); if (t - scopeSent > 0.33 && key !== scopeKey) { scopeSent = t; scopeKey = key; const c = STATION.scope; setState({ k: 'scope', v: { x, y, by: me.name, saw: c?.saw ?? '', at: c?.at ?? 0 } }); } },
-    spotted,
-    log: () => save.data.sky,
-  }, () => { input.clear(); if (me.use === i) leaveSpot(); const c = STATION.scope; if (c) setState({ k: 'scope', v: { ...c, by: '' } }); });
-}
-
 // ---------- the Subway (world/subway.ts): sounds that follow the clock-run train ----------
 let trainKey = '', lastClack = 0;
 function subwaySounds(): void {
@@ -1524,7 +1060,7 @@ function syncActionBar(): void {
 const emoteBar = $('#emotes');
 emoteBar.append(actBtn, sipBtn);
 $('#bar').prepend(pad); pad.style.display = 'none';
-const khud = new KaraokeHud($('#bar'));
+initKaraokeHud($('#bar'));
 for (const em of EMOTES) emoteBar.appendChild(pillButton('pill emo', em.key, em.label, () => emote(em.kind)));
 // the emote wheel: R (or MORE) opens 8 more emotes in a ring
 const wheel = document.createElement('div'); wheel.id = 'wheel';
@@ -1595,6 +1131,22 @@ function applyProfile(name: string, look: Look): void {
 }
 
 // ---------- local player ----------
+/** Your drift velocity while weightless (world px / s). */
+const zv = { x: 0, y: 0 };
+let bonkAt = 0;
+/** Weightless moving: you speed up and slow down gently, keep drifting when you let go, and bounce off walls. */
+function drift(dt: number, vx: number, vy: number, skate = false): number {
+  const free = !!room.freeFloat, ax = input.axis(), steer = !!tapTarget && !ax.x && !ax.y, push = !!(vx || vy);
+  const want = steer && tapTarget ? clamp(Math.hypot(tapTarget.x - me.x, tapTarget.y - me.y) / 40, 0.15, 1) : 1; // ease in to where you tapped
+  const rate = steer ? 6 : push ? (skate ? 2 : 2.4) : free ? 0.06 : skate ? 0.3 : 0.4, k = 1 - Math.exp(-dt * rate);
+  const mx = SPEED_X * (free ? 0.85 : skate ? 1.3 : 0.95), my = SPEED_Y * (free ? 1.1 : skate ? 1.2 : 0.95);
+  zv.x += (vx * mx * want - zv.x) * k; zv.y += (vy * my * want - zv.y) * k;
+  let moved = 0; const t = now(), nx = me.x + zv.x * dt, ny = me.y + zv.y * dt;
+  if (walkable(room, nx, me.y)) { moved += Math.abs(nx - me.x); me.x = nx; } else { if (Math.abs(zv.x) > 24 && t - bonkAt > 0.3) { bonkAt = t; SFX.bonk(); } zv.x *= -0.5; }
+  if (walkable(room, me.x, ny)) { moved += Math.abs(ny - me.y); me.y = ny; } else { if (Math.abs(zv.y) > 18 && t - bonkAt > 0.3) { bonkAt = t; SFX.bonk(); } zv.y *= -0.5; }
+  if (!push && Math.hypot(zv.x, zv.y) < 1.5) zv.x = zv.y = 0;
+  return moved;
+}
 function updateMe(dt: number): void {
   if (!playing || editing || switching) return;
   if (modalOpen() || hsFrozen()) { input.tap = null; me.moving = false; sendNet(now()); return; }
@@ -2411,7 +1963,7 @@ async function boot(): Promise<void> {
   playing = true;
   await enterRoom('lab', null);
   net.tokens().then(setTokens).catch(() => {});
-  net.isAdmin().then((a) => { isAdmin = a; void checkQueue(); }).catch(() => {});
+  net.isAdmin().then((a) => { setAdmin(a); void checkQueue(); }).catch(() => {});
   void checkMyPhotos(); setInterval(() => { void checkMyPhotos(); void checkQueue(); }, 90000);
   net.claimDaily().then((n) => { if (n !== null) { setTokens(n); toast('+5 tokens: daily bonus!', 3000); SFX.chime(); } }).catch(() => {});
   logLine(null, matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk · tap things (and people) to use them' : 'WASD / arrows or click to walk · E to use things · Q to sip · Enter to chat · 1-7 to emote');
@@ -2447,4 +1999,12 @@ if (import.meta.env.DEV && params.has('debug')) {
     dressBots: (looks: Partial<Look>[]) => { [...others.values()].forEach((o, i) => { if (looks[i]) { o.look = { ...o.look, ...looks[i] }; o.x = me.x + 50 + i * 44; o.y = me.y; } }); },
   };
 }
+// what the features (src/features/*) see of the game (getters: always the current room, player, network)
+setGame({
+  get net() { return net; }, get me() { return me; }, get room() { return room; }, get others() { return others; }, get playing() { return playing; },
+  get lobby() { return lobby; }, get tokens() { return myTokens; }, get input() { return input; }, get npcs() { return npcs; },
+  get editing() { return editing; }, isTouch, zv, R, usingOf,
+  sendMe: () => { forceSend = true; }, setState, setTokens, celebrate, floatText, everyone, hidden: hiddenAv, seasonPrize,
+  leaveSpot, clearTap: () => { tapTarget = null; }, serverDo,
+});
 void boot();
