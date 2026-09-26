@@ -189,7 +189,8 @@ function padBoard(a: number): void {
   const l1 = f.phase === 'pad' ? (f.left < 11 ? 'LIFTOFF IN' : 'NEXT LAUNCH') : f.phase === 'up' ? (f.k < 10 ? 'LIFTOFF!' : 'TO SPACE') : f.phase === 'docked' ? 'IN ORBIT' : 'COMING HOME';
   const l2 = f.phase === 'pad' ? (f.left < 11 ? String(Math.ceil(f.left)) : mmss(f.left)) : f.phase === 'up' ? 'GOOD LUCK' : f.phase === 'docked' ? 'BACK IN ' + mmss(f.left + (LAND - DEPART)) : 'LANDS ' + mmss(f.left);
   const hot = (f.phase === 'pad' && f.left < 11) || (f.phase === 'up' && f.k < 10);
-  lit(() => { txt(l1, 1805 - tw(l1) / 2, 351, [255, 180, 60]); txt(l2, 1805 - tw(l2, 2) / 2, 362, hot && (a % 1) < 0.5 ? SK.LED_RED : SK.LED, 2); });
+  const sc = tw(l2, 2) <= 80 ? 2 : 1; // (big numbers when they fit the screen, 84 px across; longer lines at normal size)
+  lit(() => { txt(l1, 1805 - tw(l1) / 2, 351, [255, 180, 60]); txt(l2, 1805 - tw(l2, sc) / 2, sc === 2 ? 362 : 366, hot && (a % 1) < 0.5 ? SK.LED_RED : SK.LED, sc); });
   G(1763, 347, 84, 34, hot ? SK.LED_RED : SK.LED, 0.08);
   if (f.phase === 'pad' && f.left > 11 && f.k - LAND > 2) lit(() => { const t = 'BOARDING NOW'; if ((a % 1.6) < 1.1) txt(t, PAD_X - tw(t) / 2, PAD_BASE + 36, K.GOLD); });
 }

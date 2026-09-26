@@ -86,7 +86,7 @@ function build(this: Room): void {
     ([[209, 367, [255, 240, 150]], [217, 390, [200, 240, 255]], [209, 405, [255, 210, 230]]] as [number, number, RGB][]).forEach(([x, y, c]) => { r(x, y, 10, 9, c); r(x + 4, y - 1, 2, 2, K.RED); });
     // the big window: night city in the rain (rain + lightning are animated)
     r(WIN.x - 6, WIN.y - 6, WIN.w + 12, WIN.h + 12, NK.WOOD_DK); r(WIN.x, WIN.y, WIN.w, WIN.h, NK.GLASS);
-    for (let x = WIN.x; x < WIN.x + WIN.w; x += 18) { const hgt = 30 + Math.floor(h1(x * 0.7) * 80); r(x, WIN.y + WIN.h - hgt, 16, hgt, NK.CITY); for (let y = WIN.y + WIN.h - hgt + 5; y < WIN.y + WIN.h - 4; y += 7) if (h1(x + y * 3) > 0.55) r(x + 3 + ((y >> 1) % 2) * 6, y, 2, 3, h1(x * y) > 0.7 ? [255, 200, 120] : [140, 170, 220]); }
+    for (let x = WIN.x; x < WIN.x + WIN.w; x += 18) { const hgt = 30 + Math.floor(h1(x * 0.7) * 80), bw = Math.min(16, WIN.x + WIN.w - x); r(x, WIN.y + WIN.h - hgt, bw, hgt, NK.CITY); for (let y = WIN.y + WIN.h - hgt + 5; y < WIN.y + WIN.h - 4; y += 7) { const wx = x + 3 + ((y >> 1) % 2) * 6; if (h1(x + y * 3) > 0.55 && wx + 2 <= x + bw) r(wx, y, 2, 3, h1(x * y) > 0.7 ? [255, 200, 120] : [140, 170, 220]); } } // (the last building is cut off by the window's edge)
     r(WIN.x + WIN.w / 2 - 2, WIN.y, 4, WIN.h, NK.WOOD_DK); r(WIN.x, WIN.y + WIN.h / 2 - 2, WIN.w, 4, NK.WOOD_DK);
     r(WIN.x - 10, WIN.y + WIN.h + 4, WIN.w + 20, 6, NK.WOOD_HI); r(WIN.x - 10, WIN.y + WIN.h + 10, WIN.w + 20, 3, NK.WOOD_DK);
     // window sill: little plants and the radio
