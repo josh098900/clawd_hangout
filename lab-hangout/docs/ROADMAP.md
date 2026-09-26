@@ -85,8 +85,8 @@ Guiding rules (from what already works):
 - [x] 15. The Moon (bonus: the lander, the surface, the Moon Base, moon rocks, the buggy)
 
 ## Phase 8 — The next plan (one step at a time, polished: see docs/PLAN.md and ART_STYLE §9)
-- [ ] 16. The map: fast travel between rooms, and where your friends are  ← next
-- [ ] 17. The Science Wing: the reactor control room (co-op, cartoon meltdowns, HAZMAT suit) + the chemistry bench
+- [x] 16. The map: fast travel between rooms, and where your friends are
+- [ ] 17. The Science Wing: the reactor control room (co-op, cartoon meltdowns, HAZMAT suit) + the chemistry bench  ← next
 - [ ] 18. Submarine + City Aquarium (the aquarium on the Pier, the sub dives from it; crew stations)
 - [ ] 19. The Airport (check-in, X-ray scanner, baggage carousel, departures board) + its first destinations
 - [ ] 20. Carnival on the Pier

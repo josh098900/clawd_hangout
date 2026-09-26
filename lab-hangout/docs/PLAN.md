@@ -194,7 +194,7 @@ Chosen with Josh after the Moon. Same five-stage loop as above, plus **the polis
 (ART_STYLE §9): a detailed design brief for Josh before any code, rooms built in layers, a
 close-up review and a polish pass before anything is called done.
 
-## 16. The map (fast travel)  ← built, waiting for Josh's check (brief: docs/briefs/16-map.md)
+## 16. The map (fast travel): done and confirmed (brief: docs/briefs/16-map.md)
 27 rooms is a lot of walking. A map of the whole world (the Lab, the Square, the Subway line, the
 Station and the Moon...) that shows where everyone is, with your friends marked; pick a room to go
 there. **Built** (migration `0020_map.sql`, just the EXPLORER badge): M / the MAP pill (phones: the bottom bar) and
@@ -203,7 +203,7 @@ lander bay); the city by day and night with the train, rocket and lander on thei
 everyone's dot, friends' name tags, YOU; a card per place with a live look inside; Earth is free, space keeps its rides
 (the escape pod is a way home); ? stickers + the EXPLORER badge; WHO'S ONLINE's GO follows the same rules.
 
-## 17. The Science Wing
+## 17. The Science Wing  ← next
 Off the Lab. The centrepiece is the **reactor control room**: stations for the rods, the coolant
 pumps, the turbine and the gauge wall, one player each; the reactor drifts, alarms go off, and you
 keep it in the green together. A **meltdown** is cartoon, not scary: the room goes green and
