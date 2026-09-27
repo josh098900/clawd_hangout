@@ -487,8 +487,10 @@ Two or three a dive, from the dive's seed, like the reactor's faults. Each is fi
     - A bigger catch later puts that one in your records.
     - The same fish twice is refused.
   - **The Pier's catch toast** now adds *BIGGER THAN THE AQUARIUM'S!* (or *THE AQUARIUM WANTS ONE!* for an empty tank).
-  - **MARINA** wears a lab coat and the SNORKEL. Her day is 15 minutes on the clock, so she's at the ladder for every
-    feeding and scatters food. **CAP'N BARNACLE**'s day follows SARDINE 1's 8 minutes: at the gangway while it boards,
+  - **MARINA** wears a lab coat and the SNORKEL. Her day is 15 minutes on the clock: at every feeding she climbs up the
+    ladder and throws food in from there. (At first she fed standing on the FEED step at its foot, and E there offered
+    TALK instead of FEED: Josh spotted it live. She now keeps clear of every spot players use, the touch pool
+    included, and the golden test fails if any NPC waits where E would offer TALK instead of a spot.) **CAP'N BARNACLE**'s day follows SARDINE 1's 8 minutes: at the gangway while it boards,
     and back there to meet it.
   - **The drawing is heavy** (tanks, creatures, jellies, a submarine), so:
     - the tank's still water and far rocks are baked into the set

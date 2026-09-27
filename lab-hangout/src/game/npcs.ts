@@ -253,22 +253,25 @@ const DEFS: NpcDef[] = [
     chat: ['rods out, more power. and more heat. mostly heat', 'the city wants more at night. everyone\'s streaming cat videos', 'big red button\'s the SCRAM. only when it\'s really, really bad', 'if the pool turns green, that\'s... fine. probably fine', 'there was a pigeon in the vent last week. i named him Gerald', 'suits on past the glass. house rules', 'clock in on the clipboard by the door. 4 minutes a shift', 'at a station: 1 turns it down, 2 turns it up'],
   },
   {
-    // THE CITY AQUARIUM's keeper: at the ladder for FEEDING TIME (the first 90 s of every 15 minutes, on the clock), then round the
-    // tanks, the jellies and the touch pool, and a long spell at the CURATOR'S DESK (behind it, facing you)
+    // THE CITY AQUARIUM's keeper: up the ladder for FEEDING TIME (the first 90 s of every 15 minutes, on the clock: she feeds
+    // from the top, so the FEED step at its foot stays free for players), then round the tanks, the jellies and the touch
+    // pool (beside it, not in its spot), and a long spell at the CURATOR'S DESK (behind it, facing you); back up the ladder
     id: 'npc-marina', name: 'MARINA', room: 'aquarium', speed: 34, cycle: 900,
     look: { c: 1, hat: 0, face: 10, fit: 1, sp: 0 },
     stops: [
-      { x: 1222, y: 490, wait: 90, say: ['dinner time!', 'not you, doris! wait your turn', 'who wants sprats?'] },
+      { x: 1238, y: 380, wait: 90, say: ['dinner time!', 'not you, doris! wait your turn', 'who wants sprats?'] },
+      { x: 1222, y: 490 },
       { x: 1000, y: 496, wait: 24, say: ['look at them go', 'doris ate four buckets. four'] },
       { x: 1330, y: 510, wait: 40, say: ['hello, jellies', 'no brains. lucky them'] },
       { x: 1250, y: 560 },
-      { use: 6, wait: 25, say: ['gently! two fingers', 'the crab is called CLIVE. he knows what he did'] },
-      { x: 552, y: 506, wait: 480, say: ['any catches for the gallery?', 'next!', 'the ledger is nearly full. of empty pages'] },
+      { x: 1250, y: 596, wait: 25, say: ['gently! two fingers', 'the crab is called CLIVE. he knows what he did'] },
+      { x: 552, y: 506, wait: 470, say: ['any catches for the gallery?', 'next!', 'the ledger is nearly full. of empty pages'] },
       { x: 400, y: 494, wait: 30, say: ['these tanks need a wipe', 'squeaky clean'] },
       { x: 700, y: 494, wait: 30, say: ['nearly there...', 'who put a sticker on the glass?'] },
       { x: 150, y: 500, wait: 30, say: ['welcome to the aquarium!', 'admission is free. donations welcome'] },
       { x: 292, y: 500, wait: 30, say: ['anything catch your eye?', 'the shark fin is very popular'] },
       { x: 1222, y: 490 },
+      { x: 1238, y: 380 },
     ],
     chat: ['every tank in the gallery is waiting for someone\'s catch. maybe yours', 'the whale shark\'s name is DORIS. gentle giant. mostly giant', 'don\'t tap the glass. the octopus taps back', 'feeding time is every fifteen minutes. grab a scoop!', 'the jellies have no brains. very relaxing company', 'somebody donated a boot. i love it. it is the best boot', 'catch something big off the Pier and bring it to my desk'],
   },

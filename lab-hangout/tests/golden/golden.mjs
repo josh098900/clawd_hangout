@@ -110,7 +110,22 @@ const res = await p.evaluate(async () => {
     for (let k = 0; k < 480; k++) { const d = subG.dive(t0 + k * 1000 + 500), i = PH.indexOf(d.phase), s = subG.penSink(d); if (i < last || !(s >= 0 && s <= 1) || !(subG.backIn(d) >= 0) || !(d.left > 0)) bad++; last = i; sig += d.phase[0] + (s === 0 ? '0' : s === 1 ? '1' : 'x'); }
     const f0 = Math.floor(Date.now() / 900000) * 900000; for (let k = 0; k < 900; k++) { const f = aqG.feeding(f0 + k * 1000 + 500); if (f.on !== (k < 90) || !(f.next > 0 && f.next <= 900)) bad++; }
     if (bad) throw new Error('aquarium: ' + bad + ' bad seconds in the timetables');
+
     out.sub = sig.length + ':' + [...sig].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
+  // NPCs never wait where E would offer TALK instead of a spot players need (currentAction asks nearestNpc(30), dy x1.5,
+  // before nearestSpot(20)): MARINA once stood on the aquarium's FEED step all through feeding time. A few short, older
+  // stops are known and left be (COOKIE's by the kitchen stations on purpose: talking to COOKIE starts the tour).
+  { const { Npcs } = await import('/src/game/npcs.ts'), bad = [];
+    const KNOWN = new Set(['npc-fizz:0', 'npc-fizz:5', 'npc-fizz:8', 'npc-fizz-chem:3', 'npc-gus:2', 'npc-gus:6', 'npc-gus:7', 'npc-oak:2', 'npc-oak:4', 'npc-cookie:0', 'npc-cookie:1', 'npc-cookie:2', 'npc-cookie:3', 'npc-cookie:5', 'npc-fern:1', 'npc-cosmo:1']);
+    for (const n of new Npcs(rooms).list) {
+      const room = rooms[n.def.room];
+      n.def.stops.forEach((st, si) => {
+        if (!st.wait || KNOWN.has(n.def.id + ':' + si)) return;
+        const at = st.use !== undefined ? [room.spots[st.use].sx, room.spots[st.use].sy] : [st.x, st.y];
+        room.spots.forEach((sp, j) => { if (j !== st.use && Math.hypot(sp.sx - at[0], (sp.sy - at[1]) * 1.5) < 34) bad.push(n.def.id + ' stop ' + si + ' by ' + n.def.room + ' spot ' + j + ' (' + sp.kind + ')'); });
+      });
+    }
+    if (bad.length) throw new Error('NPCs in the way of spots: ' + bad.join('; ')); }
   { const t = chemG.ALL_MIXES.map((m) => { const o = chemG.outcome(m); return m + ':' + o.kind + ':' + o.name + ':' + o.c.join('.') + ':' + o.dur; }).join(' '); out.chem = t.length + ':' + [...t].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
   out.reactor = [7, 4242, 99999].map((seed) => { let g = { ...rx.newShift('h', 'H', 2, 1790000000000), seed }; g.fixed = rx.faults(g).map(() => 0); g.rods = 6; g.pumps = 3; g.turb = 7; g = rx.advance(g, g.t0 + 240000, () => 0.3); return [g.heat.toFixed(3), g.sat.toFixed(3), g.secs, g.melt, rx.grid(g)].join(','); }).join(' ');
   out.fmt = [0, 0.4, 9.5, 59.4, 59.6, 60, 119.6, 600, 3599.9].map((s) => [fm.mmss(s), fm.mmss(s), gd.duration(s * 60), kt.raceTime(s * 1000)].join(',')).join(' ');

@@ -115,7 +115,8 @@ export function aqStep(): void {
   if (!f.on && f.next <= FEED_BELL && bellKey !== f.n) { bellKey = f.n; SFX.bell(); toast('FEEDING TIME in a minute! By the ladder at the ocean tank', 3500); }
   if (f.on && fedKey !== f.n && f.k < 3) { fedKey = f.n; SFX.bell(); SFX.splash(); toast('FEEDING TIME! Stand by the ladder and FEED to help', 4000); }
   const m = game.npcs.byId('npc-marina');
-  if (f.on && m && t - feedEmote > 2.6 && Math.abs(m.av.x - (AQR.ladder - 16)) < 6) { feedEmote = t; m.av.emote = { kind: 'feed', t0: t }; AQUA.scoops.push({ x: AQR.tank0 + 80 + Math.random() * (AQR.tank1 - AQR.tank0 - 160), t0: performance.now() / 1000 + 0.4 }); }
+  // MARINA feeds from the top of the ladder: a throw every few seconds while she's up there
+  if (f.on && m && t - feedEmote > 2.6 && m.av.y < 400) { feedEmote = t; m.av.emote = { kind: 'feed', t0: t }; AQUA.scoops.push({ x: AQR.tank0 + 80 + Math.random() * (AQR.tank1 - AQR.tank0 - 160), t0: performance.now() / 1000 + 0.4 }); }
   const T = performance.now() / 1000; while (AQUA.scoops.length && T - AQUA.scoops[0].t0 > 9) AQUA.scoops.shift();
   // the jelly disco: three or more dancing in the jelly room
   AQUA.jellyDancers = game.everyone().filter((av) => av.pose === POSE_DANCE && !av.moving && av.x > AQR.jelly && av.x < AQR.pen).length;
