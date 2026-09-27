@@ -33,7 +33,7 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
@@ -64,11 +64,23 @@ const res = await p.evaluate(async () => {
     px.withCtx(c.getContext('2d'), () => { for (const m of chemG.ALL_MIXES) for (const u of [0.3, 1.5, 3.2]) for (const b of [0, 1]) { chemW.CHEM.live = [liveMix(b, m, u)]; chemW.CHEM.duo = null; chemScene(); } });
     px.PX.glow = pg; px.PX.ctx = pc; }
   chemW.CHEM.live = []; chemW.CHEM.duo = null;
+  // THE CITY AQUARIUM: the gallery with every tank full (each fish at its own size), feeding time, the jelly disco, and
+  // SARDINE 1 in the pen (and its periscope off the Pier) at each point of its 8 minutes; the season's extras further down
+  const aqG = await import('/src/game/aquarium.ts'), aqW = await import('/src/world/aquarium.ts'), subG = await import('/src/game/sub.ts'), ar = rooms.aquarium;
+  const aqScene = () => { ar.drawBack(A); for (const pr of [...ar.props].sort((p, q) => p.y - q.y)) pr.draw(A); };
+  aqG.GALLERY.forEach((f, i) => aqG.GAL.tanks.set(f, { fish: f, name: 'NAME' + i, cm: 10 + i * 9, at: 0 }));
+  out['aquarium:gallery'] = draw(ar, aqScene);
+  aqG.FEED.skew = 30 - (Date.now() / 1000) % 900; aqW.AQUA.scoops.push({ x: 1000, t0: performance.now() / 1000 - 2 }); out['aquarium:feeding'] = draw(ar, aqScene); aqG.FEED.skew = 0; aqW.AQUA.scoops.length = 0;
+  aqW.AQUA.jellyDancers = 3; out['aquarium:disco'] = draw(ar, aqScene); aqW.AQUA.jellyDancers = 0;
+  for (const k of [20, 95, 200, 475]) { subG.SUB.skew = k - (Date.now() / 1000) % 480; out['aquarium:sub:' + k] = draw(ar, aqScene); out['pier:sub:' + k] = draw(rooms.pier, () => rooms.pier.drawBack(A)); }
+  subG.SUB.skew = 0; aqG.GAL.tanks.clear();
   season.setSeason('winter'); W.installWinter(rooms);
   for (const room of Object.values(rooms)) draw(room, () => W.winterGround(room)); // (build the snow once first: the snow layer is cached, like in the game)
   for (const [id, room] of Object.entries(rooms)) out[id + ':winter'] = draw(room, () => { W.winterGround(room); W.winterBack(room, A); for (const pr of W.winterProps(id)) pr.draw(A); W.winterFront(room, A, { x: 0, y: 0, w: room.w, h: room.h }, false); });
+  out['aquarium:own:winter'] = draw(ar, aqScene); // (the diver's Santa hat, the snowflake in the ocean tank)
   season.setSeason('halloween'); HW.installHalloween(rooms);
   for (const [id, room] of Object.entries(rooms)) out[id + ':halloween'] = draw(room, () => { HW.halloweenBack(room, A); for (const pr of HW.halloweenProps(id)) pr.draw(A); HW.halloweenFront(room, A); });
+  out['aquarium:own:halloween'] = draw(ar, aqScene); // (the diver's witch hat, a skeleton fish, cobwebs in the gallery)
   // the city map: the city baked by night and by day, and its live layer (people and a friend, you, a hover, a pin
   // dropping, ? stickers, a YOU ARE HERE, a house party), plain and in both seasons
   const mp = await import('/src/world/map.ts');
@@ -93,6 +105,12 @@ const res = await p.evaluate(async () => {
   // THE CHEM LAB's chemistry: 84 mixes, each makes something well formed (the table itself is fingerprinted too)
   let badChem = 0; for (let m = 0; m < 256; m++) { if (!chemG.okMix(m)) continue; const o = chemG.outcome(m); if (!o.name || !(o.dur > 0) || !o.kind || o.c.length !== 3 || o.c.some((v) => !(v >= 0 && v <= 255))) badChem++; }
   if (chemG.ALL_MIXES.length !== 84 || badChem) throw new Error('chem: ' + chemG.ALL_MIXES.length + ' mixes, ' + badChem + ' malformed');
+  // SARDINE 1's timetable and feeding time, every second of their loops: phases in order, the sub never half out of the pen for long
+  { const PH = ['board', 'submerge', 'dive', 'home', 'surface'], t0 = Math.floor(Date.now() / 480000) * 480000; let last = 0, bad = 0, sig = '';
+    for (let k = 0; k < 480; k++) { const d = subG.dive(t0 + k * 1000 + 500), i = PH.indexOf(d.phase), s = subG.penSink(d); if (i < last || !(s >= 0 && s <= 1) || !(subG.backIn(d) >= 0) || !(d.left > 0)) bad++; last = i; sig += d.phase[0] + (s === 0 ? '0' : s === 1 ? '1' : 'x'); }
+    const f0 = Math.floor(Date.now() / 900000) * 900000; for (let k = 0; k < 900; k++) { const f = aqG.feeding(f0 + k * 1000 + 500); if (f.on !== (k < 90) || !(f.next > 0 && f.next <= 900)) bad++; }
+    if (bad) throw new Error('aquarium: ' + bad + ' bad seconds in the timetables');
+    out.sub = sig.length + ':' + [...sig].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
   { const t = chemG.ALL_MIXES.map((m) => { const o = chemG.outcome(m); return m + ':' + o.kind + ':' + o.name + ':' + o.c.join('.') + ':' + o.dur; }).join(' '); out.chem = t.length + ':' + [...t].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
   out.reactor = [7, 4242, 99999].map((seed) => { let g = { ...rx.newShift('h', 'H', 2, 1790000000000), seed }; g.fixed = rx.faults(g).map(() => 0); g.rods = 6; g.pumps = 3; g.turb = 7; g = rx.advance(g, g.t0 + 240000, () => 0.3); return [g.heat.toFixed(3), g.sat.toFixed(3), g.secs, g.melt, rx.grid(g)].join(','); }).join(' ');
   out.fmt = [0, 0.4, 9.5, 59.4, 59.6, 60, 119.6, 600, 3599.9].map((s) => [fm.mmss(s), fm.mmss(s), gd.duration(s * 60), kt.raceTime(s * 1000)].join(',')).join(' ');

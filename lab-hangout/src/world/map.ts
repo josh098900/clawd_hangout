@@ -9,7 +9,7 @@
 // their real timetables, the weather, the people). ui/map.ts puts it on the screen; features/map.ts
 // decides where a click takes you.
 
-import { K, DK, CK, NK, RK, PK, SK, MN, MP, RX, CONFETTI, type RGB } from '../engine/palette';
+import { K, DK, CK, NK, RK, PK, SK, MN, MP, RX, AQ, CONFETTI, type RGB } from '../engine/palette';
 import { PX, r, line, disc, oval, txt, tw, lit, alpha, G, Gd, Gline, M, shade, bake, star4 } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import type { Rect, RoomId } from './room';
@@ -22,6 +22,7 @@ import { weather, wind, lightning } from './weather';
 import { isHalloween, isWinter } from './season';
 import { EXPLORE } from '../game/places';
 import { gridOn, meltAgo } from './grid';
+import { dive, penSink, SUB_DOWN, SUB_UP } from '../game/sub';
 
 export const MAP_W = 480, MAP_H = 300;
 /** The horizon, where the Square's buildings stand, and the edges of the Square and the road. */
@@ -71,7 +72,8 @@ export const PLACES: MapPlace[] = [
   { id: 'cinema', name: 'THE CINEMA', hits: [R_(94, 112, 144, 150)], at: [119, 149], zone: 'earth', pick: true, tag: [140, 133] },
   { id: 'stage', name: 'THE STAGE', hits: [R_(148, 56, 172, 150)], at: [160, 149], zone: 'earth', pick: true, tag: [174, 66] },
   { id: 'lofts', name: 'THE LOFTS', hits: [R_(334, 56, 388, 150)], at: [361, 149], zone: 'earth', pick: true, tag: [327, 61] },
-  { id: 'pier', name: 'THE PIER', hits: [R_(388, 96, 480, 214)], at: [440, 164], zone: 'earth', pick: true, tag: [464, 180] },
+  { id: 'aquarium', name: 'THE CITY AQUARIUM', hits: [R_(406, 182, 470, 214)], at: [431, 203], zone: 'earth', pick: true, tag: [399, 186] },
+  { id: 'pier', name: 'THE PIER', hits: [R_(388, 96, 480, 214)], at: [440, 164], zone: 'earth', pick: true, tag: [416, 140] },
   { id: 'park', name: 'CITY PARK', hits: [R_(2, 204, 142, 298)], at: [72, 288], zone: 'earth', pick: true, tag: [6, 210] },
   { id: 'diner', name: 'THE GREASY BYTE', hits: [R_(166, 246, 292, 298)], at: [236, 292], zone: 'earth', pick: true, tag: [172, 249] },
   { id: 'karts', name: 'THE KART TRACK', hits: [R_(308, 206, 480, 298)], at: [392, 262], zone: 'earth', pick: true, tag: [312, 218] },
@@ -160,6 +162,16 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
       r(px - 1, 173, 5, 2, dn(PK.PALM_DK, PK.PALM)); }
     for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2; r(Math.round(398 + Math.cos(an) * 5), Math.round(205 + Math.sin(an) * 2), 1, 1, dn(PK.ROCK, [140, 140, 150])); }
     line(394, 206, 402, 203, dn(PK.LOG, [120, 80, 50]), 1); line(394, 203, 402, 206, dn(PK.LOG, [120, 80, 50]), 1);
+    // THE CITY AQUARIUM on the water's edge below the pier (past the lighthouse, along the beach), its boardwalk, THE SUB PEN beside it
+    { const x0 = 412, x1 = 450, top = 197, base = 212, wall = dn(M(AQ.WALL, [20, 30, 60], 0.55), AQ.WALL);
+      r(404, 207, 9, 3, dn(PK.WOOD, [196, 160, 110])); r(404, 207, 9, 1, dn(PK.WOOD_HI, [220, 190, 140])); // the boardwalk from the sand
+      r(x0, top, x1 - x0, base - top, wall); r(x1 - 2, top, 2, base - top, shade(wall, 0.8)); r(x0, base - 3, x1 - x0, 3, dn(AQ.TILE, AQ.TILE2));
+      for (let x = x0; x < x1; x++) { const t = top - 3 + Math.round(Math.sin(x * 0.7)); r(x, t, 1, top - t + 2, dn(AQ.BAND_DK, AQ.BAND)); r(x, t, 1, 1, dn(AQ.BAND, AQ.BAND_HI)); } // the wavy roof band
+      for (let wx = x0 + 3; wx < x1 - 4; wx += 7) { if (wx > 427 && wx < 436) continue; if (day) { r(wx, top + 4, 5, 5, [150, 200, 230]); r(wx, top + 4, 5, 1, [210, 236, 250]); } else { r(wx, top + 4, 5, 5, [60, 160, 230]); WGLOW.push([wx, top + 4, 5, 5]); } }
+      r(429, top + 5, 6, base - top - 8, dn([16, 30, 56], [90, 150, 196])); r(431, top + 5, 1, base - top - 8, dn(AQ.FRAME, AQ.FRAME_HI)); if (!day) WGLOW.push([429, top + 5, 6, base - top - 8]); // the doors
+      const tail = dn(AQ.BAND_DK, AQ.BAND); r(420, 188, 2, 7, tail); r(416, 187, 4, 2, tail); r(422, 187, 4, 2, tail); r(415, 186, 2, 1, tail); r(425, 186, 2, 1, tail); // the whale tail on the roof
+      const st = dn([70, 76, 86], [150, 156, 166]); r(452, 201, 15, base - 201, st); for (let x = 452; x < 467; x += 2) r(x, 201, 1, base - 201, shade(st, 0.85)); r(451, 199, 17, 2, shade(st, 0.7)); // the pen
+      disc(459, 206, 2, dn(AQ.BRASS_DK, AQ.BRASS)); r(458, 206, 2, 1, dn([30, 70, 80], [60, 120, 130])); }
 
     // ---- THE LAB tower: the Lab, the Dev Den upstairs, the Rooftop garden and the spaceport on top ----
     { const b = dn(K.BRICK, [168, 84, 64]), m = dn(K.MORTAR, [120, 70, 56]);
@@ -537,7 +549,11 @@ export function drawMapLive(L: MapLive): void {
   { const bx = 404 + ((a * 3) % 90), by = 128; if (bx < 474) { r(Math.round(bx), by, 7, 2, [240, 236, 220]); r(Math.round(bx) + 1, by + 2, 5, 1, K.BROWN); r(Math.round(bx) + 3, by - 7, 1, 7, [70, 60, 50]); r(Math.round(bx) + 4, by - 6, 3, 5, K.WHITE); } }
   { const cx = 390 + ((Math.sin(a * 0.4) + 1) * 6), cy = 210; r(Math.round(cx), cy, 3, 1, PK.CRAB); r(Math.round(cx) - 1, cy - 1, 1, 1, PK.CRAB); r(Math.round(cx) + 3, cy - 1, 1, 1, PK.CRAB); }
   lit(() => r(473, 155, 3, 2, M([120, 100, 60], [255, 230, 170], night))); if (night > 0.1) Gd(474, 156, 4, [255, 230, 170], 0.4 * night);
-  { const by = 194 + Math.round(Math.sin(a * 1.6)); r(432, by, 3, 4, K.RED); r(432, by, 3, 1, [255, 120, 120]); r(433, by - 2, 1, 2, K.STEEL_POST); if ((a % 2) < 0.3) { lit(() => r(433, by - 3, 1, 1, [255, 90, 90])); Gd(433, by - 3, 4, [255, 90, 90], 0.5); } } // a buoy, bobbing and blinking
+  { const by = 186 + Math.round(Math.sin(a * 1.6)); r(472, by, 3, 4, K.RED); r(472, by, 3, 1, [255, 120, 120]); r(473, by - 2, 1, 2, K.STEEL_POST); if ((a % 2) < 0.3) { lit(() => r(473, by - 3, 1, 1, [255, 90, 90])); Gd(473, by - 3, 4, [255, 90, 90], 0.5); } } // a buoy, bobbing and blinking
+  // THE CITY AQUARIUM: SARDINE 1 bobbing by its pen, or (on a dive) its periscope heading out to sea and coming back
+  { const dv = dive(), sink = penSink(dv), out = dv.k >= SUB_DOWN && dv.k < SUB_DOWN + 44 ? (dv.k - SUB_DOWN) / 44 : dv.k >= SUB_UP - 44 && dv.k < SUB_UP ? 1 - (dv.k - (SUB_UP - 44)) / 44 : -1;
+    if (sink < 1) { const sy = 207 + Math.round(sink * 3 + Math.sin(a * 1.6) * 0.6); r(469, sy, 8, 3, AQ.SUB); r(469, sy, 8, 1, AQ.SUB_HI); r(472, sy - 2, 2, 2, AQ.SUB_DK); }
+    else if (out >= 0) { const px = Math.round(470 - out * 6), py = Math.round(206 - out * 20); r(px, py - 2, 1, 2, [70, 76, 90]); lit(() => { r(px - 1, py + 1, 1, 1, PK.FOAM); r(px + 1, py + 1, 1, 1, PK.FOAM); r(px - 2, py + 2, 1, 1, PK.FOAM); r(px + 2, py + 2, 1, 1, PK.FOAM); }); } }
   // ---- the Park: the pond's ripples, a rowing boat going round, ducks, a kite up on the wind ----
   lit(() => { for (let i = 0; i < 6; i++) if ((a * 0.5 + h1(i + 3)) % 1 < 0.4) r(48 + Math.floor(h1(i * 3.9) * 44), 251 + Math.floor(h1(i * 7.3) * 12), 3, 1, day > 0.5 ? MP.POND_HI_D : MP.POND_HI); });
   { const an = a * 0.12, bx = 70 + Math.cos(an) * 18, by = 258 + Math.sin(an) * 6; r(Math.round(bx) - 3, Math.round(by), 7, 2, PK.WOOD_HI); r(Math.round(bx) - 3, Math.round(by) + 2, 7, 1, PK.WOOD_DK); line(Math.round(bx) - 5, Math.round(by) + 2 + Math.round(Math.sin(a * 3)), Math.round(bx) + 5, Math.round(by) + 1 - Math.round(Math.sin(a * 3)), [200, 180, 140]); }

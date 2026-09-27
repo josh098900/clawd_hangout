@@ -171,6 +171,18 @@ export class SupabaseApi implements Api {
     crystals: async () => n0(await rpc(this.sb, 'moon_crystals')),
   };
 
+  /** THE CITY AQUARIUM (0023_aquarium.sql). */
+  readonly aquarium: Api['aquarium'] = {
+    tanks: async () => {
+      const o = await rpcJson(this.sb, 'aquarium_tanks', {});
+      const cms = (v: unknown): Record<string, number> => { const out: Record<string, number> = {}; if (v && typeof v === 'object') for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (typeof n === 'number') out[k] = n; return out; };
+      const tanks = (Array.isArray(o.tanks) ? o.tanks : []).map((t: Record<string, unknown>) => ({ fish: String(t.fish ?? ''), name: who(t.name), cm: n0(t.cm), at: n0(t.at) }));
+      return { tanks, best: cms(o.best), mine: cms(o.mine) };
+    },
+    donate: async (fish) => { const o = await rpcJson(this.sb, 'donate_fish', { fish }); return { plaque: o.plaque === true, cm: n0(o.cm), first: o.first === true, paid: n0(o.paid), tokens: n0(o.tokens), prev: typeof o.prev === 'string' ? who(o.prev) : null }; },
+    buy: async (item) => { const o = await rpcJson(this.sb, 'gift_shop', { item }); return { item: String(o.item ?? ''), tokens: n0(o.tokens) }; },
+  };
+
   /** Tips paid for a performance (the server caps them). */
   readonly tips: Api['tips'] = {
     karaoke: async (score) => { const o = await rpcJson(this.sb, 'karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },

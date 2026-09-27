@@ -105,7 +105,7 @@ const DEFS: NpcDef[] = [
       { x: 600, y: 600, wait: 8, say: ['watch the lighthouse', 'hear the waves?'] },
       { x: 730, y: 560 },
     ],
-    chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.'],
+    chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.', 'past the lighthouse there is an AQUARIUM now. they want our catches for their tanks'],
   },
   {
     id: 'npc-boo', name: 'BOO', room: 'plaza', speed: 22, season: 'halloween', ghost: true,
@@ -251,6 +251,44 @@ const DEFS: NpcDef[] = [
       { x: 380, y: 566, wait: 10, holdAfter: 0, say: ['the big board never lies', 'the city wants more at night'] },
     ],
     chat: ['rods out, more power. and more heat. mostly heat', 'the city wants more at night. everyone\'s streaming cat videos', 'big red button\'s the SCRAM. only when it\'s really, really bad', 'if the pool turns green, that\'s... fine. probably fine', 'there was a pigeon in the vent last week. i named him Gerald', 'suits on past the glass. house rules', 'clock in on the clipboard by the door. 4 minutes a shift', 'at a station: 1 turns it down, 2 turns it up'],
+  },
+  {
+    // THE CITY AQUARIUM's keeper: at the ladder for FEEDING TIME (the first 90 s of every 15 minutes, on the clock), then round the
+    // tanks, the jellies and the touch pool, and a long spell at the CURATOR'S DESK (behind it, facing you)
+    id: 'npc-marina', name: 'MARINA', room: 'aquarium', speed: 34, cycle: 900,
+    look: { c: 1, hat: 0, face: 10, fit: 1, sp: 0 },
+    stops: [
+      { x: 1222, y: 490, wait: 90, say: ['dinner time!', 'not you, doris! wait your turn', 'who wants sprats?'] },
+      { x: 1000, y: 496, wait: 24, say: ['look at them go', 'doris ate four buckets. four'] },
+      { x: 1330, y: 510, wait: 40, say: ['hello, jellies', 'no brains. lucky them'] },
+      { x: 1250, y: 560 },
+      { use: 6, wait: 25, say: ['gently! two fingers', 'the crab is called CLIVE. he knows what he did'] },
+      { x: 552, y: 506, wait: 480, say: ['any catches for the gallery?', 'next!', 'the ledger is nearly full. of empty pages'] },
+      { x: 400, y: 494, wait: 30, say: ['these tanks need a wipe', 'squeaky clean'] },
+      { x: 700, y: 494, wait: 30, say: ['nearly there...', 'who put a sticker on the glass?'] },
+      { x: 150, y: 500, wait: 30, say: ['welcome to the aquarium!', 'admission is free. donations welcome'] },
+      { x: 292, y: 500, wait: 30, say: ['anything catch your eye?', 'the shark fin is very popular'] },
+      { x: 1222, y: 490 },
+    ],
+    chat: ['every tank in the gallery is waiting for someone\'s catch. maybe yours', 'the whale shark\'s name is DORIS. gentle giant. mostly giant', 'don\'t tap the glass. the octopus taps back', 'feeding time is every fifteen minutes. grab a scoop!', 'the jellies have no brains. very relaxing company', 'somebody donated a boot. i love it. it is the best boot', 'catch something big off the Pier and bring it to my desk'],
+  },
+  {
+    // SARDINE 1's skipper, on the dock in the SUB PEN, through the sub's 8-minute loop (game/sub.ts): at the gangway while it boards,
+    // watching it go down, the dive board, the rope, the toolbox, and back at the gangway to meet it
+    id: 'npc-barnacle', name: "CAP'N BARNACLE", room: 'aquarium', speed: 28, cycle: 480,
+    look: { c: 7, hat: 18, face: 4, fit: 12, sp: 0 },
+    stops: [
+      { x: 1548, y: 532, wait: 90, say: ['sea trials! no passengers yet', 'she dives in a minute. empty, for now', 'stand clear of the gangway!'] },
+      { x: 1640, y: 532, wait: 36, say: ['down she goes...', 'dive, dive!'] },
+      { x: 1726, y: 532 },
+      { x: 1754, y: 490, wait: 60, say: ['six and a half minutes under', 'all systems... probably fine'] },
+      { x: 1726, y: 532 },
+      { x: 1452, y: 552, wait: 60, say: ['this rope has seen things', 'a sailor coils his rope. that\'s the rule'] },
+      { x: 1740, y: 570, wait: 80, say: ['where is my wrench', 'ah. there is my wrench'] },
+      { x: 1600, y: 532, wait: 60, say: ['she\'s coming home', 'any minute now'] },
+      { x: 1548, y: 532 },
+    ],
+    chat: ['ahoy! CAP\'N BARNACLE, skipper of SARDINE 1', 'finest sub in the harbour. the only sub, but still', 'soon you\'ll be able to come down with me. sea trials first!', 'we call her SARDINE because it gets cosy in there', 'the SEA GATE opens under the water. how? a secret', 'i once saw a whale. or a very big rock. it winked at me'],
   },
   {
     id: 'npc-sage', name: 'SAGE', room: 'den', speed: 38, cycle: 1800, // one pomodoro: code for the focus, break for the break

@@ -74,6 +74,9 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Work a reactor station (Science Wing) | E at RODS / COOLANT / TURBINE, then 1 down · 2 up; E twice at SCRAM (the cover, then the button) | ▼ ▲ buttons |
 | Mix at a chem lab bench (Science Wing) | E at a bench, 1-8 to put 2 or 3 reagents in (again to take one out), then E to MIX | the reagent pills, then MIX! |
 | Drink a potion you've made | Q (here or anywhere) | DRINK button |
+| Donate a catch (City Aquarium, past the lighthouse) | E at the CURATOR'S DESK, then DONATE on a fish you've caught | the DONATE button |
+| Buy at the aquarium's gift shop | E at the till | the SHOP button |
+| Help at feeding time (every 15 min) | E at the step by the ocean tank's ladder | the FEED! button |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
@@ -137,6 +140,9 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
     CHIEF ENGINEER badge
 22. `supabase/migrations/0022_chem.sql`: THE CHEM LAB's daily quest (brew a potion) and the CHEMIST badge (the whole
     recipe book). The mixing itself needs nothing from the server
+23. `supabase/migrations/0023_aquarium.sql`: THE CITY AQUARIUM: the FISH GALLERY (donate your biggest catch of each kind;
+    a bigger one takes the tank's plaque; your first of each kind pays a thank-you), the gift shop (four clothes, and
+    prices for its four pieces of furniture), the donate and feeding quests, and the CURATOR badge
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

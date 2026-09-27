@@ -36,6 +36,7 @@ const PUMPKINS: Partial<Record<RoomId, [number, number, number][]>> = {
   diner: [[760, 492, 1]], lofts: [[820, 500, 1]], station: [[1000, 488, 1]],
   subway: [[300, 520, 1], [1100, 520, 0]], parkstn: [[300, 520, 1], [1100, 520, 0]], dinerstn: [[300, 520, 1], [1100, 520, 0]], kartstn: [[300, 520, 1], [1100, 520, 0]],
   wing: [[250, 474, 1], [1040, 474, 0]], reactor: [[590, 486, 1]], chem: [[196, 474, 1], [546, 474, 0]],
+  aquarium: [[116, 490, 1], [1404, 488, 0], [1730, 530, 1]],
 };
 /** No cobwebs out in space. */
 const NO_WEBS: RoomId[] = ['rocket', 'spacewalk'];

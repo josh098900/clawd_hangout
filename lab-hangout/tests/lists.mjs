@@ -2,7 +2,7 @@
 //
 // The game keeps its own copy of a few lists the database also has (the server decides, the game draws and
 // explains): claw prizes, fish + rarity odds, seeds, furniture / wallpaper / floor prices and the starter kit,
-// the daily quests, and the weather roll. This builds the database from every migration (tests/sql/run.mjs
+// the daily quests, the aquarium's gift shop, and the weather roll. This builds the database from every migration (tests/sql/run.mjs
 // --lists) and checks the game's source says exactly the same. A price or odds changed on one side only fails here.
 
 import { spawnSync } from 'node:child_process';
@@ -33,7 +33,7 @@ const game = await page.evaluate(async () => {
   return {
     claw: c.CLAW.map(([k, wt, s]) => [k, wt, s ?? null]), fish: f.FISH.map((x) => [x.name, x.rarity, x.cm[0], x.cm[1]]), odds: f.ODDS,
     seeds: g.SEEDS.map((s, i) => [i, s.name, s.cost, s.growS, s.pays]), furn: ids.map((id) => [id, fu.PRICE(id), fu.STARTER[id] ?? 0]),
-    quests: Object.keys(q.QUESTS), roll: Array.from({ length: 3000 }, (_, i) => w.roll(i)),
+    quests: Object.keys(q.QUESTS), gifts: c.GIFTS, roll: Array.from({ length: 3000 }, (_, i) => w.roll(i)),
   };
 });
 await browser.close(); await server.close();
@@ -51,6 +51,7 @@ same('rarity odds', Object.entries(game.odds), Object.entries(sql.odds));
 same('seeds', game.seeds, sql.seeds);
 same('furniture, wallpapers, floors + starter kit', game.furn, sql.furn);
 same('daily quests', game.quests, sql.quests);
+same("the aquarium's gift shop", game.gifts, sql.gifts);
 const rollOk = key(game.roll) === key(sql.roll);
 if (!rollOk) bad++;
 console.log(`${rollOk ? ' ok ' : 'FAIL'}  weather roll (3000 slots)`);

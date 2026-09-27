@@ -24,6 +24,7 @@ import { makeMoonBase } from './world/moonbase';
 import { makeWing } from './world/wing';
 import { makeReactor } from './world/reactor';
 import { makeChem } from './world/chem';
+import { makeAquarium } from './world/aquarium';
 import { FLIGHT, PAD_X, flight } from './world/space';
 import { skyThings } from './world/sky';
 import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
@@ -107,6 +108,10 @@ import { live as reactorLive, RST } from './game/reactor';
 import { REACT } from './world/reactor';
 import { chemBench, chemDebug, chemEntered, chemForce, chemMix, chemPick, chemReady, chemStep, drinkPotion, fxToNewcomer, gogglesLabel, myFx, onChem, onFx, pullShower, readBook, setFx, takeGoggles } from './features/chem';
 import { CHEM } from './world/chem';
+import { aqDebug, aqEntered, aqStep, catchVsGallery, feedFish, onScoop, openDonate, openGiftShop, touchPool } from './features/aquarium';
+import { FEED, feeding } from './game/aquarium';
+import { SUB } from './game/sub';
+import { AQUA_TRACK } from './audio/music';
 import { REAGENTS } from './game/chem';
 import { adventMenu, drawBalls, fightHits, flyBall, openPresent, refreshWinter, rollSnowman, scoopSnow, sendGiftTo, snowTarget, startSnowfight, throwSnowball, treeMenu, winterLine, winterStep } from './features/winter';
 
@@ -121,7 +126,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem(), aquarium: makeAquarium() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -150,7 +155,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer(), aquaScore = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -174,7 +179,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map(), wing: new Map(), reactor: new Map(), chem: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map(), wing: new Map(), reactor: new Map(), chem: new Map(), aquarium: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -303,6 +308,7 @@ function onNet(e: NetEvent): void {
     case 'grid': if (allow(e.id, 'grid', 1, 4)) onGrid(e.g); break;
     case 'chem': if (room.id === 'chem' && others.has(e.id) && allow(e.id, 'chem', 2, 4)) onChem(e.id, e.b, e.m, e.at); break;
     case 'fx': if (allow(e.id, 'fx', 3, 6)) onFx(e.id, e.k, e.s); break;
+    case 'scoop': if (room.id === 'aquarium' && others.has(e.id) && allow(e.id, 'scoop', 2, 4)) onScoop(e.x); break;
     case 'status': toast(e.text); break;
   }
 }
@@ -445,6 +451,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   if (id === 'diner') dinerEntered();
   if (id === 'reactor') reactorEntered();
   if (id === 'chem') chemEntered();
+  if (id === 'aquarium') aqEntered();
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
@@ -584,6 +591,8 @@ function useSpot(i: number): void {
   if (s.kind === 'rfault') { faultPress(s.n ?? 0); return; }
   if (s.kind === 'rstation' && s.n === RST.SCRAM) { scramPress(); return; }
   if (s.kind === 'goggles') { takeGoggles(); return; }
+  if (s.kind === 'touch') { touchPool(); return; }
+  if (s.kind === 'feedfish') { feedFish(); return; }
   if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.api.flats.doors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.api.flats.mine().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.api.flats.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
   if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
   if (s.kind === 'flatparty') {
@@ -657,6 +666,8 @@ function useSpot(i: number): void {
   else if (s.kind === 'chem') chemBench(s.n ?? 0);
   else if (s.kind === 'recipes') readBook(i);
   else if (s.kind === 'shower') pullShower();
+  else if (s.kind === 'donate') openDonate(i);
+  else if (s.kind === 'giftshop') openGiftShop(i);
   else if (s.kind === 'scope') openStars(closeSpot(i));
   else if (s.kind === 'hammock') SFX.sit();
   else if (s.kind === 'fish') { fishing = { bite: t + (3 + Math.random() * 6) * biteK(), state: 'wait' }; SFX.zap(); toast((isTouch ? 'Wait for a bite, then tap REEL!' : 'Wait for a bite, then press E to REEL!') + (biteK() < 1 ? ' They bite fast in the rain!' : ''), 3000); }
@@ -873,7 +884,7 @@ function reel(): void {
     if (inStorm && f.rarity !== 'JUNK') quests.stat('stormFish');
     say(net.selfId, (f.rarity === 'JUNK' ? 'ugh, a ' : 'caught a ') + f.name + ' (' + c.cm + 'cm)!', now(), true);
     const contest = c.contest && f.rarity !== 'JUNK' ? ' · CONTEST: ' + (c.rank === 1 ? 'YOU LEAD!' : 'NO. ' + c.rank) : '';
-    toast((log.isNew ? 'NEW! ' : '') + f.rarity + ' · FISH LOG ' + log.count + '/12' + contest, 3500);
+    toast((log.isNew ? 'NEW! ' : '') + f.rarity + ' · FISH LOG ' + log.count + '/12' + contest + catchVsGallery(f.name, c.cm), 3500);
     if (rare || c.rank === 1) { SFX.score(); celebrate(); } else SFX.chime();
     if (c.contest) refreshContest();
   }).catch((e: unknown) => toast(errText(e), 2500));
@@ -972,7 +983,7 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: tk.verb ?? 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
-  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
+  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
   if (isWinter() && !me.hold && onSnow(room, me.x, me.y) && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
@@ -1464,7 +1475,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); karaokeStep(dt); winterStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); aqStep(); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -1510,8 +1521,9 @@ function frame(nowMs: number): void {
     const rh = reactorHeat(); // THE REACTOR's own music, faster and more urgent when the core runs hot
     reactorScore.set(rh < 0 ? null : CRITICAL_MASS[rh > 0.85 ? 2 : rh > 0.6 ? 1 : 0], 0); reactorScore.volume(rh >= 0 && !g ? 0.45 : 0); reactorScore.tick();
     chemScore.set(room.id === 'chem' ? CHEM_TRACK : null, 0); chemScore.volume(room.id === 'chem' && !g ? 0.35 : 0); chemScore.tick(); // THE CHEM LAB's own tune
+    aquaScore.set(room.id === 'aquarium' ? AQUA_TRACK : null, 0); aquaScore.volume(room.id === 'aquarium' && !g ? (me.x > 1240 && me.x < 1420 ? 0.5 : 0.32) : 0); aquaScore.tick(); // THE CITY AQUARIUM's tune (louder in the jelly room)
     // seated somewhere with a view (the cinema), the camera pans up to frame it
-    const view = room.watch && (usingOf(me) === 'sit' || usingOf(me) === 'rstation') ? room.watch : null;
+    const view = (me.use >= 0 ? room.spots[me.use]?.watch : undefined) ?? (room.watch && (usingOf(me) === 'sit' || usingOf(me) === 'rstation') ? room.watch : null);
     // decorating: zoom out so the whole flat (wall pieces down to the front row: y 320-590) fits between the panel and the chat box
     if (decorating()) {
       const panel = $('#deco').getBoundingClientRect().bottom, avail = (R.cssH - panel - 56) * R.dpr, sc = Math.max(1, Math.floor(avail / 275));
@@ -1647,6 +1659,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     diner: () => DINER.g, tickets: () => (DINER.g ? openTickets(DINER.g) : []), cook: (st: number) => cook(st), clockIn: () => clockIn(),
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     reactor: () => reactorDebug(), rset: (patch: Record<string, unknown>) => { const g = REACT.g; if (g) setState({ k: 'reactor', v: { ...g, ...patch } as typeof g }); }, badges: () => [...quests.mine], stats: () => save.data.stats, owns: (k: string) => save.has(k), rpress: (st: number, d: number) => reactorPress(st, d), rclock: () => reactorClockIn(), rfix: (k: number) => faultPress(k), scram: () => scramPress(),
+    aq: () => aqDebug(), aqCatch: (fish: string, cm: number) => (net.api as unknown as { fakeCatch?(f: string, c: number): void }).fakeCatch?.(fish, cm), feedAt: (k: number) => { FEED.skew = 0; FEED.skew = k - (Date.now() / 1000) % 900; }, subAt: (k: number) => { SUB.skew = 0; SUB.skew = k - (Date.now() / 1000) % 480; },
     chem: () => chemDebug(), mix: (b: number, m: number) => chemForce(b, m), chemFrom: (id: string, b: number, m: number) => onChem(id, b, m, Date.now()), pick: (i: number) => chemPick(i), mixNow: () => chemMix(), drink: () => drinkPotion(), fxOf: (id: string) => (id === net.selfId ? me : others.get(id))?.fx ?? null, setFx: (k: number, s: number) => setFx(me, k, s), hold: (h: number) => { me.hold = h; forceSend = true; }, goggles: () => takeGoggles(),
     map: (b?: RoomId) => openMap(b ?? null), mapOpen: () => mapOpen(), mapRoute: (id: RoomId, pod?: boolean) => mapRoute(id, pod), zone: () => zoneNow(), places: () => save.data.places,
     mapGo: (id: RoomId, pod?: boolean) => { const rt = mapRoute(id, pod); if (rt.ok) travel(rt); return rt; }, goTo: (r: RoomId) => goToRoom(r), mapPreview: (id: RoomId) => mapPreview(id)?.toDataURL() ?? null,

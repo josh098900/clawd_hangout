@@ -22,6 +22,8 @@ export interface Furn {
   id: string; name: string; price: number; w: number; h: number; layer: Layer;
   /** Only in the shop in this season (you keep it after). */
   season?: string;
+  /** Sold somewhere in the world instead of DECORATE's SHOP ('aquarium': the City Aquarium's gift shop). */
+  shop?: 'aquarium';
   /** Seats as [dx from centre, lift]. */
   seats?: [number, number][];
   use?: FurnUse; label?: string;
@@ -148,6 +150,33 @@ export const FURNITURE: Furn[] = [
     for (let j = -8; j <= 8; j++) { const w = Math.round(Math.sqrt(64 - j * j)); r(x - w, y - 14 + j, w * 2, 1, [170, 214, 240]); }
     r(x - 3, y - 12, 6, 6, [38, 124, 76]); r(x - 1, y - 16, 2, 4, [38, 124, 76]); r(x - 5, y - 7, 10, 2, [240, 244, 250]);
     lit(() => { for (let k = 0; k < 8; k++) { const t = (c.a * 0.4 + h1(k)) % 1, px = x - 6 + Math.floor(h1(k * 3) * 12) + Math.round(Math.sin(c.a * 2 + k) * 1.5), py = y - 21 + Math.floor(t * 14); if ((px - x) ** 2 + (py - (y - 14)) ** 2 < 56) r(px, py, 1, 1, K.WHITE); } r(x - 5, y - 19, 2, 2, K.WHITE); }); } },
+  // ---------- the City Aquarium's gift shop (sold there, not in DECORATE's SHOP) ----------
+  { id: 'plush', name: 'FISH PLUSH', price: 6, w: 26, h: 18, layer: 'floor', shop: 'aquarium', draw(x, y, f) {
+    const q = R(x, f), o: RGB = [255, 150, 70], od: RGB = [220, 100, 50], oh: RGB = [255, 196, 130];
+    oval(x, y - 7, 9, 6, o); q(-8, y - 11, 10, 2, oh); q(-9, y - 5, 12, 1, od); // the round body, lit on top
+    q(8, y - 12, 4, 4, o); q(8, y - 6, 4, 4, o); q(9, y - 9, 2, 2, od); // the tail
+    q(-3, y - 15, 5, 3, od); q(-2, y - 16, 3, 1, o); // the fin
+    q(-7, y - 10, 3, 3, K.WHITE); q(-6, y - 9, 2, 2, [20, 20, 28]); q(-6, y - 10, 1, 1, K.WHITE); // a big button eye
+    q(-8, y - 6, 3, 1, od); q(-2, y - 9, 1, 5, [255, 214, 170]); q(2, y - 9, 1, 5, [255, 214, 170]); // stitched smile, stripes
+  } },
+  { id: 'jlamp', name: 'JELLYFISH LAMP', price: 14, w: 18, h: 40, layer: 'floor', shop: 'aquarium', draw(x, y, _f, c) {
+    r(x - 7, y - 4, 14, 4, [60, 60, 72]); r(x - 7, y - 4, 14, 1, [100, 100, 116]); r(x - 5, y - 36, 10, 32, [120, 140, 170]); // the base and the glass tube
+    const col = CONFETTI[Math.floor(c.a * 0.25) % CONFETTI.length], bob = Math.round(Math.sin(c.a * 1.4) * 3), pulse = Math.floor(c.a * 1.4) % 2;
+    lit(() => { r(x - 4, y - 35, 8, 30, M([20, 30, 60], col, 0.25)); r(x - 3 - pulse, y - 26 + bob, 6 + pulse * 2, 3, col); r(x - 2, y - 27 + bob, 4, 1, M(col, K.WHITE, 0.5));
+      for (let k = 0; k < 3; k++) r(x - 2 + k * 2, y - 23 + bob, 1, 5 + (k + Math.floor(c.a * 3)) % 2, M(col, K.WHITE, 0.25)); });
+    r(x - 5, y - 38, 10, 3, [60, 60, 72]); alpha(0.3, () => r(x - 4, y - 35, 1, 30, K.WHITE)); Gd(x, y - 22, 16, col, 0.3); } },
+  { id: 'bottle', name: 'SHIP IN A BOTTLE', price: 10, w: 34, h: 18, layer: 'floor', shop: 'aquarium', draw(x, y, f) {
+    const q = R(x, f); q(-14, y - 3, 4, 3, WOOD_DK); q(8, y - 3, 4, 3, WOOD_DK); q(-15, y - 4, 28, 1, WOOD); // the cradle
+    alpha(0.55, () => { q(-13, y - 15, 22, 11, [120, 190, 150]); q(9, y - 12, 4, 5, [120, 190, 150]); }); q(13, y - 12, 2, 5, [190, 140, 90]); // the glass, the cork
+    q(-10, y - 7, 16, 2, [110, 70, 40]); q(-9, y - 8, 14, 1, [150, 100, 60]); q(-2, y - 14, 1, 7, [90, 60, 40]); // the hull, the mast
+    q(-7, y - 13, 5, 5, K.WHITE); q(0, y - 12, 4, 4, K.WHITE); lit(() => q(-1, y - 15, 2, 1, [230, 60, 60])); // sails, a flag
+    alpha(0.7, () => { q(-12, y - 14, 18, 1, [220, 250, 235]); q(-12, y - 13, 1, 3, [220, 250, 235]); }); } },
+  { id: 'aqposter', name: 'AQUARIUM POSTER', price: 5, w: 26, h: 36, layer: 'wall', shop: 'aquarium', draw(x, y) {
+    for (let j = 0; j < 36; j += 2) r(x - 13, y - 36 + j, 26, 2, M([30, 110, 170], [10, 30, 70], j / 36));
+    oval(x, y - 22, 9, 4, [70, 90, 120]); r(x + 8, y - 26, 3, 8, [70, 90, 120]); r(x - 3, y - 27, 4, 2, [70, 90, 120]); // a whale shark
+    for (let k = 0; k < 6; k++) r(x - 7 + k * 3, y - 24 + (k % 2) * 2, 1, 1, [210, 230, 245]); r(x - 7, y - 21, 12, 1, [150, 170, 196]);
+    for (let k = 0; k < 4; k++) r(x - 9 + k * 5, y - 33 + (k % 2) * 2, 1, 1, [200, 240, 255]);
+    txt('DORIS', x - tw('DORIS') / 2, y - 9, [255, 214, 90]); } },
   { id: 'pframe', name: 'PHOTO FRAME', price: 10, w: 40, h: 40, layer: 'wall', draw(x, y, _f, c) {
     r(x - 20, y - 40, 40, 38, [120, 84, 54]); r(x - 19, y - 39, 38, 36, [184, 136, 90]); r(x - 18, y - 38, 36, 34, [250, 248, 240]);
     if (c.photo) PX.ctx.drawImage(c.photo, x - 16, y - 36); else { r(x - 16, y - 36, 32, 30, [200, 204, 214]); txt('PHOTO', x - tw('PHOTO') / 2, y - 26, [120, 126, 140]); txt('WALL', x - tw('WALL') / 2, y - 19, [120, 126, 140]); }

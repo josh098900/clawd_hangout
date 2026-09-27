@@ -129,6 +129,24 @@ export const CH = table({
   FIZZ: '#F4E6F0', GOO: '#3B6CFF', SPARK: '#FFC83A', SLIME: '#72D84A', OIL: '#E45CFF', BUBBLE: '#7FDFFF', GLOW: '#9CFFC8', TONIC: '#FF7A45',
 });
 
+/** THE CITY AQUARIUM (world/aquarium.ts, and its front on the Pier): white walls with a sea-blue band, the gallery's deep
+ * blue, brass plaques, tank water from bright to deep, sand, coral and kelp, the jelly room's black, the gift shop's red awning,
+ * the sub pen's concrete and hazard yellow, and SARDINE 1's yellow. */
+export const AQ = table({
+  WALL: '#EAF2F4', WALL2: '#DDE8EB', WALL_HI: '#F8FBFC', BAND: '#2A7FB8', BAND_HI: '#4FA2D8', BAND_DK: '#1D5E8C', SKIRT: '#16304A',
+  DEEP: '#0F2340', DEEP2: '#13294A', DEEP_HI: '#1F3E68', CEIL: '#0A1426', CEIL2: '#101E36',
+  FLOOR: '#4F7E86', FLOOR2: '#47737A', FLOOR_LN: '#39616A', FLOOR_SP: '#7FAAB0', INLAY: '#E6D6A2',
+  WATER0: '#082E58', WATER1: '#10589A', WATER2: '#2E8ED0', WATER_HI: '#9AD8FF', MURK: '#26484E', SAND: '#D8C08A', SAND_DK: '#B09460', SAND_HI: '#EAD8A8',
+  CORAL: '#FF7A6A', CORAL2: '#FFB05A', CORAL3: '#C86AE0', KELP: '#2F7A48', KELP_HI: '#5AAE5A', ROCK: '#3E4E60', ROCK_HI: '#5E7086',
+  BRASS: '#D9A441', BRASS_HI: '#F2D27A', BRASS_DK: '#9C7026', FRAME: '#26303C', FRAME_HI: '#44505E', GLASS: '#8FD8E8', GLASS_HI: '#DFF6FF',
+  JELLY_BG: '#060914', JELLY_WALL: '#0B1020',
+  CONCRETE: '#7A8086', CONCRETE2: '#868C92', CONCRETE_DK: '#5A6066', HAZ: '#F2C230', HAZ_DK: '#202226', LAMP: '#FFB45A',
+  POOL: '#0C3E44', POOL2: '#125058', POOL_HI: '#4FA89A',
+  SUB: '#F2C230', SUB_HI: '#FFE27A', SUB_DK: '#C49A28', SUB_SH: '#8C6A1E', NAVY: '#1E2A56',
+  SHOP: '#E0503E', SHOP_HI: '#F07A62', SHOP2: '#F4F0E4', WOOD: '#9A6A44', WOOD_HI: '#BC8A5E', WOOD_DK: '#6E4A2E',
+  TILE: '#2A6C9C', TILE2: '#3A86B8', TILE_HI: '#7CC0E8',
+});
+
 /** The city map (world/map.ts, ui/map.ts): the ground, the park, the sea and the sand, the roads, by night and by day. */
 export const MP = table({
   GROUND: '#1A2238', GROUND2: '#1F2843', GROUND_D: '#6F8A6A', GROUND2_D: '#7C976F',

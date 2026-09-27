@@ -20,6 +20,8 @@ export const LIGHT_LINES: Partial<Record<RoomId, Line[]>> = {
   // the Science Wing: just under the ceiling, in the gaps between the door signs, the RADIATION display and BONEY's corner
   wing: [[90, 337, 280, 337], [500, 337, 720, 337], [826, 337, 938, 337]], reactor: [[8, 321, 160, 321]],
   chem: [[100, 333, 300, 333], [400, 333, 600, 333], [680, 333, 880, 333], [890, 333, 1080, 333]],
+  // THE CITY AQUARIUM: over the lobby, above the gallery's title, along the ocean tank's top edge, over the pool in the sub pen
+  aquarium: [[4, 340, 176, 340], [344, 336, 548, 336], [556, 336, 756, 336], [776, 318, 1224, 318], [1430, 342, 1700, 342]],
 };
 
 /** How a season's lights look: bulb colours (in turn), how far they sag, every nth bulb blinks off, the wire. */

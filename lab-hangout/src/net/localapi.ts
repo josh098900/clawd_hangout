@@ -2,13 +2,14 @@
 // rules of each SQL function are copied here and everything is kept in this browser's localStorage (every tab shares it).
 
 import { type Api, type MyPhoto, type Ornament, type Photo, type Plot, type Tray, type TreeGift, parseDoor, parseLayout } from './transport';
-import { CLAW, rollClaw } from '../entities/critter';
+import { CLAW, GIFTS, rollClaw } from '../entities/critter';
 import { GARDEN, growth, plantState, SEEDS } from '../world/garden';
 import { TRAY_SPEED } from '../world/station';
 import { PRICE, STARTER } from '../world/furniture';
 import { raining } from '../world/weather';
 import { QUESTS } from '../game/quests';
-import { rollFish } from '../game/fish';
+import { FISH, rollFish } from '../game/fish';
+import { THANKS } from '../game/aquarium';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
@@ -55,6 +56,19 @@ export class LocalApi implements Api {
   private contests(v?: Record<string, { id: string; name: string; fish: string; cm: number }[]>): Record<string, { id: string; name: string; fish: string; cm: number }[]> {
     return v ? db.set('labhangout.localContests', v) : db.get('labhangout.localContests', {});
   }
+  // ---- the City Aquarium (same rules as 0023_aquarium.sql): the gallery is shared by every tab; your catches (catchFish
+  //      keeps them, like private.catches) and your donations are yours ----
+  private catches(add?: { fish: string; cm: number }): { fish: string; cm: number }[] {
+    const k = 'labhangout.localCatches.' + this.selfId, v = db.get<{ fish: string; cm: number }[]>(k, []);
+    if (add) { v.push(add); db.set(k, v.slice(-400)); }
+    return v;
+  }
+  /** Dev/tests (LOCAL only, see ?debug's aqCatch): pretend you reeled this one in. */
+  fakeCatch(fish: string, cm: number): void { this.catches({ fish, cm }); }
+  private aqTanks(v?: Record<string, { fish: string; name: string; cm: number; at: number; id: string }>): Record<string, { fish: string; name: string; cm: number; at: number; id: string }> {
+    return v ? db.set('labhangout.localAqTanks', v) : db.get('labhangout.localAqTanks', {});
+  }
+  private aqMine(v?: Record<string, number>): Record<string, number> { const k = 'labhangout.localAqMine.' + this.selfId; return v ? db.set(k, v) : db.get(k, {}); }
   // ---- the Space Station's trays + spacewalk pay, kept in this browser per server (same rules as 0015_space.sql) ----
   private trayList(v?: Tray[]): Tray[] {
     const k = 'labhangout.localTrays.' + (this.server ?? 'none');
@@ -188,6 +202,7 @@ export class LocalApi implements Api {
   readonly fishing: Api['fishing'] = {
     catchFish: async () => {
       const { fish, cm } = rollFish(), cl = contestClock(), hour = String(Math.floor(Date.now() / 3600000));
+      this.catches({ fish: fish.name, cm });
       let rank: number | null = null;
       if (cl.live && fish.rarity !== 'JUNK') {
         const all = this.contests(), list = all[hour] ?? [], name = (await this.ctx.loadProfile())?.name ?? 'YOU';
@@ -375,6 +390,32 @@ export class LocalApi implements Api {
       return { tokens: this.wallet(), paid, crystal, crystals: n, prize };
     },
     crystals: async () => db.get('labhangout.localCrystals', 0),
+  };
+
+  /** THE CITY AQUARIUM, kept in this browser (same rules as 0023_aquarium.sql). */
+  readonly aquarium: Api['aquarium'] = {
+    tanks: async () => {
+      const best: Record<string, number> = {}; for (const c of this.catches()) best[c.fish] = Math.max(best[c.fish] ?? 0, c.cm);
+      return { tanks: Object.values(this.aqTanks()).map(({ fish, name, cm, at }) => ({ fish, name, cm, at })), best, mine: this.aqMine() };
+    },
+    donate: async (fish) => {
+      const f = FISH.find((x) => x.name === fish); if (!f) throw new Error('there is no tank for that');
+      const best = Math.max(0, ...this.catches().filter((c) => c.fish === fish).map((c) => c.cm)); if (!best) throw new Error('catch one off the Pier first');
+      const tanks = this.aqTanks(), cur = tanks[fish], mine = this.aqMine(), first = !(fish in mine), took = !cur || best > cur.cm;
+      if (!first && !took && mine[fish] >= best) throw new Error('you have donated that one already');
+      const prev = took && cur && cur.id !== this.selfId ? cur.name : null;
+      if (took) { tanks[fish] = { fish, name: (await this.ctx.loadProfile())?.name || 'SOMEONE', cm: best, at: Date.now() / 1000, id: this.selfId }; this.aqTanks(tanks); }
+      mine[fish] = Math.max(mine[fish] ?? 0, best); this.aqMine(mine);
+      const paid = first ? THANKS[f.rarity] : 0; if (paid) this.wallet(this.wallet() + paid);
+      return { plaque: took, cm: best, first, paid, tokens: this.wallet(), prev };
+    },
+    buy: async (item) => {
+      const g = GIFTS.find(([k]) => k === item); if (!g) throw new Error('the shop does not sell that');
+      if (this.inv().includes(item)) throw new Error('you have that one already');
+      if (this.wallet() < g[1]) throw new Error('that costs ' + g[1] + ' tokens');
+      this.inv(item); this.wallet(this.wallet() - g[1]);
+      return { item, tokens: this.wallet() };
+    },
   };
 
   /** Tips paid for a performance (the server caps them). */

@@ -111,7 +111,7 @@ export function drops(pass: number): { n: number; x: number; y: number; land: nu
   return pick.map((k, n) => ({ n, x: DROP_SPOTS[k][0], y: DROP_SPOTS[k][1], land: 8 + n * 1.1 + 3, wrap: Math.floor(h1(pass + n) * 6) }));
 }
 const SLEIGH_Y: Partial<Record<RoomId, number>> = { plaza: 452, pier: 368, park: 424, roof: 356 }; // (low enough to be in view from the ground)
-const SLEIGH_W: Partial<Record<RoomId, number>> = { plaza: 1400, pier: 1300, park: 1600, roof: 1860 };
+const SLEIGH_W: Partial<Record<RoomId, number>> = { plaza: 1400, pier: 1900, park: 1600, roof: 1860 };
 function drawSleigh(x: number, y: number, a: number): void {
   x = Math.round(x); y = Math.round(y + Math.sin(a * 2) * 3);
   // a sparkle trail behind
@@ -168,7 +168,7 @@ const SNOW: Partial<Record<RoomId, { top?: number; clear?: Box[]; dust?: Box[]; 
     ...stairwell(186, 680, 12), ...sign([200, 620, 256, 638], 226, 638, 708), // the Arcade
     ...stairwell(760, 682, 14), ...sign([776, 618, 826, 632], 800, 632, 708), // the Subway
   ] },
-  pier: { top: 558, clear: [[16, 556, 62, 568]], dust: [[700, 420, 760, 548]] }, // the beach below the wet sand, the "<- SQUARE" in the sand
+  pier: { top: 558, clear: [[16, 556, 62, 568], [1334, 550, 1892, 592]], dust: [[700, 420, 760, 548]] }, // the beach below the wet sand, the "<- SQUARE" in the sand, the aquarium's boardwalk
   park: {
     clear: [
       [40, 470, 180, 490], [52, 490, 56, 530], [164, 490, 168, 530], // CITY PARK
@@ -221,7 +221,7 @@ function snowLayer(room: Room): HTMLCanvasElement {
 /** Little decorated trees standing indoors (on the same safe spots Halloween's pumpkins use). */
 const XTREES: Partial<Record<RoomId, [number, number][]>> = {
   lab: [[520, 452]], den: [[700, 452]], cinema: [[940, 464]], stage: [[186, 496]], arcade: [[1060, 488]], diner: [[760, 492]], lofts: [[820, 500]], station: [[1000, 488]],
-  wing: [[1050, 476]], chem: [[1080, 478]],
+  wing: [[1050, 476]], chem: [[1080, 478]], aquarium: [[176, 490]],
 };
 function smallTree(x: number, y: number, a: number): void {
   r(x - 3, y - 8, 6, 8, [110, 70, 40]); r(x - 9, y - 4, 18, 4, [214, 44, 56]); r(x - 9, y - 4, 18, 1, [240, 90, 96]);

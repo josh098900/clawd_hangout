@@ -217,9 +217,19 @@ BUBBLES, FLOATY) that follow you through doors; two-chemist reactions (ELEPHANT 
 CONFETTI CANNON); the RECIPE BOOK (20 entries, the CHEMIST badge), LAB GOGGLES from the dispenser, the safety shower,
 BONEY, SIR BUBBLES, PROF. FIZZ part-time; the map's annex, the fume stack; a daily quest (migration `0022_chem.sql`).
 
+## 18. Submarine + City Aquarium: push 1 (THE CITY AQUARIUM) built; push 2 (the submarine) next
+Brief: docs/briefs/18-aquarium-sub.md (§6 is the submarine, to be expanded before push 2). Migration `0023_aquarium.sql`.
+Josh picked: dives on a timetable that anyone can steer, shared donations, all four dive jobs (photos, claw treasure,
+cartoon trouble, a mission each dive) and all four prizes (the DIVING HELMET, a BABY OCTOPUS pet, a gift shop, quests + badges).
+**Built, push 1:** the Pier runs on past the lighthouse to the aquarium (a boardwalk, the whale shark fountain, the SUB
+PEN with SARDINE 1 in its porthole, its periscope heading out to sea on every dive); inside: the lobby, THE GIFT SHOP
+(CAPTAIN'S HAT, SHARK FIN, SNORKEL, SAILOR TOP, and four pieces of furniture for your flat), THE FISH GALLERY (12 tanks
+filled by the city's donations: your biggest catch, a bigger one takes the plaque, a thank-you for your first of each
+kind, the CURATOR badge), THE OCEAN TANK (DORIS the whale shark and friends, benches, the diver, FEEDING TIME every 15
+minutes with scoops to throw, the TOUCH POOL), THE JELLY ROOM (the jelly disco), THE SUB PEN (SARDINE 1 diving and
+surfacing on its 8-minute timetable: SEA TRIALS, no passengers yet); MARINA the keeper and CAP'N BARNACLE; the map.
+
 ## Later (order to be decided)
-- **18. Submarine + City Aquarium:** the aquarium on the Pier; the sub dives from it, portholes that
-  change with depth, crew stations (helm, sonar, periscope).
 - **19. The Airport:** check-in, a security X-ray that shows what you're holding, a baggage carousel
   game, a departures board on the clock; each flight opens a new destination (beach island, ski
   mountain, a city abroad), so it's how the world keeps growing.

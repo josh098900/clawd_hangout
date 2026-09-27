@@ -61,7 +61,8 @@ export type StateVal =
   | { k: 'snowman'; v: { day: number; rolls: number; deco: number } } | { k: 'snowfight'; v: { t0: number; by: string } }
   | { k: 'moonbest'; v: { name: string; ms: number } }
   | { k: 'reactor'; v: ReactorState } | { k: 'reactbest'; v: { name: string; score: number } }
-  | { k: 'chemlog'; v: ChemLog };
+  | { k: 'chemlog'; v: ChemLog }
+  | { k: 'aq'; v: { n: number } };
 /** THE CHEM LAB's EXPERIMENTS board: how many mixes, and the latest discovery (a reaction id, see game/chem.ts) and who made it. */
 export interface ChemLog { n: number; rx: string; by: string }
 /**
@@ -93,7 +94,7 @@ export type MsgEvent = { [K in MsgType]: { type: K } & NonNullable<ReturnType<(t
 export interface Outgoing {
   emote: { kind: EmoteKind }; state: StateMsg; draw: DrawMsg; note: { i: number; n: number }; pong: PongMsg; cook: { st: number };
   kart: KartMsg; tank: TankMsg; junk: { n: number }; kscore: KScore; snowball: SnowballMsg; flat: FlatMsg; world: HideSeek;
-  rx: { st: number; d: number }; grid: GridMsg; chem: ChemMsg; fx: FxMsg;
+  rx: { st: number; d: number }; grid: GridMsg; chem: ChemMsg; fx: FxMsg; scoop: { x: number };
 }
 /** THE CHEM LAB: "I mixed `m` (a bitmask of reagents, 2 or 3 of them) at bench `b`, at wall time `at` (ms)". */
 export interface ChemMsg { b: number; m: number; at: number }
@@ -217,6 +218,12 @@ export interface Tray { tray: number; owner: string; ownerName: string; plantedA
 export interface ContestBoard { live: boolean; top: { name: string; fish: string; cm: number }[]; last: { name: string; fish: string; cm: number; prize: number; anglers: number; at: number } | null; won: boolean }
 /** What the claw machine gave you: the prize, whether you had it already (1 token back), your balance. */
 export interface ClawResult { item: string; dupe: boolean; tokens: number }
+/** A tank in the City Aquarium's FISH GALLERY: whose fish is on show (their name when they donated it), how big, and since when (epoch s). */
+export interface AqTank { fish: string; name: string; cm: number; at: number }
+/** The FISH GALLERY: the tanks with something in, your biggest catch of each kind, and what you've donated (fish -> cm). */
+export interface AqGallery { tanks: AqTank[]; best: Record<string, number>; mine: Record<string, number> }
+/** A donation: whether it took the plaque, how big it was, your first of that kind?, the thank-you, your balance, and whose plaque it took. */
+export interface AqDonation { plaque: boolean; cm: number; first: boolean; paid: number; tokens: number; prev: string | null }
 
 /**
  * The game's server requests, grouped by feature (net.api.garden.plant(...)). Online each is a database function or
@@ -345,6 +352,15 @@ export interface Api {
     assay(): Promise<{ tokens: number; paid: number; crystal: boolean; crystals: number; prize: string | null }>;
     /** How many moon crystals you've found (the case in the Moon Base). */
     crystals(): Promise<number>;
+  };
+  /** THE CITY AQUARIUM (0023_aquarium.sql). */
+  aquarium: {
+    /** The FISH GALLERY: each tank's plaque, your biggest catch of each kind, and what you've donated. */
+    tanks(): Promise<AqGallery>;
+    /** Donate your biggest catch of `fish`: it takes the plaque if the tank's empty or yours is bigger; the first of each kind pays a thank-you. */
+    donate(fish: string): Promise<AqDonation>;
+    /** Buy a piece of clothing at the GIFT SHOP (once each). */
+    buy(item: string): Promise<{ item: string; tokens: number }>;
   };
   /** Tips paid for a performance (the server caps them). */
   tips: {
@@ -534,6 +550,7 @@ const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>
   reactor: (x) => { const v = obj(x); return v && parseReactor(v); },
   reactbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 100); return name && score !== null ? { name, score } : null; },
   chemlog: (x) => { const v = obj(x); if (!v) return null; const n = int(v.n, 0, 1e7), rx = v.rx === '' || (typeof v.rx === 'string' && rxById(v.rx)) ? (v.rx as string) : null; return n === null || rx === null ? null : { n, rx, by: cleanName(v.by) }; },
+  aq: (x) => { const v = obj(x); if (!v) return null; const n = num(v.n, 0, 1e13); return n === null ? null : { n }; },
 };
 export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   const o = obj(p);
@@ -604,6 +621,10 @@ export function parseChem(p: unknown): { id: string; b: number; m: number; at: n
 export function parseFx(p: unknown): { id: string; k: number; s: number } | null {
   const o = obj(p), k = int(o?.k, 0, FX_MAX), sec = num(o?.s, 0, 60);
   return o && isId(o.id) && k !== null && sec !== null ? { id: o.id, k, s: sec } : null;
+}
+export function parseScoop(p: unknown): { id: string; x: number } | null {
+  const o = obj(p), x = num(o?.x, 0, 4000);
+  return o && isId(o.id) && x !== null ? { id: o.id, x } : null;
 }
 export function parseKart(p: unknown): { id: string; k: KartMsg } | null {
   const o = obj(p);
@@ -710,6 +731,7 @@ export function parseLobby(p: unknown): LobbyPerson | null {
  *   grid    GridMsg                      THE REACTOR's host to the whole server: a shift is on / melted down / over
  *   chem    ChemMsg                      THE CHEM LAB: "I mixed m at bench b" (every browser works out the same reaction from it)
  *   fx      FxMsg                        "I'm under a potion (or a frazzle) for s more seconds": sent on drinking, and again whenever anyone arrives
+ *   scoop   { x }                        THE CITY AQUARIUM at feeding time: "I threw a scoop of food into the big tank at x"
  */
 export const MESSAGES = {
   move: { parse: parseMove, on: 'room' },
@@ -731,6 +753,7 @@ export const MESSAGES = {
   grid: { parse: parseGrid, on: 'lobby' },
   chem: { parse: parseChem, on: 'room' },
   fx: { parse: parseFx, on: 'room' },
+  scoop: { parse: parseScoop, on: 'room' },
 } as const satisfies Record<string, { parse: (p: unknown) => { id: string } | null; on: 'room' | 'srv' | 'lobby' }>;
 export type MsgType = keyof typeof MESSAGES;
 export const MSG_TYPES = Object.keys(MESSAGES) as MsgType[];

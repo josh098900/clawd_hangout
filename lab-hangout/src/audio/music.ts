@@ -278,6 +278,13 @@ export const CHEM_TRACK: Track = {
   bass: 'C3 . G2 . C3 . G2 . D3 . A2 . D3 . A2 . E3 . B2 . E3 . C3 . F2 . G2 . C3 . . .',
   drums: 'k . h . s . h h k . h . s . h . k . h . s . h h k k h . s . h .',
 };
+/** THE CITY AQUARIUM's music: slow, soft and watery, arpeggios drifting like bubbles (louder in the jelly room). */
+export const AQUA_TRACK: Track = {
+  name: "DOWN WHERE IT'S BLUE", bpm: 80, wave: 'sine', leadVol: 0.045,
+  lead: 'A4 C5 E5 . G5 - E5 . F4 A4 C5 . E5 - C5 . D4 F4 A4 . C5 - A4 . E4 G4 B4 . D5 - B4 .',
+  bass: 'A2 . . . . . E2 . F2 . . . . . C2 . D2 . . . . . A2 . E2 . . . . . B2 .',
+  drums: 'k . . . . . h . . . . . s . . . k . . . . . h . . . h . s . . .',
+};
 /** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
 class NoiseLoop {
   private g: GainNode | null = null;

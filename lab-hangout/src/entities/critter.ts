@@ -15,11 +15,13 @@ export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT', 'P
 export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON: 'COO', CAT: 'MEOW', CRAB: 'SNIP', DUCK: 'QUACK', GHOST: 'BOO', BAT: 'SQUEAK', PENGUIN: 'NOOT', 'MOON ROVER': 'BEEP' };
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT'] as const;
-export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE', 'LAB GOGGLES'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT', "CAPTAIN'S HAT", 'SHARK FIN'] as const;
+export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE', 'LAB GOGGLES', 'SNORKEL'] as const;
 /** The chem lab's safety goggles (free from its dispenser). */
 export const FACE_LAB_GOGGLES = 9;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST'] as const;
+/** The City Aquarium's gift shop: a dive mask and snorkel. */
+export const FACE_SNORKEL = 10;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST', 'SAILOR TOP'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
  * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
@@ -39,13 +41,20 @@ export const CLAW: [string, number, string?][] = [
   // Winter (1 Dec - 6 Jan): also the present hunt's prize and the advent calendar's (0018_winter.sql)
   ['hat:17', 10, 'winter'], ['face:8', 10, 'winter'], ['hat:16', 6, 'winter'], ['fit:9', 6, 'winter'], ['pet:7', 3, 'winter'], ['hat:15', 3, 'winter'],
 ];
+/** The City Aquarium's GIFT SHOP: clothes for tokens, one of each (keep in step with private.gift_items in 0023_aquarium.sql). */
+export const GIFTS: [string, number][] = [['hat:18', 15], ['hat:19', 12], ['face:10', 10], ['fit:12', 12]];
 export const RARITY = (item: string): string => { const w = CLAW.find(([k]) => k === item)?.[1] ?? 0; return w >= 10 ? 'COMMON' : w >= 6 ? 'UNCOMMON' : w >= 3 ? 'RARE' : w ? 'LEGENDARY' : 'SPECIAL'; };
 /** Is this item locked until earned? */
-export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + ':' + i; return k in EARNED || CLAW.some(([c]) => c === k); };
+export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + ':' + i; return k in EARNED || CLAW.some(([c]) => c === k) || GIFTS.some(([g]) => g === k); };
 /** How to get a locked item. */
-export const unlockHint = (slot: Slot, i: number): string => EARNED[slot + ':' + i] ?? (CLAW.find(([k]) => k === slot + ':' + i)?.[2] === 'halloween' ? 'HALLOWEEN: TRICK-OR-TREAT OR CLAW' : CLAW.find(([k]) => k === slot + ':' + i)?.[2] === 'winter' ? 'WINTER: PRESENTS, ADVENT CALENDAR OR CLAW' : 'CLAW MACHINE PRIZE');
+export const unlockHint = (slot: Slot, i: number): string => {
+  const k = slot + ':' + i, gift = GIFTS.find(([g]) => g === k), claw = CLAW.find(([c]) => c === k);
+  if (EARNED[k]) return EARNED[k];
+  if (gift) return "THE AQUARIUM'S GIFT SHOP (" + gift[1] + ' TOKENS)';
+  return claw?.[2] === 'halloween' ? 'HALLOWEEN: TRICK-OR-TREAT OR CLAW' : claw?.[2] === 'winter' ? 'WINTER: PRESENTS, ADVENT CALENDAR OR CLAW' : 'CLAW MACHINE PRIZE';
+};
 /** Every collectable, for the collection counter. */
-export const COLLECTABLES = [...Object.keys(EARNED), ...CLAW.map(([k]) => k)];
+export const COLLECTABLES = [...Object.keys(EARNED), ...CLAW.map(([k]) => k), ...GIFTS.map(([k]) => k)];
 export function itemName(item: string): string {
   const [slot, i] = item.split(':'), n = Number(i);
   const list = slot === 'hat' ? HATS : slot === 'face' ? FACES : slot === 'fit' ? FITS : slot === 'pet' ? PETS : null;
@@ -207,6 +216,9 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     } else if (look.fit === 11) { // HI-VIS VEST: orange, open down the front, two reflective stripes
       for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, y === -4 ? VIS_DK : VIS); R(hw - 1, y, 1, 1, VIS_DK); R(-2, y, 4, 1, y < -11 ? body : belly); }
       for (const y of [-10, -7]) { R(-hwAt(y) - 1, y, hwAt(y) - 1, 1, STRIPE); R(3, y, hwAt(y) - 2, 1, STRIPE); }
+    } else if (look.fit === 12) { // SAILOR TOP: white with navy stripes, a navy collar and a red neckerchief knot
+      for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1, nv = (y + 13) % 3 === 2; R(-hw, y, hw * 2, 1, nv ? SAIL_N : SAIL_W); R(hw - 1, y, 1, 1, nv ? SAIL_N : SAIL_WD); }
+      R(-hwAt(-13) - 1, -13, hwAt(-13) * 2 + 2, 1, SAIL_N); R(-2, -13, 4, 2, SAIL_R); R(-1, -11, 2, 2, SAIL_R); R(-2, -13, 1, 1, M(SAIL_R, K.WHITE, 0.35));
     }
     // face
     const ey = -20, ex = [-7 + d, 3 + d];
@@ -262,11 +274,13 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 }
 
 /** Hats that hide the critter's antenna. */
-const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17]);
+const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17, 18, 19]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
 /** The HAZMAT SUIT's yellows, its boots, the HI-VIS VEST's orange and its reflective stripes. */
 const HZ: RGB = [242, 194, 48], HZ_DK: RGB = [196, 146, 28], HZ_HI: RGB = [255, 226, 120], BOOT: RGB = [34, 34, 40], VIS: RGB = [255, 122, 34], VIS_DK: RGB = [210, 90, 20], STRIPE: RGB = [226, 230, 236];
-const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]], 10: [HZ, HZ_DK] };
+/** The SAILOR TOP's white, its shade, the navy stripes and the red neckerchief. */
+const SAIL_W: RGB = [240, 242, 248], SAIL_WD: RGB = [200, 206, 222], SAIL_N: RGB = [36, 50, 110], SAIL_R: RGB = [220, 50, 60];
+const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]], 10: [HZ, HZ_DK], 12: [SAIL_W, SAIL_N] };
 /** The ROCK STAR jacket's gold sequins and the twinkles on them (they catch the light as you move). */
 const SEQ: RGB = [236, 190, 60], SEQ_DK: RGB = [184, 136, 30], SEQ_HI: RGB = [255, 236, 150];
 function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void, x0: number, x1: number, y0: number, y1: number, P: Pose): void {
@@ -274,7 +288,7 @@ function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void
   lit(() => { for (let k = 0; k < 5; k++) { const x = x0 + ((k * 7 + ph * 3) % Math.max(1, x1 - x0)), y = y0 + ((k * 5 + ph) % Math.max(1, y1 - y0)); R(x, y, 1, 1, k % 2 ? K.WHITE : SEQ_HI); } });
 }
 /** How far each prize hat (6..10) rises above its brim row. */
-const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16];
+const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16, 8, 14];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
 
 /** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
@@ -346,6 +360,24 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
     lit(() => { const bx = d * 6, by = b - 16; R(bx - 1, by - 1, 3, 3, [255, 214, 90]); R(bx - 1, by - 1, 1, 1, K.WHITE); });
     return [d * 6, b - 16];
   }
+  if (hat === 18) { // CAPTAIN'S HAT: a white top wider than its navy band, gold braid, an anchor badge, a shiny black peak
+    const wh: RGB = [244, 244, 248], sh: RGB = [206, 210, 222], nv: RGB = [34, 40, 70], gd: RGB = [255, 214, 90];
+    [18, 22, 24, 22].forEach((w, j) => { R(-w / 2, b - 7 + j, w, 1, wh); R(w / 2 - 2, b - 7 + j, 2, 1, sh); });
+    R(-8, b - 7, 12, 1, K.WHITE);
+    R(-10, b - 3, 20, 2, nv); R(-10, b - 3, 20, 1, M(nv, K.WHITE, 0.2)); R(-10, b - 1, 20, 1, gd);
+    R(-2 + d, b - 6, 4, 3, gd); R(-1 + d, b - 5, 2, 1, [184, 144, 42]);
+    R(-8 + d * 2, b, 16, 2, [24, 24, 32]); R(-7 + d * 2, b, 9, 1, [96, 96, 116]);
+    return null;
+  }
+  if (hat === 19) { // SHARK FIN: a grey dorsal fin on a headband, swept back, with a pale leading edge
+    const g: RGB = [120, 134, 152], gd: RGB = [84, 96, 114], gl: RGB = [178, 190, 206];
+    R(-11, b - 1, 22, 2, gd); R(-11, b - 1, 22, 1, g);
+    for (let j = 0; j < 12; j++) {
+      const w = Math.max(1, Math.round(10 * (1 - j / 12))), x0 = -d * Math.round((j * j) / 26) - Math.floor(w / 2);
+      R(x0, b - 2 - j, w, 1, g); R(d > 0 ? x0 + w - 1 : x0, b - 2 - j, 1, 1, gl); if (w > 3) R(d > 0 ? x0 : x0 + w - 1, b - 2 - j, 1, 1, gd);
+    }
+    return null;
+  }
   if (hat === 14) { // space helmet: a glass fishbowl over the whole head (antenna and all) on a metal collar
     const rim: RGB = [200, 236, 255], rim2: RGB = [150, 200, 235], cy = b + 5, rad = 17;
     for (let k = 0; k < 64; k++) {
@@ -374,6 +406,17 @@ function extraFace(R: Rect, face: number, ex: number[], ey: number, mx: number, 
     R(x0, ey - 3, x1 - x0, 1, fr); R(x0 + 1, ey - 4, x1 - x0 - 2, 1, fh); R(x0, ey + 5, x1 - x0, 1, fd); R(x0, ey - 3, 1, 9, fr); R(x1 - 1, ey - 3, 1, 9, fd);
     R(mx - 1, ey + 3, 3, 2, fr); for (let k = 0; k < 4; k++) R(x0 + 3 + k * Math.round((x1 - x0 - 6) / 3), ey - 4, 1, 1, fd);
     R(x0 + 2, ey - 1, 2, 1, K.WHITE); R(x0 + 2, ey, 1, 1, K.WHITE);
+    return;
+  }
+  if (face === FACE_SNORKEL) { // SNORKEL: a dive mask over both eyes (a blue rim, clear glass, a nose pocket), the strap, and a tube up the side of the head
+    const x0 = ex[0] - 3, x1 = ex[1] + 6, rim: RGB = [44, 100, 186], rd: RGB = [28, 62, 128];
+    R(x0 - 2, ey, 2, 2, [30, 32, 44]); R(x1, ey, 2, 2, [30, 32, 44]);
+    alpha(0.35, () => R(x0 + 1, ey - 2, x1 - x0 - 2, 7, [170, 225, 250]));
+    R(x0, ey - 3, x1 - x0, 1, rim); R(x0, ey + 5, x1 - x0, 1, rd); R(x0, ey - 3, 1, 9, rim); R(x1 - 1, ey - 3, 1, 9, rd); R(mx - 2, ey + 4, 4, 2, rim);
+    R(x0 + 2, ey - 1, 2, 1, K.WHITE); R(x0 + 2, ey, 1, 1, K.WHITE);
+    const tx = mx >= 0 ? x0 - 3 : x1 + 1, ty = ey - 10;
+    R(tx, ty, 2, my + 3 - ty, [255, 190, 60]); R(tx + 1, ty, 1, my + 3 - ty, [214, 140, 40]); R(tx - 1, ty - 2, 4, 2, [255, 120, 50]);
+    const m0 = Math.min(tx, mx - 1), m1 = Math.max(tx + 2, mx + 2); R(m0, my + 2, m1 - m0, 2, [34, 34, 44]);
     return;
   }
   if (face === 6) { R(mx - 2, my + 2, 1, 2, K.WHITE); R(mx + 1, my + 2, 1, 2, K.WHITE); return; }
@@ -476,6 +519,9 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
       [-12, -6, 3, 9].forEach((lx, i) => { const up = P.lift === (i % 2 ? 2 : 1) ? 2 : 0; R(lx, -3 - up, 3, 3, BOOT); });
     } else if (look.fit === 11) { // HI-VIS VEST
       R(-13, -15, 26, 11, VIS); R(-13, -5, 26, 1, VIS_DK); R(12, -15, 1, 11, VIS_DK); R(-2, -15, 4, 10, body); for (const y of [-12, -8]) { R(-13, y, 10, 1, STRIPE); R(3, y, 10, 1, STRIPE); }
+    } else if (look.fit === 12) { // SAILOR TOP
+      R(-13, -15, 26, 11, SAIL_W); R(12, -15, 1, 11, SAIL_WD); for (let y = -12; y <= -6; y += 3) R(-13, y, 26, 1, SAIL_N); R(-13, -15, 26, 1, SAIL_N); R(-13, -5, 26, 1, SAIL_N);
+      R(-2, -15, 4, 2, SAIL_R); R(-1, -13, 2, 2, SAIL_R); R(-2, -15, 1, 1, M(SAIL_R, K.WHITE, 0.35));
     }
     const sleeve = SLEEVES[look.fit] ?? null;
     const arm2 = (side: -1 | 1, raised: boolean, sway: number) => {
