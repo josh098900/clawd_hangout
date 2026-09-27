@@ -33,7 +33,7 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'], sub: ['sub', 'makeSub'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
@@ -74,6 +74,27 @@ const res = await p.evaluate(async () => {
   aqW.AQUA.jellyDancers = 3; out['aquarium:disco'] = draw(ar, aqScene); aqW.AQUA.jellyDancers = 0;
   for (const k of [20, 95, 200, 475]) { subG.SUB.skew = k - (Date.now() / 1000) % 480; out['aquarium:sub:' + k] = draw(ar, aqScene); out['pier:sub:' + k] = draw(rooms.pier, () => rooms.pier.drawBack(A)); }
   subG.SUB.skew = 0; aqG.GAL.tanks.clear();
+  // SARDINE 1 (step 18, push 2): the cabin with the window at the dock, going down, and in every zone of the sea (lights on and off, by
+  // night too), the troubles, the visitors and the baby octopus on the glass, the claw at work and its CLAW CAM; every new creature and find
+  const subW = await import('/src/world/sub.ts'), seaW = await import('/src/world/sea.ts'), sl = await import('/src/world/sealife.ts'), sr = rooms.sub, T = Date.now() / 1000, N = 3729166, S = subW.SUBW;
+  const subScene = () => { sr.drawBack(A); for (const pr of [...sr.props, ...(sr.extras?.(A) ?? [])].sort((p, q) => p.y - q.y)) pr.draw(A); };
+  const seaAt = (x, y, lamps, day = 1) => ({ x, y, vx: 0, vy: 0, T, n: N, day, a: A, lamps, lampT: T - 5, life: subG.seaLife(T, N, { x, y, still: 5 }, { on: lamps, lt: T - 5, lp: T - 20 }), finds: subG.findsOf(N), got: 0, ping: { T: T - 1, x, y }, buoys: subG.buoysOf(N), mapped: 1, rain: false, flashK: 0, snow: false, halloween: false, winter: false });
+  S.board = ['DOCKED', 'DIVE 1:08', 'MISSION:', 'THE WHALE']; S.pen = { a: A, day: 1, wl: 360, slide: 0, gate: 0, boil: 0 }; out['sub:dock'] = draw(sr, subScene);
+  S.pen = { a: A, day: 1, wl: 300, slide: 40, gate: 0.5, boil: 1 }; out['sub:diving'] = draw(sr, subScene); S.pen = null;
+  for (const [name, x, y, lamps] of [['harbour', 300, 20, false], ['kelp', 800, 70, false], ['reef', 1400, 88, false], ['wreck', 1990, 120, true], ['dropoff', 2420, 205, false], ['deep', 2440, 520, true], ['trench', 3000, 1110, true], ['trenchdark', 3000, 1110, false], ['end', 3300, 1000, true]]) { S.sea = seaAt(x, y, lamps); S.depth = y; S.lamps = lamps; out['sub:' + name] = draw(sr, subScene); }
+  S.sea = seaAt(1400, 88, false, 0); out['sub:reef:night'] = draw(sr, subScene);
+  S.sea = seaAt(1990, 120, true); S.leak = 1; S.fixing = [true, false, false, false]; out['sub:leak'] = draw(sr, subScene); S.leak = 0;
+  S.fixing = [false, false, true, false]; S.lightsOut = true; out['sub:lightsout'] = draw(sr, subScene); S.lightsOut = false; S.fixing = [false, false, false, false];
+  S.glass = { ...S.glass, seal: 3 }; out['sub:seal'] = draw(sr, subScene); S.glass = { ...S.glass, seal: -1, squid: 3 }; out['sub:squid'] = draw(sr, subScene); S.glass = { ...S.glass, squid: -1, octo: 3 }; out['sub:octo'] = draw(sr, subScene); S.glass = { ...S.glass, octo: -1 };
+  S.claw = { cx: 5, cd: 20, shut: 0.5, hold: 'coins', busy: true }; S.bin = ['chest', 'coins', 'bottle']; out['sub:claw'] = draw(sr, subScene);
+  { const c = px.mk(240, 140); seaW.drawClawCam(c, { v: seaAt(1940, 150, true), cx: 0, cd: 20, shut: 1, hold: 'chest' }); out['sub:clawcam'] = H(c); }
+  S.sea = null; S.claw = { cx: 0, cd: 0, shut: 0, hold: null, busy: false }; S.bin = []; S.depth = 0; S.lamps = false;
+  out['sealife:new'] = draw({ w: 520, h: 250, dim: 0 }, () => { sl.seaOtter(20, 20, 1, A); sl.seal(60, 20, 1, A); sl.sealOnGlass(120, 34, A, 2); sl.seahorse(170, 20, A, 1); sl.seahorse(185, 20, A, 0); sl.garibaldi(210, 20, 1, A); sl.leopardShark(250, 20, 1, A); sl.octopusRock(300, 20, A, 1); sl.octopusRock(320, 20, A, 0); sl.grouper(340, 20, A, 1); sl.lanternfish(380, 20, A, 1); sl.humpback(110, 110, 1, A); sl.anglerfish(250, 100, 1, A, true); sl.anglerfish(290, 100, 1, A, false); sl.dumbo(330, 100, 1, A); sl.yetiCrab(360, 100, 1, A); sl.squidOnGlass(380, 70, 510, 150, A, 2); sl.babyOctopusOnGlass(460, 195, A, 2); ['coins', 'pearl', 'bottle', 'chest', 'duck', 'rduck', 'cone', 'phone', 'gnome', 'shades', 'trumpet', 'tyre', 'globe', 'present', 'bell', 'boot', 'can', 'bag', 'crisps'].forEach((k, i) => sl.drawFind(k, 14 + i * 26, 240, A)); });
+  // UP PERISCOPE's view all the way round from the surface (5 views side by side), in each weather and time of day, the rocket on its pad
+  { const ui = await import('/src/ui/sub.ts'), sp = await import('/src/world/space.ts'); sp.FLIGHT.skew = 1190 - (Date.now() / 1000) % 1200;
+    for (const [name, day, wx] of [['day', 1, 'clear'], ['dusk', 0.42, 'clear'], ['night', 0, 'clear'], ['rain', 0.9, 'rain'], ['storm', 0.1, 'storm'], ['fog', 0.05, 'fog'], ['snow', 0.8, 'snow']])
+      out['periscope:' + name] = draw({ w: 480, h: 96, dim: 0 }, () => { for (let i = 0; i < 5; i++) { const g = px.PX.ctx; g.save(); g.translate(i * 96, 0); ui.surfaceView(i * 96, day, wx, 0, A); g.restore(); } });
+    sp.FLIGHT.skew = 0; }
   season.setSeason('winter'); W.installWinter(rooms);
   for (const room of Object.values(rooms)) draw(room, () => W.winterGround(room)); // (build the snow once first: the snow layer is cached, like in the game)
   for (const [id, room] of Object.entries(rooms)) out[id + ':winter'] = draw(room, () => { W.winterGround(room); W.winterBack(room, A); for (const pr of W.winterProps(id)) pr.draw(A); W.winterFront(room, A, { x: 0, y: 0, w: room.w, h: room.h }, false); });
@@ -112,6 +133,24 @@ const res = await p.evaluate(async () => {
     if (bad) throw new Error('aquarium: ' + bad + ' bad seconds in the timetables');
 
     out.sub = sig.length + ':' + [...sig].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
+  // SARDINE 1's seeds: 10,000 dives, each mission / trouble / find / whale / octopus / buoy well formed (the reactor-freeze lesson)
+  { let bad = 0, sig = 0;
+    for (let n = 0; n < 10000; n++) {
+      const m = subG.missionOf(n), ts = subG.troublesOf(n), fs2 = subG.findsOf(n, n % 2 === 0), bs = subG.buoysOf(n), oc = subG.octopusAt(n);
+      if (!(m >= 0 && m < subG.MISSIONS.length) || (n > 0 && subG.missionOf(n - 1) === m)) bad++;
+      if (ts.length < 2 || ts.length > 3 || ts.some((t, i) => !(t.kind >= 0 && t.kind < 4) || t.k < 130 || t.k > 395 || (i && t.k - ts[i - 1].k < 50))) bad++;
+      for (const f of fs2) if (!subG.FIND_NAMES[f.kind] || !(f.y <= subG.seabed(f.x) + 0.5) || !(f.x > 0 && f.x < subG.SEA_W) || f.i > 15) bad++;
+      for (const b2 of bs) if (!(b2.y < subG.seabed(b2.x) - 10)) bad++;
+      if (oc !== null && !(oc >= 160 && oc + subG.OCTO_S < subG.SUB_HOME)) bad++;
+      sig = (sig * 31 + m * 7 + ts.length + fs2.length * 3 + (oc ?? 0) + (subG.whaleOn(n) ? 1 : 0)) >>> 0;
+    }
+    if (bad) throw new Error('SARDINE 1: ' + bad + ' malformed dives');
+    out.dives = sig; }
+  // ...and the Cap'n's tour, flown from the gate on calm seas: it never touches the rock, and it's the same every time
+  { const st = subG.newDive(3729166, 'x'); let m = { x: st.x, y: st.y, vx: 0, vy: 0 }, bonks = 0, sig = '';
+    for (let T2 = st.at; T2 < 3729166 * 480 + subG.SUB_HOME; T2 += subG.TICK) { const s2 = subG.autoStick(m, T2 - 3729166 * 480), r2 = subG.stepSub(m, s2.sx, s2.sy, subG.CALM, T2); m = r2.m; if (r2.bonk) bonks++; if (Math.round((T2 - st.at) * 10) % 200 === 0) sig += m.x.toFixed(1) + ',' + m.y.toFixed(1) + ' '; }
+    if (bonks) throw new Error('SARDINE 1: the tour bonked ' + bonks + ' times');
+    out.tour = sig.length + ':' + [...sig].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 0); }
   // NPCs never wait where E would offer TALK instead of a spot players need (currentAction asks nearestNpc(30), dy x1.5,
   // before nearestSpot(20)): MARINA once stood on the aquarium's FEED step all through feeding time. A few short, older
   // stops are known and left be (COOKIE's by the kitchen stations on purpose: talking to COOKIE starts the tour).
@@ -184,6 +223,9 @@ Object.assign(res, await p2.evaluate(async () => {
   const fxAt = (k, since) => (a) => { a.fx = { k, t0: NOW - since, t1: NOW + 20 }; };
   await grid('fx', L(7).flatMap((k) => [[{}, fxAt(k + 1, 3)], [{}, fxAt(k + 1, 0.2)]]).concat([1, 2, 7].map((k) => [{ sp: 1 }, fxAt(k, 3)])));
   await grid('chempose', ['chem', 'shower', 'recipes'].map((u) => [{}, (a) => { a.use = 0; }, u]));
+  // SARDINE 1: the escape hatch's rubber ring (just starting, and on Clawd), and the poses at its stations
+  await grid('fxring', [[{}, fxAt(8, 3)], [{}, fxAt(8, 0.2)], [{ sp: 1 }, fxAt(8, 3)]]);
+  await grid('subpose', ['helm', 'subcam', 'sonar', 'subclaw', 'periscope', 'tea'].map((u) => [{}, (a) => { a.use = 0; }, u]));
   // the Moon: a rock in hand, the buggy (bouncing), a moon jump, bounding, the rover (and a pet that waits inside), mining
   av.ENV.lowG = true; av.ENV.airless = true; av.ENV.bump = () => 3;
   await grid('moon', [[{}, (a) => { a.hold = 18; }], [{}, (a) => { a.pose = 6; a.moving = true; }], [{}, (a) => { a.pose = 5; }], [{}, (a) => { a.moving = true; a.walkDist = 13; }], [{ pet: 8 }], [{ pet: 2 }], [{}, (a) => { a.use = 0; }, 'rock']]);

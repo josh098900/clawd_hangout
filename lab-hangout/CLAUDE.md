@@ -1,7 +1,7 @@
 # CLAUDE.md — Lab Hangout
 
 A multiplayer 2D pixel hangout. Players are little "lab critters" (or Clawd) who walk around
-31 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
+32 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
 play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
@@ -16,7 +16,7 @@ Room map (doors):
                                                                                   ├── tower door → STAGE
                                                                                   ├── grate → CRYPT
                                                                                   ├── THE LOFTS door → lobby → elevator → your flat (LIVING ROOM, BEDROOM, KITCHEN) or a neighbour's
-                                                                                  ├── right edge → PIER ── boardwalk (past the lighthouse) → THE CITY AQUARIUM
+                                                                                  ├── right edge → PIER ── boardwalk (past the lighthouse) → THE CITY AQUARIUM ── gangway (while it boards) → SARDINE 1
                                                                                   └── stairs → SUBWAY (Square station) ── train ── PARK station → CITY PARK
                                                                                                                     ├── DINER station → THE GREASY BYTE
                                                                                                                     └── KARTS station → THE KART TRACK
@@ -62,6 +62,9 @@ Handy URLs while developing:
 - THE CITY AQUARIUM (`?debug`): `__hangout.subAt(k)` jumps SARDINE 1's 8-minute loop to k s in (0 boarding, 90 submerge, 100 out, 470
   surfacing), `feedAt(k)` does the same for feeding time's 15 minutes (0-90 = feeding), `aq()` shows the gallery, scoops and jelly dancers,
   and `aqCatch(fish, cm)` (LOCAL only) pretends you reeled one in, so it can be donated. `?quests=a,b,c` sets LOCAL's quests of the day.
+  Aboard SARDINE 1: `sub()` shows the dive (its state, where the sub is, who's skipper / at the helm, the claw, the log), `subGo(x, y)` puts
+  the sub there at once, `subPeek()` lists what a photo would get now, `subHorn()` sounds the horn. To pick a dive with something in it (a
+  mission, the octopus, a visitor), set `SUB.skew` so `subT()` = n × 480 + k (game/sub.ts's pure functions say which n has what).
 - `?season=winter` (or `halloween`) previews a season in this browser; `?nye=N` (LOCAL/dev) = New Year in N seconds
 - `?weather=rain|storm|fog|snow|clear` pins the weather in this browser (any mode; the server still
   decides whether rain waters the gardens). `?debug` adds `weather(k)`, `crews()` and `danceBots(x, y)`
@@ -86,7 +89,10 @@ src/
                        re-sent to anyone who arrives), the KA-BOOM's frazzle, the goggles dispenser, the shower, BONEY watching), aquarium (THE CITY
                        AQUARIUM: donating at the curator's desk, the gift shop, feeding time + the 'scoop' broadcast, the touch pool, the jelly
                        disco, SARDINE 1's sounds in the pen; fetches the FISH GALLERY on the way in, after room state 'aq', and now and then on
-                       the Pier for the catch toast's BIGGER THAN THE AQUARIUM'S). Each owns its state; main calls what it exports (spots,
+                       the Pier for the catch toast's BIGGER THAN THE AQUARIUM'S), sub (SARDINE 1: a dive for everyone aboard: the helm and
+                       the autopilot (every browser flies it from the skipper's snapshot; the pilot's `helm` messages), the stations (camera,
+                       sonar, lights, claw + CLAW CAM, periscope, tea, the fixes), the troubles and visitors, CAP'N BARNACLE's lines, the
+                       report and the pay). Each owns its state; main calls what it exports (spots,
                        per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
@@ -184,7 +190,17 @@ src/
                        POOL), THE JELLY ROOM (the jelly disco), THE SUB PEN (the moon pool, SARDINE 1: sardine(), the SEA GATE, the DIVE BOARD);
                        AQUA (scoops, jelly dancers, the view: busy parts only draw in view); stillProp() = a prop drawn once and stamped
     sealife.ts         sea creatures in pixels: drawCatch (the Pier's 12 catches, sized by cm), whaleShark, manta, turtle, reefShark,
-                       clownfish, shoal, moray, diver (with a season's hat), jelly, kelp, boneFish (Halloween), snowflake (Winter)
+                       clownfish, shoal, moray, diver (with a season's hat), jelly, kelp, boneFish (Halloween), snowflake (Winter); and the
+                       open sea's: the otter, seal, seahorse, garibaldi, leopard shark, octopus, grouper, lanternfish, humpback, anglerfish,
+                       dumbo, yeti crab, what gets on the glass (the seal, the giant squid, the baby octopus), and every find (drawFind)
+    sub.ts             SARDINE 1 (1000x600): the cabin (the helm, camera, sonar, lights, claw, periscope, galley, fuse box, valve, ZAP box,
+                       the ladder and the ESCAPE HATCH, the chart table's SEA LIFE LOG, the TREASURE BIN; the hull overhead); the window
+                       (world/sea.ts, live) with a FORE layer baked for what stands in front of it; SUBW (what the feature tells it to show);
+                       the leak's water (extras), `frameTop` keeps the window just under the HUD
+    sea.ts             the sea outside SARDINE 1's window (3400 x 1200 m): the scenery baked in 256x128 tiles (the pen's wall and gate, the
+                       Pier's legs, kelp, the reef, the LUCKY HERRING's wreck, the drop-off, the vents, the END OF THE SEA sign), then live:
+                       the light and the dark (the floodlights cut out of it), kelp, reef fish, the vents' smoke, the sea life, the finds,
+                       marine snow; what's on the glass (drawGlass), the pen at the dock (drawPen), the CLAW CAM (drawClawCam)
     grid.ts            GRID: whether a reactor shift is on and the last meltdown (from the lobby's 'grid'): the Square's POWERED BY sign,
                        its brownout, the corridor's RADIATION display, the map's cooling tower, meltGlow (everyone in the wing glows green)
     boards.ts          BOARD.near: you're at this room's map board (the Square's kiosk, a platform's line map, the station's chart)
@@ -219,8 +235,11 @@ src/
                        hash), FX (TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY, FRAZZLED), POTION_S / FRAZZLE_S
   game/aquarium.ts     THE CITY AQUARIUM's rules (pure): GALLERY (the 12 tanks' order), THANKS (a first donation's tokens by rarity), GAL (the
                        gallery as last fetched), donatedKinds (CURATOR), feeding() (every 15 min on the clock, 90 s; FEED.skew for tests)
-  game/sub.ts          SARDINE 1's timetable from the wall clock: dive() (board 0-90, submerge, the dive 100-420, home, surface; SUB.skew for
-                       tests), penSink() (how far under it is in the pen), backIn()
+  game/sub.ts          SARDINE 1's rules (pure): the timetable from the wall clock (dive(): board 0-90, submerge, the dive 100-420, home,
+                       surface; SUB.skew for tests), the sea's shape (seabed, the zones, the wreck), stepSub (0.1 s ticks), the Cap'n's
+                       tour (TOUR, autoStick) and the run home, each dive's seed: its mission (MISSIONS, never the same twice running), its
+                       troubles, its finds, the whale, the octopus, the buoys; THE SEA LIFE LOG (LOG, 20) and what a photo gets (seaLife,
+                       inWindow, visible), DiveState + mergeDive, missionDone, divePay (the server's sums). Tuned by simulation
   game/diner.ts        the Diner's co-op kitchen game: tickets (from t0 + seed), cookAct() (pure: host applies, others predict),
                        missed tickets / shift end / score all derived from the clock
   game/dinertour.ts    COOKIE's hands-on kitchen tour for first-timers (TOUR steps; a local practice kitchen, lvl 0;
@@ -257,6 +276,10 @@ src/
     chembook.ts        THE RECIPE BOOK (the chem lab's lectern): found entries with their recipe chips, the rest as riddles
     aquarium.ts        THE FISH GALLERY panel (a row per tank: what's on show, your biggest, DONATE) and THE GIFT SHOP (the clothes on you,
                        the furniture; clothes are GIFTS in entities/critter.ts, furniture has `shop: 'aquarium'` so DECORATE doesn't sell it)
+    sealog.ts          THE SEA LIFE LOG: a page per zone, the ones you've photographed with their picture and line, the rest as dark
+                       shapes with a hint
+    sub.ts             SARDINE 1's panels: THE TREASURE BIN (and the notes in the bottles), UP PERISCOPE (surfaceView: the city from the sea,
+                       as it is; water deeper down; the pen at the dock) and THE DIVE REPORT
     map.ts             the CITY MAP panel: its two canvases (crisp + glow), the card for a place (live look inside, who's there,
                        how you'd get there), the pin + zoom when you pick one; 30 fps while open. Phones: the card goes under the map
   audio/sfx.ts         synthesized blips (no audio files)
@@ -308,7 +331,10 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        0023 aquarium (the FISH GALLERY: aq_tanks (one plaque per kind, the whole city) + aq_donations; aquarium_tanks,
                        donate_fish (your biggest catch from private.catches; empty tank or bigger = the plaque; first of a kind pays 1/2/3/4/6
                        by rarity); gift_items + gift_shop (clothes into your inventory, once each); the gift shop's furniture prices; the
-                       donate + feeding quests and the CURATOR badge)
+                       donate + feeding quests and the CURATOR badge) ·
+                       0024 sub (dive_pay(finds, mission): members only, just after a dive surfaces (the server works out the dive from
+                       its clock), once a dive, 1 + finds (max 4) + 3 for the mission, 24 a day; found_boot(): THE OTHER BOOT's plaque in
+                       the FISH GALLERY; the dive quest + MARINE BIOLOGIST badge)
 docs/ART_STYLE.md      the style bible (§9: the polish standard every new room follows)
 docs/briefs/           each step's design brief (written and agreed before any code)
 ```
@@ -363,6 +389,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | space | none for the rocket: `flight()` from the clock; table `space_trays` (members read, per server) + RPCs `space_plant(tray)`, `space_harvest(tray)`, `space_dig_up(tray)`, room state `trays` = "look again"; room state `scope` (the telescope: where it points, who's at it, the last thing spotted); broadcast `junk` `{ id, n }` (you grabbed floating thing n); RPC `spacewalk_pay(pts)` when you come back in | tray `{ tray, owner, owner_name, planted_at }` |
 | moon | none for the lander: `lander()` from the clock; broadcast `junk` `{ id, n }` on the Moon = you mined rock slot n (`rockKey`); room state `moonbest` `{ name, ms }` (the fastest buggy lap); RPCs `moon_assay()` (hand in a rock: the server rolls it), `moon_crystals()` | `{ tokens, paid, crystal, crystals, prize }` |
 | reactor | room state `reactor` (the shift: host, t0, seed, settings, when each fault was fixed, a snapshot of heat + score at `at`; only its host writes it, re-sent every 3 s) + broadcast `rx` `{ id, st, d }` ("I worked station st" / fixed a fault, st 10+kind: the host applies it with `act`); `reactbest`; lobby broadcast `grid` `{ k: on / melt / off, until?, at? }` from the host (the city's sign, brownout, tower); RPC `reactor_pay(grid)` at the end | see game/reactor.ts |
+| submarine | room state `dive` (the skipper's, the lowest id aboard: the dive n, a snapshot of where the sub is at `at`, the lights, when each trouble was fixed, the visitor, finds taken, kinds photographed, mission bits, the octopus; merged, not replaced: bits OR'd, the earliest fix, the newest snapshot; re-sent every 3 s) + broadcast `helm` `{ x, y, vx, vy, sx, sy, off? }` (whoever's at the helm, on each stick change and every 0.5 s; everyone else flies the sub on from it) and `sub` `{ e, v, x?, y? }` (snap / ping / grab / fix / lights / tea / horn / claw / bonk: every browser applies it the same way); RPCs `dive_pay(finds, mission)` at surfacing, `found_boot()` | see game/sub.ts |
 | aquarium | RPCs `aquarium_tanks()` (the plaques, your biggest catch of each kind, what you've donated), `donate_fish(fish)`, `gift_shop(item)` (and `buy_furniture` for its furniture); room state `aq` `{ n }` ("the gallery changed: look again"); broadcast `scoop` `{ id, x }` (a scoop of food thrown into the ocean tank at feeding time); feeding time and SARDINE 1's dives from the clock | `{ plaque, cm, first, paid, tokens, prev }` |
 | chem lab | broadcast `chem` `{ id, b, m, at }` ("I mixed m, a bitmask of 2-3 reagents, at bench b": every browser works out the same reaction with `outcome`; the same discovery at both benches within 3 s by two players = a two-chemist reaction) + `fx` `{ id, k, s }` ("I'm under potion / frazzle k for s more seconds": sent when you drink, and again whenever anyone arrives); room state `chemlog` (the EXPERIMENTS board); no server calls | see game/chem.ts |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
@@ -388,8 +415,9 @@ avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) 
 `room.lowG()` (the Moon) makes walking a bounding stride and SPACE a jump; `room.airless` puts helmets on and leaves pets inside
 (except the MOON ROVER). In THE REACTOR everyone past the glass (`ENV.suitX`) is drawn in the HAZMAT SUIT (fit 10); after a
 meltdown everyone in the Science Wing glows green for a minute (`ENV.glow`). FITS 10 HAZMAT SUIT (earned: 80% grid), 11 HI-VIS VEST (free). FACES 9 LAB GOGGLES (free, from the chem
-lab's dispenser). A drunk potion (or a KA-BOOM) is `Avatar.fx` `{ k, t0, t1 }`: drawAvatar scales, recolours, lights, floats or frazzles
-anyone with one, in any room.
+lab's dispenser). A drunk potion (or a KA-BOOM, or SARDINE 1's ESCAPE HATCH: the RUBBER RING, FX 8) is `Avatar.fx` `{ k, t0, t1 }`: drawAvatar scales,
+recolours, lights, floats or frazzles anyone with one, in any room. PETS 9 BABY OCTOPUS (a dive's stowaway: photograph it on the glass);
+HATS 20 DIVING HELMET (10 creatures in the SEA LIFE LOG).
 Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the

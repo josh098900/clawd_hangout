@@ -285,6 +285,21 @@ export const AQUA_TRACK: Track = {
   bass: 'A2 . . . . . E2 . F2 . . . . . C2 . D2 . . . . . A2 . E2 . . . . . B2 .',
   drums: 'k . . . . . h . . . . . s . . . k . . . . . h . . . h . s . . .',
 };
+/** SARDINE 1's music, TWENTY THOUSAND BEEPS: slow and pinging, a sonar blip on the beat. Lower and slower as you go deeper (the shallows, the blue, the deep). */
+export const SUB_TRACK: Track[] = [
+  { name: 'TWENTY THOUSAND BEEPS', bpm: 84, wave: 'triangle', leadVol: 0.03,
+    lead: 'E6 . . . . . . . B4 . D5 . E5 - G5 . E6 . . . . . . . A4 . C5 . D5 - B4 . E6 . . . . . . . G4 . B4 . E5 - D5 . E6 . . . . . . . F#4 . A4 . B4 - - .',
+    bass: 'E2 . . . B2 . . . E2 . . . B2 . . . A2 . . . E3 . . . A2 . . . E3 . . . G2 . . . D3 . . . G2 . . . D3 . . . B1 . . . F#2 . . . B1 . . . F#2 . . .',
+    drums: 'k . . . . . h . . . h . . . h . k . . . . . h . . . h . . . h . k . . . . . h . . . h . . . h . k . . . . . h . . . h . k . h .' },
+  { name: 'TWENTY THOUSAND BEEPS (THE BLUE)', bpm: 72, wave: 'sine', leadVol: 0.035,
+    lead: 'E6 . . . . . . . E4 - - . G4 - - . E6 . . . . . . . D4 - - . F#4 - - . E6 . . . . . . . C4 - - . E4 - - . E6 . . . . . . . B3 - - . D4 - - .',
+    bass: 'E2 . . . . . . . . . . . . . . . D2 . . . . . . . . . . . . . . . C2 . . . . . . . . . . . . . . . B1 . . . . . . . . . . . . . . .',
+    drums: 'k . . . . . . . . . . . h . . . k . . . . . . . . . . . h . . . k . . . . . . . . . . . h . . . k . . . . . . . . . . . h . . .' },
+  { name: 'TWENTY THOUSAND BEEPS (THE DEEP)', bpm: 60, wave: 'sine', leadVol: 0.03,
+    lead: 'E6 . . . . . . . . . . . . . . . . . . . . . . . B3 - - - - - - - E6 . . . . . . . . . . . . . . . . . . . . . . . C4 - - - - - - -',
+    bass: 'E1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . C1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .',
+    drums: 'k . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . k . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .' },
+];
 /** A looping, low-passed noise (rain, a rocket's roar). set(v) fades to volume v; set(0) fades out. */
 class NoiseLoop {
   private g: GainNode | null = null;

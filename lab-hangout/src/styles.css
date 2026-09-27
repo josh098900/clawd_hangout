@@ -62,6 +62,10 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.wing { --pa: rgba(24, 40, 46, .95); --pb: rgba(47, 122, 130, .9); --edge: #F2C230; --sub: #C8F7FF; --big: #FFFFFF; --glow: 0 3px 0 #10282C, 0 0 14px rgba(124, 242, 208, .6); }
 .plate.reactor { --pa: rgba(10, 20, 50, .96); --pb: rgba(20, 90, 190, .9); --edge: #F2C230; --sub: #A8E4FF; --big: #FFFFFF; --glow: 0 3px 0 #06205A, 0 0 16px rgba(63, 168, 255, .9); }
 .plate.moonbase { --pa: rgba(60, 50, 40, .95); --pb: rgba(232, 120, 60, .9); --edge: #FFFBF2; --sub: #FFE0C8; --big: #FFFFFF; --glow: 0 3px 0 #301808, 0 0 14px rgba(232, 120, 60, .6); }
+.plate.chem { --pa: rgba(16, 40, 30, .95); --pb: rgba(40, 120, 80, .9); --edge: #B6F25A; --sub: #D8FFC0; --big: #FFFFFF; --glow: 0 3px 0 #0C2818, 0 0 14px rgba(182, 242, 90, .7); }
+.plate.aquarium { --pa: rgba(8, 24, 52, .95); --pb: rgba(30, 110, 170, .9); --edge: #9FEFFF; --sub: #CFF6FF; --big: #FFFFFF; --glow: 0 3px 0 #06183A, 0 0 14px rgba(95, 231, 255, .7); }
+.plate.sub { --pa: rgba(10, 30, 50, .95); --pb: rgba(196, 150, 40, .92); --edge: #F2C230; --sub: #FFF0C0; --big: #FFE27A; --glow: 0 3px 0 #3A2A06, 0 0 14px rgba(242, 194, 48, .7); }
+#clawcam { width: 240px; height: 140px; image-rendering: pixelated; border: 3px solid #26282C; box-shadow: 0 0 0 2px #9C7026; background: #081418; }
 
 #deco { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 6px); transform: translateX(-50%); width: min(960px, 96vw); background: rgba(20, 16, 28, .94); border-top: 3px solid #FFD65A; padding: 6px 8px 8px; z-index: 5; display: none; flex-direction: column; gap: 6px; font-family: 'Press Start 2P', ui-monospace, monospace; }
 #deco.on { display: flex; }

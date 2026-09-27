@@ -252,6 +252,16 @@ export function poseFor(av: Avatar, a: number, now: number, using: Using = null)
     P.arm = 'wave'; P.wave = Math.sin(a * 7 + av.seed * 3) * 1.1; P.lean = 1; P.eyes = (a * 0.4 + av.seed) % 1 < 0.05 ? 'b' : 'n';
   } else if (using === 'shower') { // under the safety shower: eyes shut, arms up, shivering
     P.eyes = 'b'; P.mouth = 'o'; P.arm = 'up'; P.lean = Math.sin(a * 40) * 0.6; P.sy = 0.95 + 0.02 * Math.sin(a * 30); P.ant = Math.sin(a * 25);
+  } else if (using === 'helm') { // at SARDINE 1's wheel: both hands on it, leaning into the turns
+    P.arm = 'up'; P.lean = Math.sin(a * 0.9) * 1.5; P.eyes = (a * 0.3 + av.seed) % 1 < 0.05 ? 'b' : 'n';
+  } else if (using === 'subcam' || using === 'sonar' || using === 'lights') { // an eye to the camera, the sonar's glow
+    P.lean = 1.6; P.eyes = using === 'subcam' ? 'h' : 'n'; P.ant = Math.sin(a * 1.4) * 0.8;
+  } else if (using === 'subclaw') { // working the claw's joystick
+    P.eyes = 'w'; P.lean = Math.round(Math.sin(a * 2.3)) * 1.2; P.arm = 'wave'; P.wave = Math.sin(a * 6) * 0.8;
+  } else if (using === 'periscope') { // up periscope: both hands on the handles
+    P.arm = 'up'; P.eyes = 'b'; P.lean = 0; P.ant = Math.sin(a * 2) * 0.5;
+  } else if (using === 'tea') {
+    P.eyes = Math.sin(a * 5) > 0.6 ? 'b' : 'n'; P.sy += 0.02 * Math.sin(a * 12);
   } else if (using === 'recipes') { // reading the recipe book
     P.lean = 1.5; P.eyes = (a * 0.3 + av.seed) % 1 < 0.06 ? 'b' : 'n'; P.ant = Math.sin(a * 1.2) * 0.8;
   }
@@ -414,6 +424,14 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
     R(2, -13, 1, 5, [132, 140, 156]); R(1 + look2, -15, 4, 3, [96, 104, 122]); lit(() => { R(3 + look2, -14, 1, 1, MN.CRYSTAL); R(4 + look2, -14, 1, 1, MN.CRYSTAL); });
     for (const wx of [-5, -1, 3]) { R(wx, -3, 3, 3, wh); R(wx + (roll ? 1 : 0), -3, 1, 1, MN.TYRE_HI); }
     lit(() => R(-5, -11, 1, 2, (a * 1.5 + av.seed) % 1 < 0.2 ? [255, 90, 90] : [110, 50, 50]));
+  } else if (kind === 9) { // the BABY OCTOPUS: a pink blob with big eyes, bouncing on its curly arms; sits in a little puddle; inks when you emote
+    const c: RGB = [255, 130, 150], dk: RGB = [214, 86, 116], hi: RGB = [255, 200, 210], bob = d > 4 ? -Math.round(Math.abs(Math.sin(a * 10)) * 2) : Math.round(Math.sin(a * 2 + av.seed * 5) * 0.6);
+    if (still) alpha(0.3, () => oval(x, y, 6, 1, [120, 190, 230]));
+    for (let i = 0; i < 4; i++) { const ax = -5 + i * 3, curl = Math.round(Math.sin(a * 6 + i + av.seed * 3)); R(ax, -3 + bob, 1, 2, dk); R(ax + curl, -1 + bob, 1, 1, dk); }
+    R(-4, -10 + bob, 9, 7, c); R(-3, -11 + bob, 7, 1, c); R(-3, -10 + bob, 3, 1, hi); R(4, -9 + bob, 1, 5, dk);
+    R(0, -8 + bob, 2, 3, K.WHITE); R(3, -8 + bob, 2, 3, K.WHITE); R(1, -7 + bob, 1, 2, K.EYE); R(4, -7 + bob, 1, 2, K.EYE);
+    if ((a * 0.35 + av.seed) % 1 < 0.25) { const q = ((a * 0.35 + av.seed) % 1) / 0.25; alpha(1 - q, () => lit(() => ring(x + d2 * 5, Math.round(y - 12 - q * 10), 1 + Math.round(q), 1 + Math.round(q), [200, 236, 255]))); }
+    if (av.emote && now - av.emote.t0 < 0.9) { const q = (now - av.emote.t0) / 0.9; for (let k = 0; k < 3; k++) alpha(0.55 * (1 - q), () => disc(Math.round(x - d2 * (6 + q * 8 + k * 3)), y - 5 - k, 1 + Math.round(q * 3), [30, 20, 40])); }
   } else if (kind === 6) { // bat: always flapping, red eyes
     const c: RGB = [62, 44, 84], up = Math.floor(a * 14 + av.seed * 5) % 2;
     R(-2, -8, 5, 4, c); R(-1, -9, 1, 1, c); R(2, -9, 1, 1, c);
@@ -539,6 +557,7 @@ function fxPose(av: Avatar, fx: Fx, P: Pose, look: Look, hop: number, a: number,
   else if (fx.k === FX.RAINBOW) look = { ...look, c: Math.floor(a * 5 + av.seed * 9) % BODY.length };
   else if (fx.k === FX.FLOATY) { hop += (18 + Math.sin(a * 2.2 + av.seed * 5) * 3) * Math.max(0, Math.min(1, k)); P.lift = Math.floor(a * 1.5) % 2 ? 1 : 2; if (u < 1) { P.arm = 'up'; P.eyes = 'w'; P.mouth = 'O'; } else P.ant = Math.sin(a * 1.6) * 2; }
   else if (fx.k === FX.FRAZZLED) { if (u < 2) { P.eyes = 'w'; P.mouth = 'o'; } P.ant = Math.sin(a * 13) * 1.5; }
+  else if (fx.k === FX.RING) { P.arm = 'up'; P.sy *= 1 + 0.03 * Math.sin(a * 4); hop += Math.abs(Math.sin(a * 2.2)) * 2; if (u < 1.2) { P.eyes = 'w'; P.mouth = 'O'; } }
   if (sc !== 1) { P.sy *= sc; P.sx *= sc * Math.sqrt(sc); hop *= sc; }
   return { look, hop, sc };
 }
@@ -551,7 +570,8 @@ function fxOver(av: Avatar, fx: Fx, TX: (x: number, y: number) => [number, numbe
   } else if (fx.k === FX.RAINBOW) lit(() => { for (let j = 0; j < 4; j++) { const q = ((a * 1.2) + j / 4 + av.seed) % 1, [x, y] = TX(-14 + (j * 9) % 28, -30 + q * 26); if (q < 0.8) star4(Math.round(x), Math.round(y), j % 2, CONFETTI[(j + Math.floor(a * 4)) % CONFETTI.length]); } });
   else if (fx.k === FX.BUBBLES) bubbleTrail(av, now, TX);
   else if (fx.k === FX.FRAZZLED) frazzle(av, TX, a);
-  if (u < 0.5 || left < 0.4) { const q = u < 0.5 ? u / 0.5 : 1 - left / 0.4, [x, y] = TX(0, -14), col = fxCol(fx.k); lit(() => { for (let j = 0; j < 8; j++) { const an = j * 0.785 + a, d = (8 + q * 20) * Math.max(1, sc); star4(Math.round(x + Math.cos(an) * d), Math.round(y + Math.sin(an) * d * 0.7), 1, j % 2 ? K.WHITE : col); } }); }
+  else if (fx.k === FX.RING) rubberRing(av, TX, a);
+  if (fx.k !== FX.RING && (u < 0.5 || left < 0.4)) { const q = u < 0.5 ? u / 0.5 : 1 - left / 0.4, [x, y] = TX(0, -14), col = fxCol(fx.k); lit(() => { for (let j = 0; j < 8; j++) { const an = j * 0.785 + a, d = (8 + q * 20) * Math.max(1, sc); star4(Math.round(x + Math.cos(an) * d), Math.round(y + Math.sin(an) * d * 0.7), 1, j % 2 ? K.WHITE : col); } }); }
 }
 /** BUBBLES: a bubble every 10 px you walk (and now and then standing still), floating up, wobbling, popping. */
 function bubbleTrail(av: Avatar, now: number, TX: (x: number, y: number) => [number, number]): void {
@@ -566,6 +586,12 @@ function bubbleTrail(av: Avatar, now: number, TX: (x: number, y: number) => [num
     if (t > life) { lit(() => star4(x, y, 1, K.WHITE)); continue; }
     lit(() => { ring(x, y, b.s, b.s, CH.BUBBLE); r(x - Math.max(0, b.s - 1), y - Math.max(0, b.s - 1), 1, 1, K.WHITE); if (b.s > 1) r(x + b.s - 1, y + b.s - 1, 1, 1, [50, 130, 180]); });
   }
+}
+/** SARDINE 1's escape hatch: a rubber ring round your middle (orange and white), and drips falling off you. */
+function rubberRing(av: Avatar, TX: (x: number, y: number) => [number, number], a: number): void {
+  const [cx, cy] = TX(0, -7), x = Math.round(cx), y = Math.round(cy);
+  for (let i = -15; i <= 15; i++) { const h = Math.round(4 * Math.sqrt(Math.max(0, 1 - (i / 16) ** 2))); r(x + i, y - h, 1, 2, (Math.floor((i + 16) / 6) % 2) ? [255, 110, 40] : [246, 246, 250]); r(x + i, y + h - 1, 1, 2, (Math.floor((i + 16) / 6) % 2) ? [220, 80, 30] : [214, 214, 224]); }
+  lit(() => { for (let k = 0; k < 3; k++) { const q = (a * 1.4 + k / 3 + av.seed) % 1; r(x - 10 + k * 10, Math.round(y + 2 + q * 10), 1, 2, [150, 210, 255]); } });
 }
 /** The KA-BOOM's frazzle: fur sticking out all round the top, soot smudges, a wisp of smoke off the head. */
 function frazzle(av: Avatar, TX: (x: number, y: number) => [number, number], a: number): void {

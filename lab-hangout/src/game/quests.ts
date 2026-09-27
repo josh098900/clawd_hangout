@@ -12,6 +12,7 @@ import { COLLECTABLES } from '../entities/critter';
 import { EXPLORE } from './places';
 import { REACTIONS, found } from './chem';
 import { GALLERY, donatedKinds } from './aquarium';
+import { LOG } from './sub';
 import type { Transport } from '../net/transport';
 
 export const QUESTS: Record<string, { text: string; goal: number }> = {
@@ -50,6 +51,7 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   chem: { text: 'Brew a potion in the chem lab (the Science Wing)', goal: 1 },
   donate: { text: 'Donate a fish to the City Aquarium', goal: 1 },
   feeding: { text: 'Help out at feeding time in the City Aquarium', goal: 1 },
+  dive: { text: 'Go on a dive in SARDINE 1 (the City Aquarium\'s sub pen)', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -78,6 +80,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'engineer', name: 'CHIEF ENGINEER', hint: 'Keep the city 90% powered in a reactor shift', earned: () => stat('reactorBest') >= 90 },
   { id: 'chemist', name: 'CHEMIST', hint: 'Fill in the chem lab\'s whole recipe book', earned: () => found(save.data.chem) >= REACTIONS.length },
   { id: 'curator', name: 'CURATOR', hint: 'Donate all 12 kinds of catch to the City Aquarium', earned: () => donatedKinds() >= GALLERY.length },
+  { id: 'biologist', name: 'MARINE BIOLOGIST', hint: 'Photograph all 20 kinds of sea life from SARDINE 1', earned: () => LOG.every((c) => save.data.sea.includes(c.id)) },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

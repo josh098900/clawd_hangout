@@ -25,6 +25,7 @@ import { makeWing } from './world/wing';
 import { makeReactor } from './world/reactor';
 import { makeChem } from './world/chem';
 import { makeAquarium } from './world/aquarium';
+import { makeSub, SUBW } from './world/sub';
 import { FLIGHT, PAD_X, flight } from './world/space';
 import { skyThings } from './world/sky';
 import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
@@ -111,7 +112,8 @@ import { CHEM } from './world/chem';
 import { aqDebug, aqEntered, aqStep, catchVsGallery, feedFish, onScoop, openDonate, openGiftShop, touchPool } from './features/aquarium';
 import { FEED, feeding } from './game/aquarium';
 import { SUB } from './game/sub';
-import { AQUA_TRACK } from './audio/music';
+import { AQUA_TRACK, SUB_TRACK } from './audio/music';
+import { horn as subHorn, onHelm, onSub, SUBPAD, subAction, subDebug, subEntered, subInput, subLabel, subLeft, subLine, subPeek, subSpace, subSpot, subStep, subStepOff, subTea, subTeleport } from './features/sub';
 import { REAGENTS } from './game/chem';
 import { adventMenu, drawBalls, fightHits, flyBall, openPresent, refreshWinter, rollSnowman, scoopSnow, sendGiftTo, snowTarget, startSnowfight, throwSnowball, treeMenu, winterLine, winterStep } from './features/winter';
 
@@ -126,7 +128,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem(), aquarium: makeAquarium() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem(), aquarium: makeAquarium(), sub: makeSub() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -155,7 +157,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer(), aquaScore = new MusicPlayer();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer(), aquaScore = new MusicPlayer(), subScore = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -179,7 +181,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map(), wing: new Map(), reactor: new Map(), chem: new Map(), aquarium: new Map() };
+const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map(), wing: new Map(), reactor: new Map(), chem: new Map(), aquarium: new Map(), sub: new Map() };
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -309,6 +311,8 @@ function onNet(e: NetEvent): void {
     case 'chem': if (room.id === 'chem' && others.has(e.id) && allow(e.id, 'chem', 2, 4)) onChem(e.id, e.b, e.m, e.at); break;
     case 'fx': if (allow(e.id, 'fx', 3, 6)) onFx(e.id, e.k, e.s); break;
     case 'scoop': if (room.id === 'aquarium' && others.has(e.id) && allow(e.id, 'scoop', 2, 4)) onScoop(e.x); break;
+    case 'helm': if (room.id === 'sub' && others.has(e.id) && allow(e.id, 'helm', 10, 16)) onHelm(e.id, e.h); break;
+    case 'sub': if (room.id === 'sub' && others.has(e.id) && allow(e.id, 'sub', 8, 14)) onSub(e.id, e.s); break;
     case 'status': toast(e.text); break;
   }
 }
@@ -433,6 +437,7 @@ function enterRoom(id: RoomId, at: { x: number; y: number } | null): Promise<voi
 async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Promise<void> {
   if (room.id === 'diner' && id !== 'diner') { endTour(false); leaveKitchen(); } // (while the others are still here to hand over to)
   if (room.id === 'reactor' && id !== 'reactor') leaveReactor();
+  if (room.id === 'sub' && id !== 'sub') subLeft();
   if (decorating() && !isFlat(id)) closeDecorate(true); // walked out while decorating: keep it
   if (isFlat(id) && FLAT.owner !== FLAT.photoOf) loadFlatPhoto(FLAT.owner);
   if (isFlat(id) && FLAT.owner !== flatSeen) { flatSeen = FLAT.owner; for (const f of FLAT_ROOMS) { roomState[f].clear(); FLAT.juke[f] = { n: -1, t0: 0 }; } } // a different flat
@@ -452,6 +457,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   if (id === 'reactor') reactorEntered();
   if (id === 'chem') chemEntered();
   if (id === 'aquarium') aqEntered();
+  if (id === 'sub') subEntered(from);
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
@@ -532,7 +538,10 @@ const FILL: Partial<Record<string, { hold: number; secs: number; msg: string }>>
   popcorn: { hold: HOLD_POPCORN, secs: 1.2, msg: 'Popcorn!' },
   soda: { hold: HOLD_SODA, secs: 1.2, msg: 'Soda!' },
   hotdog: { hold: HOLD_HOTDOG, secs: 1.5, msg: 'Hot dog!' },
+  tea: { hold: HOLD_MUG, secs: 2.2, msg: 'A nice cup of tea!' },
 };
+/** SARDINE 1's spots that features/sub.ts handles (it says whether you stay at them). */
+const SUB_KINDS = new Set(['helm', 'subcam', 'lights', 'sonar', 'subclaw', 'periscope', 'subfix', 'bin', 'sealog', 'escape']);
 // ---------- party games ----------
 function gameNow(): GameState | null { const s = roomState[room.id].get('game'); return s?.k === 'game' && live(s.v) ? s.v : null; }
 const posOf = (id: string): { x: number; y: number } | null => (id === net.selfId ? { x: me.x, y: me.y } : others.get(id) ?? null);
@@ -593,6 +602,7 @@ function useSpot(i: number): void {
   if (s.kind === 'goggles') { takeGoggles(); return; }
   if (s.kind === 'touch') { touchPool(); return; }
   if (s.kind === 'feedfish') { feedFish(); return; }
+  if (SUB_KINDS.has(s.kind) && !subSpot(s.kind, s.n ?? 0)) return; // (SARDINE 1: the stations you stay at go on to sit you there)
   if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.api.flats.doors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.api.flats.mine().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.api.flats.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
   if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
   if (s.kind === 'flatparty') {
@@ -646,7 +656,7 @@ function useSpot(i: number): void {
   forceSend = true;
   const fill = FILL[s.kind];
   if (s.kind === 'sit') SFX.sit();
-  else if (fill) { fillEnd = t + fill.secs; if (s.kind === 'coffee') SFX.brew(); else if (s.kind === 'soda') SFX.pour(); else SFX.pop(); }
+  else if (fill) { fillEnd = t + fill.secs; if (s.kind === 'coffee' || s.kind === 'tea') SFX.brew(); else if (s.kind === 'soda') SFX.pour(); else SFX.pop(); }
   else if (s.kind === 'arcade') openArcade(Math.max(save.data.hi, roomHi()?.score ?? 0), endArcade);
   else if (s.kind === 'claw') openClawMachine(i);
   else if (s.kind === 'pong') startPong(i);
@@ -723,7 +733,8 @@ function wearItem(item: string): void { applyProfile(me.name, withItem(me.look, 
 /** onClose for a panel opened from spot i: hand the keys back to walking and step off the spot. */
 const closeSpot = (i: number) => (): void => { input.clear(); if (me.use === i) leaveSpot(); };
 function leaveSpot(): void {
-  const s = room.spots[me.use];
+  const s = room.spots[me.use], sk = usingOf(me);
+  if (sk === 'helm' || sk === 'subclaw' || sk === 'periscope') subStepOff(sk);
   if (s) { me.x = s.sx; me.y = s.sy; }
   me.use = -1; me.stopT = now(); forceSend = true;
 }
@@ -850,8 +861,17 @@ const pad = document.createElement('div'); pad.id = 'pad';
 const PAD_LABELS = [['C', 'D', 'E', 'G', 'A', 'C', 'D', 'E'], ['KICK', 'SNARE', 'HAT', 'OPEN', 'TOM', 'TOM', 'CLAP', 'CRASH'], ['C', 'D', 'E', 'G', 'A', 'C', 'D', 'E'], ['LA', 'LA', 'LA', 'LA', 'LA', 'LA', 'LA', 'LA']];
 let padShown = -1;
 function syncPad(): void {
-  const s = me.use >= 0 ? room.spots[me.use] : undefined, i = s?.kind === 'instrument' ? s.inst ?? 0 : s?.kind === 'rstation' && s.n ? 10 + s.n : s?.kind === 'chem' ? 20 + (s.n ?? 0) : -1;
+  const s = me.use >= 0 ? room.spots[me.use] : undefined, i = s?.kind === 'instrument' ? s.inst ?? 0 : s?.kind === 'rstation' && s.n ? 10 + s.n : s?.kind === 'chem' ? 20 + (s.n ?? 0) : s?.kind === 'helm' ? 30 : s?.kind === 'subclaw' ? 31 : -1;
   if (i === padShown) { if (i >= 20) pad.querySelectorAll<HTMLButtonElement>('button[data-r]').forEach((b) => { const v = String(CHEM.picks.includes(Number(b.dataset.r))); if (b.getAttribute('aria-pressed') !== v) b.setAttribute('aria-pressed', v); }); return; }
+  if (i !== 30 && i !== 31) SUBPAD.x = SUBPAD.y = 0;
+  if (i >= 30) { // SARDINE 1's helm or claw: a d-pad you hold, and the HORN / GRAB
+    padShown = i; pad.style.display = ''; document.body.classList.toggle('jamming', true);
+    const t = document.createElement('span'); t.className = 'pill quiet'; t.textContent = i === 30 ? 'HELM' : 'CLAW';
+    const hold = (label: string, dx: number, dy: number) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; b.textContent = label; b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (dx) SUBPAD.x = dx; if (dy) SUBPAD.y = dy; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (dx) SUBPAD.x = 0; if (dy) SUBPAD.y = 0; }); return b; };
+    const act = document.createElement('button'); act.type = 'button'; act.className = 'pill'; keyLabel(act, 'SPACE', i === 30 ? 'HORN' : 'GRAB'); act.style.boxShadow = '0 0 0 2px #FFD65A'; act.addEventListener('pointerdown', (e) => { e.preventDefault(); subSpace(); });
+    pad.replaceChildren(t, hold('◀', -1, 0), hold('▶', 1, 0), hold('▲', 0, -1), hold('▼', 0, 1), act);
+    return;
+  }
   if (i >= 20) { // at a chem bench: the eight reagents (1-8), each in its colour
     padShown = i; pad.style.display = ''; document.body.classList.toggle('jamming', true);
     const t = document.createElement('span'); t.className = 'pill quiet'; t.textContent = 'BENCH ' + (i === 20 ? 'A' : 'B');
@@ -968,7 +988,8 @@ function currentAction(): Action | null {
   if (me.pose === POSE_BOAT) return Math.hypot(me.x - DOCK.launch.x, me.y - DOCK.launch.y) < 44 ? { label: 'GET OUT', run: land, at: null } : null;
   if (me.pose === POSE_BUGGY) return { label: 'PARK', run: parkBuggy, at: null };
   if (me.use >= 0) {
-    const k = usingOf(me);
+    const k = usingOf(me), sa = k ? subAction(k) : null;
+    if (sa) return { label: sa.label, run: sa.run, at: null };
     if (k === 'fish') return fishing?.state === 'bite' ? { label: 'REEL!', run: reel, at: null } : { label: 'STOP FISHING', run: () => { fishing = null; leaveSpot(); }, at: null };
     if (k === 'rstation') return { label: 'STEP AWAY', run: leaveSpot, at: null };
     if (k === 'chem') return chemReady() ? { label: 'MIX!', run: chemMix, at: null } : { label: 'STEP AWAY', run: leaveSpot, at: null };
@@ -983,7 +1004,7 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: tk.verb ?? 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(20);
-  if (i >= 0) { const s = room.spots[i]; return { label: s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
+  if (i >= 0) { const s = room.spots[i], sl = room.id === 'sub' ? subLabel(s.kind, s.n ?? 0) : null; return { label: sl ? sl : s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
   if (isWinter() && !me.hold && onSnow(room, me.x, me.y) && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
@@ -1059,6 +1080,7 @@ emoteBar.appendChild(pillButton('pill mapb', 'M', 'MAP', () => openMap())); // (
 input.onKey = (e) => {
   if (!playing || editing || modalOpen() || isTyping(e)) return;
   if (wheel.classList.contains('on')) { if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') closeWheel(); else if (e.key >= '1' && e.key <= '8') { closeWheel(); emote(WHEEL[Number(e.key) - 1]); } return; }
+  if (e.key === ' ' && subSpace()) { e.preventDefault(); return; } // (SARDINE 1: the horn at the helm, GRAB at the claw)
   if (e.key === 'r' || e.key === 'R') { openWheel(); return; }
   if (e.key === 'm' || e.key === 'M') { openMap(); return; }
   if (e.key === ' ' && room.zeroG?.()) { e.preventDefault(); spaceKey(); return; }
@@ -1170,7 +1192,9 @@ function updateMe(dt: number): void {
   // busy with a spot: sitting, filling a cup, the photo booth
   if (me.use >= 0) {
     const k = usingOf(me), fill = FILL[k ?? ''];
+    if (k === 'helm' || k === 'subclaw') { subInput(ax.x, ax.y); me.moving = false; sendNet(t); return; } // (SARDINE 1's helm and claw: the arrows steer, E steps away)
     if (fill && t >= fillEnd) {
+      if (k === 'tea') subTea();
       me.hold = fill.hold; me.sips = 0; leaveSpot(); SFX.chime();
       if (!told.has(fill.hold)) { told.add(fill.hold); const verb = useEmote(fill.hold); logLine(null, fill.msg + (isTouch ? ' Tap ' + verb.toUpperCase() + ' to ' + verb : ' Press Q to ' + verb)); }
     } else if (k === 'booth' && booth) runBooth(t);
@@ -1475,7 +1499,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); aqStep(); karaokeStep(dt); winterStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); aqStep(); subStep(dt); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -1483,7 +1507,7 @@ function frame(nowMs: number): void {
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || moonLine() || reactorLine() || winterLine());
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || moonLine() || reactorLine() || subLine() || winterLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = (g && partyMusic(g)) || (isFlat(room.id) && partyOn());
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -1521,6 +1545,7 @@ function frame(nowMs: number): void {
     const rh = reactorHeat(); // THE REACTOR's own music, faster and more urgent when the core runs hot
     reactorScore.set(rh < 0 ? null : CRITICAL_MASS[rh > 0.85 ? 2 : rh > 0.6 ? 1 : 0], 0); reactorScore.volume(rh >= 0 && !g ? 0.45 : 0); reactorScore.tick();
     chemScore.set(room.id === 'chem' ? CHEM_TRACK : null, 0); chemScore.volume(room.id === 'chem' && !g ? 0.35 : 0); chemScore.tick(); // THE CHEM LAB's own tune
+    const deep = SUBW.depth; subScore.set(room.id === 'sub' ? SUB_TRACK[deep > 400 ? 2 : deep > 120 ? 1 : 0] : null, 0); subScore.volume(room.id === 'sub' && !g ? 0.4 : 0); subScore.tick(); // SARDINE 1's tune, deeper as you go down
     aquaScore.set(room.id === 'aquarium' ? AQUA_TRACK : null, 0); aquaScore.volume(room.id === 'aquarium' && !g ? (me.x > 1240 && me.x < 1420 ? 0.5 : 0.32) : 0); aquaScore.tick(); // THE CITY AQUARIUM's tune (louder in the jelly room)
     // seated somewhere with a view (the cinema), the camera pans up to frame it
     const view = (me.use >= 0 ? room.spots[me.use]?.watch : undefined) ?? (room.watch && (usingOf(me) === 'sit' || usingOf(me) === 'rstation') ? room.watch : null);
@@ -1532,7 +1557,8 @@ function frame(nowMs: number): void {
     } else {
       // the Rooftop at liftoff / touchdown: the camera tilts up to follow the rocket
       const rt = room.id === 'roof' && playing && Math.abs(me.x - PAD_X) < 520 ? rocketTop() : null, up = rt !== null ? Math.min(Math.max(0, rt - 40), me.y - R.cam.h * 0.62) : undefined;
-      R.setScaleCap(null); R.follow(view ? view.x : up !== undefined ? me.x * 0.4 + PAD_X * 0.6 : me.x, me.y, room.w, room.h, dt, false, view?.top ?? up);
+      const ft = room.frameTop !== undefined ? room.frameTop - (112 * R.dpr) / R.cam.sc : undefined; // (the top HUD is ~112 css px)
+      R.setScaleCap(null); R.follow(view ? view.x : up !== undefined ? me.x * 0.4 + PAD_X * 0.6 : me.x, me.y, room.w, room.h, dt, false, view?.top ?? up ?? ft);
     }
     const sh = shakeNow(), ox = (Math.random() - 0.5) * sh * 6, oy = (Math.random() - 0.5) * sh * 4;
     R.cam.x += ox; R.cam.y += oy;
@@ -1660,6 +1686,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     weather: (k: string | null) => forceWeather(k), crews: () => crews.map((c) => c.members.map((m) => m.id)), danceBots: (x: number, y: number) => bots?.danceAt(x, y),
     reactor: () => reactorDebug(), rset: (patch: Record<string, unknown>) => { const g = REACT.g; if (g) setState({ k: 'reactor', v: { ...g, ...patch } as typeof g }); }, badges: () => [...quests.mine], stats: () => save.data.stats, owns: (k: string) => save.has(k), rpress: (st: number, d: number) => reactorPress(st, d), rclock: () => reactorClockIn(), rfix: (k: number) => faultPress(k), scram: () => scramPress(),
     aq: () => aqDebug(), aqCatch: (fish: string, cm: number) => (net.api as unknown as { fakeCatch?(f: string, c: number): void }).fakeCatch?.(fish, cm), feedAt: (k: number) => { FEED.skew = 0; FEED.skew = k - (Date.now() / 1000) % 900; }, subAt: (k: number) => { SUB.skew = 0; SUB.skew = k - (Date.now() / 1000) % 480; },
+    sub: () => subDebug(), subGo: (x: number, y: number) => subTeleport(x, y), subPeek: () => subPeek(), subHorn: () => subHorn(),
     chem: () => chemDebug(), mix: (b: number, m: number) => chemForce(b, m), chemFrom: (id: string, b: number, m: number) => onChem(id, b, m, Date.now()), pick: (i: number) => chemPick(i), mixNow: () => chemMix(), drink: () => drinkPotion(), fxOf: (id: string) => (id === net.selfId ? me : others.get(id))?.fx ?? null, setFx: (k: number, s: number) => setFx(me, k, s), hold: (h: number) => { me.hold = h; forceSend = true; }, goggles: () => takeGoggles(),
     map: (b?: RoomId) => openMap(b ?? null), mapOpen: () => mapOpen(), mapRoute: (id: RoomId, pod?: boolean) => mapRoute(id, pod), zone: () => zoneNow(), places: () => save.data.places,
     mapGo: (id: RoomId, pod?: boolean) => { const rt = mapRoute(id, pod); if (rt.ok) travel(rt); return rt; }, goTo: (r: RoomId) => goToRoom(r), mapPreview: (id: RoomId) => mapPreview(id)?.toDataURL() ?? null,

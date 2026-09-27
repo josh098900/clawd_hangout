@@ -105,7 +105,7 @@ const DEFS: NpcDef[] = [
       { x: 600, y: 600, wait: 8, say: ['watch the lighthouse', 'hear the waves?'] },
       { x: 730, y: 560 },
     ],
-    chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.', 'past the lighthouse there is an AQUARIUM now. they want our catches for their tanks'],
+    chat: ['ahoy!', 'fish off the end of the pier', 'wait for the bobber to dip, then REEL', 'legend says there is a MOON FISH out there', 'marshmallows are in the cooler', 'the crabs are harmless. mostly.', 'past the lighthouse there is an AQUARIUM now. they want our catches for their tanks', 'that yellow submarine goes all the way down to the trench now. in MY day we had a rowing boat and a bucket'],
   },
   {
     id: 'npc-boo', name: 'BOO', room: 'plaza', speed: 22, season: 'halloween', ghost: true,
@@ -273,25 +273,33 @@ const DEFS: NpcDef[] = [
       { x: 1222, y: 490 },
       { x: 1238, y: 380 },
     ],
-    chat: ['every tank in the gallery is waiting for someone\'s catch. maybe yours', 'the whale shark\'s name is DORIS. gentle giant. mostly giant', 'don\'t tap the glass. the octopus taps back', 'feeding time is every fifteen minutes. grab a scoop!', 'the jellies have no brains. very relaxing company', 'somebody donated a boot. i love it. it is the best boot', 'catch something big off the Pier and bring it to my desk'],
+    chat: ['every tank in the gallery is waiting for someone\'s catch. maybe yours', 'the whale shark\'s name is DORIS. gentle giant. mostly giant', 'don\'t tap the glass. the octopus taps back', 'feeding time is every fifteen minutes. grab a scoop!', 'the jellies have no brains. very relaxing company', 'somebody donated a boot. i love it. it is the best boot', 'catch something big off the Pier and bring it to my desk', 'bring me back something from the deep! not a squid. we\'ve got a squid'],
   },
   {
-    // SARDINE 1's skipper, on the dock in the SUB PEN, through the sub's 8-minute loop (game/sub.ts): at the gangway while it boards,
-    // watching it go down, the dive board, the rope, the toolbox, and back at the gangway to meet it
-    id: 'npc-barnacle', name: "CAP'N BARNACLE", room: 'aquarium', speed: 28, cycle: 480,
+    // SARDINE 1's skipper (the loop is the sub's 8 minutes: game/sub.ts). On the dock by the gangway while it boards ("All aboard!"),
+    // up the gangway as the hatch shuts, aboard for the dive (npc-barnacle-sub), and back off it onto the dock as it docks again
+    id: 'npc-barnacle', name: "CAP'N BARNACLE", room: 'aquarium', speed: 28, cycle: 480, when: (T) => { const k = T % 480; return k < 66 || k >= 478; },
     look: { c: 7, hat: 18, face: 4, fit: 12, sp: 0 },
     stops: [
-      { x: 1548, y: 532, wait: 90, say: ['sea trials! no passengers yet', 'she dives in a minute. empty, for now', 'stand clear of the gangway!'] },
-      { x: 1640, y: 532, wait: 36, say: ['down she goes...', 'dive, dive!'] },
-      { x: 1726, y: 532 },
-      { x: 1754, y: 490, wait: 60, say: ['six and a half minutes under', 'all systems... probably fine'] },
-      { x: 1726, y: 532 },
-      { x: 1452, y: 552, wait: 60, say: ['this rope has seen things', 'a sailor coils his rope. that\'s the rule'] },
-      { x: 1740, y: 570, wait: 80, say: ['where is my wrench', 'ah. there is my wrench'] },
-      { x: 1600, y: 532, wait: 60, say: ['she\'s coming home', 'any minute now'] },
-      { x: 1548, y: 532 },
+      { x: 1548, y: 524, wait: 0.3 },
+      { x: 1590, y: 548, wait: 60, say: ['all aboard! mind your heads, she\'s a SARDINE', 'today\'s mission is on the board. i believe in you. mostly', 'up the gangway, in at the hatch, down the ladder', 'tickets? no tickets. just get in'] },
+      { x: 1548, y: 524 },
     ],
-    chat: ['ahoy! CAP\'N BARNACLE, skipper of SARDINE 1', 'finest sub in the harbour. the only sub, but still', 'soon you\'ll be able to come down with me. sea trials first!', 'we call her SARDINE because it gets cosy in there', 'the SEA GATE opens under the water. how? a secret', 'i once saw a whale. or a very big rock. it winked at me'],
+    chat: ['ahoy! CAP\'N BARNACLE, skipper of SARDINE 1', 'finest sub in the harbour. the only sub, but still', 'she dives every 8 minutes. up the gangway while she\'s boarding', 'we call her SARDINE because it gets cosy in there', 'the escape hatch works. i tested it. once. by accident', 'if you see THE OTHER BOOT, grab it. MARINA\'s been waiting years'],
+  },
+  {
+    // ...and aboard SARDINE 1 for the dive: down the ladder as the hatch shuts, then at the bow beside the wheel (never on a station: that's
+    // the AUTOPILOT button on his side), a stroll round the deck mid-dive, and back to the ladder for home
+    id: 'npc-barnacle-sub', name: "CAP'N BARNACLE", room: 'sub', speed: 40, cycle: 480, when: (T) => { const k = T % 480; return k >= 66 && k < 478; },
+    look: { c: 7, hat: 18, face: 4, fit: 12, sp: 0 },
+    stops: [
+      { x: 500, y: 506, wait: 68 },
+      { x: 962, y: 524, wait: 120 },
+      { x: 958, y: 548, wait: 20, say: ['just stretching my legs', 'everything shipshape?', 'who left the kettle on?'] },
+      { x: 962, y: 524, wait: 212, say: ['steady as she goes', 'nice work, crew'] },
+      { x: 500, y: 506 },
+    ],
+    chat: ['twenty years i\'ve sailed her. well. six months. feels like twenty', 'ping the sonar in the kelp. seahorses are shy', 'the claw\'s rigged. same people who made the arcade\'s', 'lights off in the deep and wait. something always comes to look', 'if you see THE OTHER BOOT, grab it. MARINA\'s been waiting years', 'the escape hatch works. i tested it. once. by accident', 'take the helm if you like. i\'ll put the kettle on'],
   },
   {
     id: 'npc-sage', name: 'SAGE', room: 'den', speed: 38, cycle: 1800, // one pomodoro: code for the focus, break for the break

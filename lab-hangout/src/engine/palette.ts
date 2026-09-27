@@ -147,6 +147,27 @@ export const AQ = table({
   TILE: '#2A6C9C', TILE2: '#3A86B8', TILE_HI: '#7CC0E8',
 });
 
+/** SARDINE 1's cabin (world/sub.ts): cream hull paint, a sea-green band, brass and rubber, red valve wheels, the screens' green and amber, the caged lamps' orange. */
+export const SB = table({
+  HULL: '#E8DFC4', HULL2: '#DCD2B4', HULL_HI: '#F6F0DC', HULL_DK: '#B8AC88', RIVET: '#A89C78', RIVET_HI: '#FFF8E4',
+  BAND: '#5E9E8C', BAND_HI: '#80BCA8', BAND_DK: '#3E7466', RIB: '#CFC39E', RIB_DK: '#9A8E6C',
+  CEIL: '#3A3C40', CEIL2: '#46484C', PIPE: '#8A8E94', PIPE_HI: '#B0B4BA', PIPE_DK: '#5E6268', LAG: '#D8D2C2',
+  DECK: '#5C6066', DECK2: '#52565C', DECK_HI: '#7A7E84', RUNNER: '#8C3A34', RUNNER_HI: '#A8524A',
+  BRASS: '#D9A441', BRASS_HI: '#F2D27A', BRASS_DK: '#9C7026', RUBBER: '#26282C',
+  WHEEL: '#C8343A', WHEEL_HI: '#E85A5A', WHEEL_DK: '#8C2226',
+  CONSOLE: '#4E6A6A', CONSOLE_HI: '#6E8C8A', CONSOLE_DK: '#34484A', SCREEN: '#08180E', GREEN: '#62F29A', AMBER: '#FFB43C',
+  LAMP: '#FFB45A', ENGINE: '#4E7A52', ENGINE_HI: '#6E9E6C', ENGINE_DK: '#34563A', RED: '#E0303A',
+});
+/** THE SEA outside SARDINE 1's window (world/sea.ts): the water, the sky over it, the ground by zone, kelp, coral, the wreck's rust, the vents. */
+export const SEA = table({
+  W0: '#5CBCB6', W1: '#2F8CB8', W2: '#20609C', W3: '#224C84', SKY: '#9ED8F0', SKY_N: '#101A3A',
+  SAND: '#C8B07A', SAND_DK: '#A08A58', SAND_HI: '#E0CC98', OOZE: '#5A6068', OOZE_HI: '#7A8088', ROCK: '#4A5260', ROCK_HI: '#6A7482', ROCK_DK: '#303640',
+  CLIFF: '#3C4250', CLIFF_HI: '#586070', RUST: '#8A4A2E', RUST_HI: '#B06A40', RUST_DK: '#5A2E1E', HULL: '#3E4A52', HULL_HI: '#5A6870',
+  KELP: '#2F7A48', KELP_HI: '#5AAE5A', KELP_DK: '#205A34', CONCRETE: '#6E767C', CONCRETE_DK: '#4E555A', PILE: '#5A4A3A', PILE_HI: '#7A6650', MUSSEL: '#2A2A3A',
+  SPONGE: '#E0A040', WHIP: '#C84A6A', VENT: '#2A2A30', VENT_HI: '#4A4A52', WORM: '#E03A3A', WORM_HI: '#FF8A7A',
+  FLOOD: '#CFE8F0', LURE: '#9AFFE0', LANTERN: '#7AE8FF',
+});
+
 /** The city map (world/map.ts, ui/map.ts): the ground, the park, the sea and the sand, the roads, by night and by day. */
 export const MP = table({
   GROUND: '#1A2238', GROUND2: '#1F2843', GROUND_D: '#6F8A6A', GROUND2_D: '#7C976F',

@@ -217,8 +217,8 @@ BUBBLES, FLOATY) that follow you through doors; two-chemist reactions (ELEPHANT 
 CONFETTI CANNON); the RECIPE BOOK (20 entries, the CHEMIST badge), LAB GOGGLES from the dispenser, the safety shower,
 BONEY, SIR BUBBLES, PROF. FIZZ part-time; the map's annex, the fume stack; a daily quest (migration `0022_chem.sql`).
 
-## 18. Submarine + City Aquarium: push 1 (THE CITY AQUARIUM) built; push 2 (the submarine) next
-Brief: docs/briefs/18-aquarium-sub.md (§6 is the submarine, to be expanded before push 2). Migration `0023_aquarium.sql`.
+## 18. Submarine + City Aquarium: push 1 (THE CITY AQUARIUM) done; push 2 (the submarine) built, awaiting its live check
+Brief: docs/briefs/18-aquarium-sub.md (§6 is the submarine). Migrations `0023_aquarium.sql`, `0024_sub.sql`.
 Josh picked: dives on a timetable that anyone can steer, shared donations, all four dive jobs (photos, claw treasure,
 cartoon trouble, a mission each dive) and all four prizes (the DIVING HELMET, a BABY OCTOPUS pet, a gift shop, quests + badges).
 **Built, push 1:** the Pier runs on past the lighthouse to the aquarium (a boardwalk, the whale shark fountain, the SUB
@@ -228,6 +228,14 @@ filled by the city's donations: your biggest catch, a bigger one takes the plaqu
 kind, the CURATOR badge), THE OCEAN TANK (DORIS the whale shark and friends, benches, the diver, FEEDING TIME every 15
 minutes with scoops to throw, the TOUCH POOL), THE JELLY ROOM (the jelly disco), THE SUB PEN (SARDINE 1 diving and
 surfacing on its 8-minute timetable: SEA TRIALS, no passengers yet); MARINA the keeper and CAP'N BARNACLE; the map.
+**Built, push 2:** SARDINE 1 takes passengers: up the gangway while it boards, every 8 minutes. The cabin has a big
+window onto a 3400 m sea (the harbour, the kelp forest, the coral reef, the LUCKY HERRING's wreck, the drop-off, the
+trench 1200 m down) that CAP'N BARNACLE tours on autopilot, and anyone can take the helm. The stations: the CAMERA (THE
+SEA LIFE LOG: 20 creatures, 10 for the DIVING HELMET, all 20 for the MARINE BIOLOGIST badge), the SONAR, the
+floodlights, the CLAW with its CLAW CAM (coins, a pearl, a chest in the wreck, bottles with notes, odd things, litter),
+UP PERISCOPE (the city seen from the sea), tea at the galley. Cartoon troubles (a LEAK, a VISITOR: the seal or THE GIANT
+SQUID, LIGHTS OUT, a JELLY IN THE INTAKE) the Cap'n sorts out if nobody does; a mission each dive (10 kinds); THE BABY
+OCTOPUS that follows you home; the whale; THE DIVE REPORT and its pay; the ESCAPE HATCH (a rubber ring); a daily quest.
 
 ## Later (order to be decided)
 - **19. The Airport:** check-in, a security X-ray that shows what you're holding, a baggage carousel

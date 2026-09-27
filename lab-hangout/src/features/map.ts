@@ -19,6 +19,8 @@ import { placeById, type Zone } from '../world/map';
 import { CYCLE, DEPART, DOCK_ARRIVE, LAND, PAD_ARRIVE, UP_S, flight } from '../world/space';
 import { L_CYCLE, L_TOUCH, MOON_PAD_ARRIVE, lander } from '../world/moon';
 import { LANDER_BAY_ARRIVE } from '../world/lander';
+import { backIn, hatchOpen } from '../game/sub';
+import { PEN_ARRIVE } from '../world/sub';
 import { isFlat } from '../world/flat';
 import type { RoomId } from '../world/room';
 import { POSE_BOAT } from '../entities/avatar';
@@ -76,6 +78,7 @@ export function blockedWhy(): string | null {
   if (!game.playing || game.editing) return 'Not yet!';
   if (game.switching) return 'Hold on, still getting there...';
   if (zoneNow() === 'flying') return "You're mid-flight! Wait until you've landed";
+  if (game.room.id === 'sub' && !hatchOpen()) return "You're on a dive! SARDINE 1 surfaces in " + mmss(backIn()) + ', or use the ESCAPE HATCH';
   if (hsFrozen()) return "You're IT: count first, then go and find them!";
   if (game.me.pose === POSE_BOAT) return 'Row back to the jetty first';
   if (perf) return 'Finish your song first!';
@@ -108,6 +111,7 @@ export function placeForPerson(room: RoomId): RoomId {
   if (room === 'spacewalk') return 'station';
   if (room === 'rocket') return flight().phase === 'pad' ? 'roof' : 'station';
   if (room === 'lander') return lander().phase === 'landed' ? 'moon' : 'station';
+  if (room === 'sub') return 'aquarium';
   return room;
 }
 /** Go by route `rt`: through a door, as it were. A ride's door says when it goes. */
@@ -121,6 +125,7 @@ export function goToRoom(room: RoomId): void {
   const rt = routeTo(placeForPerson(room));
   if (!rt.ok) { toast(rt.why); return; }
   if (isFlat(room)) setTimeout(() => toast('They\'re in a flat: take the LIFT to knock', 4000), 450);
+  if (room === 'sub') { setTimeout(() => toast(hatchOpen() ? 'They\'re aboard SARDINE 1: it\'s boarding, up the gangway!' : 'They\'re on a dive in SARDINE 1: back in ' + mmss(backIn()), 4500), 450); travel({ ...rt, at: PEN_ARRIVE }); return; }
   travel(rt);
 }
 
@@ -224,6 +229,7 @@ export function openCityMap(board: RoomId | null, friends: Map<string, string>, 
       const extras: { label: string; run: () => void }[] = [];
       if (id === 'lofts' && z === 'earth' && !blockedWhy()) { extras.push({ label: 'YOUR FLAT', run: () => void goHome() }); for (const p of lofts.parties.slice(0, 2)) extras.push({ label: 'PARTY: ' + p.name.toUpperCase(), run: () => void visitFlat(p.id) }); }
       if (z === 'orbit' && pl.zone === 'earth' && !blockedWhy()) { const pod = routeTo(id, true); if (pod.ok) extras.push({ label: 'ESCAPE POD', run: () => travel(pod) }); }
+      if (id === 'aquarium' && rt.ok && !rt.ride) { const r2 = rt; extras.push({ label: hatchOpen() ? 'SARDINE 1: BOARDING NOW' : 'SARDINE 1: BACK IN ' + mmss(backIn()), run: () => travel({ ...r2, at: PEN_ARRIVE }) }); }
       return { cls: id, sub: rm.sub, title: pl.name, preview: () => preview(id), people, route: rt, extras };
     },
     go: (rt) => travel(rt),

@@ -141,4 +141,18 @@ export const SFX = {
   foghorn: () => { tone('sawtooth', 98, 92, 1.5, 0.05); tone('square', 49, 46, 1.5, 0.035); tone('sine', 196, 184, 1.3, 0.02, 0.05); },
   clang: () => { noise(420, 3, 0.35, 0.14); tone('square', 230, 170, 0.25, 0.03); tone('sine', 690, 660, 0.7, 0.02, 0.02); },
   gurgle: () => { noise(500, 0.8, 1.2, 0.08, 0, 180); for (let i = 0; i < 7; i++) tone('sine', rnd(180, 320), rnd(420, 700), 0.07, 0.035, 0.1 + i * 0.14); },
+  /** SARDINE 1 (features/sub.ts): the sonar's ping and its echo, the flash charging, the kettle, the claw's whirr, whale song, the seal's bark
+   *  and knock, the engine coughing and puttering, the hull creaking, a rivet popping, and a little fanfare. */
+  ping: () => { tone('sine', 1400, 1380, 0.35, 0.06); tone('sine', 1400, 1380, 0.3, 0.02, 0.55); tone('sine', 1400, 1380, 0.25, 0.008, 1.1); },
+  flashWhine: () => tone('sine', 1600, 4200, 0.5, 0.012),
+  whistle: () => { tone('sine', 1760, 1980, 1.0, 0.025); tone('sine', 2200, 2400, 1.0, 0.012); },
+  whirr: () => { noise(900, 2, 0.22, 0.035); tone('square', 210, 250, 0.22, 0.012); },
+  whale: () => { tone('sine', 170, 420, 1.5, 0.05); tone('sine', 420, 230, 1.7, 0.045, 1.4); tone('sine', 300, 560, 1.3, 0.03, 3.0); tone('triangle', 85, 110, 2.6, 0.02, 0.4); },
+  bark: () => { for (let i = 0; i < 2; i++) { tone('square', 560, 360, 0.12, 0.035, i * 0.22); noise(900, 1.5, 0.08, 0.05, i * 0.22); } },
+  knock: () => { noise(600, 3, 0.06, 0.14); noise(600, 3, 0.06, 0.12, 0.2); noise(600, 3, 0.06, 0.1, 0.55); },
+  cough: () => { for (let i = 0; i < 3; i++) noise(200, 0.8, 0.18, 0.12, i * 0.28); tone('sawtooth', 60, 38, 0.8, 0.035); },
+  putter: () => { noise(150, 1.2, 0.06, 0.03); tone('square', 68, 58, 0.05, 0.01); },
+  creak: () => { tone('sawtooth', 92, 70, 1.3, 0.018); noise(280, 2, 0.9, 0.03); },
+  rivet: () => { tone('sine', 2600, 2200, 0.08, 0.04); tone('sine', 2400, 2000, 0.05, 0.03, 0.22); tone('sine', 2300, 1900, 0.04, 0.02, 0.38); },
+  jingleShort: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone('triangle', f, f, 0.16, 0.04, i * 0.07)),
 };

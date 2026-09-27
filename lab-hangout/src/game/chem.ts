@@ -31,9 +31,9 @@ export type RxKind = 'foam' | 'sparkler' | 'fountain' | 'smoke' | 'ice' | 'storm
   | 'puff' | 'fizz' | 'sludge' | 'toothpaste' | 'confetti';
 
 /** What a potion or a KA-BOOM does to you (Avatar.fx), for everyone to see. 0 = nothing. */
-export const FX = { NONE: 0, TINY: 1, HUGE: 2, RAINBOW: 3, GLOWING: 4, BUBBLES: 5, FLOATY: 6, FRAZZLED: 7 } as const;
-export const FX_MAX = 7;
-export const FX_NAMES = ['', 'TINY', 'HUGE', 'RAINBOW', 'GLOWING', 'BUBBLES', 'FLOATY', 'FRAZZLED'];
+export const FX = { NONE: 0, TINY: 1, HUGE: 2, RAINBOW: 3, GLOWING: 4, BUBBLES: 5, FLOATY: 6, FRAZZLED: 7, /** SARDINE 1's escape hatch: bobbing up by the Pier in a rubber ring */ RING: 8 } as const;
+export const FX_MAX = 8;
+export const FX_NAMES = ['', 'TINY', 'HUGE', 'RAINBOW', 'GLOWING', 'BUBBLES', 'FLOATY', 'FRAZZLED', 'RUBBER RING'];
 /** How long a potion lasts once you drink it, and a KA-BOOM's frazzle (s). */
 export const POTION_S = 30, FRAZZLE_S = 10;
 

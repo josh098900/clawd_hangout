@@ -183,6 +183,12 @@ export class SupabaseApi implements Api {
     buy: async (item) => { const o = await rpcJson(this.sb, 'gift_shop', { item }); return { item: String(o.item ?? ''), tokens: n0(o.tokens) }; },
   };
 
+  /** SARDINE 1 (0024_sub.sql). */
+  readonly sub: Api['sub'] = {
+    pay: async (finds, mission) => { const o = await rpcJson(this.sb, 'dive_pay', { finds: Math.max(0, Math.min(16, Math.round(finds))), mission }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },
+    boot: async () => (await rpc(this.sb, 'found_boot')) === true,
+  };
+
   /** Tips paid for a performance (the server caps them). */
   readonly tips: Api['tips'] = {
     karaoke: async (score) => { const o = await rpcJson(this.sb, 'karaoke_tip', { score: Math.max(0, Math.round(score)) }); return { tokens: n0(o.tokens), paid: n0(o.paid) }; },

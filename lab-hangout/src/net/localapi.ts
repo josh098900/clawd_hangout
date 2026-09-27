@@ -10,6 +10,7 @@ import { raining } from '../world/weather';
 import { QUESTS } from '../game/quests';
 import { FISH, rollFish } from '../game/fish';
 import { THANKS } from '../game/aquarium';
+import { SUB_CYCLE, SUB_UP, divePay, subT } from '../game/sub';
 import { contestClock } from '../world/contest';
 import { h1 } from '../engine/math';
 
@@ -415,6 +416,26 @@ export class LocalApi implements Api {
       if (this.wallet() < g[1]) throw new Error('that costs ' + g[1] + ' tokens');
       this.inv(item); this.wallet(this.wallet() - g[1]);
       return { item, tokens: this.wallet() };
+    },
+  };
+
+  /** SARDINE 1, kept in this browser (same rules as 0024_sub.sql): paid once a dive, just after it surfaces (on the dive clock, so ?debug's subAt works), 24 a day. */
+  readonly sub: Api['sub'] = {
+    pay: async (finds, mission) => {
+      const s = subT(), n = Math.round((s - SUB_UP) / SUB_CYCLE), surf = n * SUB_CYCLE + SUB_UP;
+      if (s < surf - 30 || s > surf + 70) throw new Error('pay comes just after a dive surfaces');
+      const k = 'labhangout.localDives.' + this.selfId, v = db.get<{ day: string; n: number[]; paid: number }>(k, { day: '', n: [], paid: 0 });
+      if (v.day !== this.day()) { v.day = this.day(); v.n = []; v.paid = 0; }
+      if (v.n.includes(n)) throw new Error('that dive was paid already');
+      const paid = Math.max(0, Math.min(divePay(finds, mission), 24 - v.paid));
+      v.n.push(n); v.paid += paid; db.set(k, v);
+      if (paid) this.wallet(this.wallet() + paid);
+      return { tokens: this.wallet(), paid };
+    },
+    boot: async () => {
+      const tanks = this.aqTanks(); if (tanks['OTHER BOOT']) return false;
+      tanks['OTHER BOOT'] = { fish: 'OTHER BOOT', name: (await this.ctx.loadProfile())?.name || 'SOMEONE', cm: 0, at: Date.now() / 1000, id: this.selfId }; this.aqTanks(tanks);
+      return true;
     },
   };
 

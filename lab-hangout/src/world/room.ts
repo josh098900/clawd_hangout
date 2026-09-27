@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor' | 'chem' | 'aquarium';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor', 'chem', 'aquarium'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor' | 'chem' | 'aquarium' | 'sub';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor', 'chem', 'aquarium', 'sub'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -33,7 +33,9 @@ export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number 
  * Something you can use: a seat, the coffee machine, the arcade. Its index in `room.spots`
  * goes over the network (`MoveMsg.use`), so only ever APPEND to a room's spot list.
  */
-export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map' | 'rstation' | 'rfault' | 'rshift' | 'chem' | 'recipes' | 'goggles' | 'shower' | 'donate' | 'giftshop' | 'touch' | 'feedfish';
+export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map' | 'rstation' | 'rfault' | 'rshift' | 'chem' | 'recipes' | 'goggles' | 'shower' | 'donate' | 'giftshop' | 'touch' | 'feedfish'
+  // SARDINE 1 (world/sub.ts): the stations, the troubles' fix spots, the galley, the treasure bin, the SEA LIFE LOG, the escape hatch
+  | 'helm' | 'subcam' | 'lights' | 'sonar' | 'subclaw' | 'periscope' | 'subfix' | 'tea' | 'bin' | 'sealog' | 'escape';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -115,6 +117,8 @@ export interface Room {
   lantern?: import('../engine/palette').RGB;
   /** Seated here, the camera frames this instead of your feet (the cinema screen). */
   watch?: { x: number; top: number };
+  /** Keep this y just under the HUD at the top of the screen, wherever you walk (SARDINE 1's window). */
+  frameTop?: number;
   /** Water you can row a boat on (the Park pond). */
   water?(x: number, y: number): boolean;
   /** Multiplier for all soft glow (lamps fade out in daylight). */

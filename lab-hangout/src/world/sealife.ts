@@ -4,7 +4,7 @@
 // window draws from here too. Every creature is drawn at (x, y) = its middle, facing `d` (1 = right, -1 = left).
 
 import { K, AQ, type RGB } from '../engine/palette';
-import { r, disc, oval, lit, alpha, Gd, M, shade } from '../engine/pixel';
+import { r, disc, oval, line, lit, alpha, Gd, M, shade } from '../engine/pixel';
 import { h1 } from '../engine/math';
 
 type Rect = (dx: number, dy: number, w: number, h: number, c: RGB) => void;
@@ -142,8 +142,8 @@ export function shoal(cx: number, cy: number, n: number, a: number, spread = 1, 
   }
 }
 /** A moray eel looking out of its rock: in and out, jaws working. */
-export function moray(x: number, y: number, a: number): void {
-  const out = Math.max(0, Math.sin(a * 0.4)) * 7, c: RGB = [120, 150, 60], cd: RGB = [80, 104, 40], m = Math.floor(a * 2) % 2;
+export function moray(x: number, y: number, a: number, outK?: number): void {
+  const out = (outK ?? Math.max(0, Math.sin(a * 0.4))) * 7, c: RGB = [120, 150, 60], cd: RGB = [80, 104, 40], m = Math.floor(a * 2) % 2;
   for (let i = 0; i < out; i++) r(Math.round(x + i), Math.round(y + Math.sin(i * 0.8) * 0.5), 1, 4, i > out - 3 ? cd : c);
   if (out > 2) { r(Math.round(x + out - 2), Math.round(y), 1, 1, EYE); r(Math.round(x + out), Math.round(y + 2 + m), 2, 1, cd); }
 }
@@ -183,6 +183,203 @@ export function jelly(x: number, y: number, col: RGB, a: number, ph: number, k =
   Gd(x, y - 2, 10 * k, col, 0.22);
 }
 /** Kelp: a frond from the sand at (x, y) up `len` px, swaying, with a few leaves and floats. */
-export function kelp(x: number, y: number, len: number, a: number, ph: number): void {
-  for (let j = 0; j < len; j += 2) { const sw = Math.round(Math.sin(a * 0.9 + ph + j * 0.05) * (j / len) * 8); r(x + sw, y - j - 1, 2, 2, j % 10 === 0 ? AQ.KELP_HI : AQ.KELP); if (j % 14 === 6) r(x + sw + 2, y - j - 1, 3, 2, AQ.KELP_HI); }
+export function kelp(x: number, y: number, len: number, a: number, ph: number, blades = false): void {
+  for (let j = 0; j < len; j += 2) { const sw = Math.round(Math.sin(a * 0.9 + ph + j * 0.05) * (j / len) * 8); r(x + sw, y - j - 1, 2, 2, j % 10 === 0 ? AQ.KELP_HI : AQ.KELP); if (j % 14 === 6) r(x + sw + 2, y - j - 1, 3, 2, AQ.KELP_HI); if (blades && j % 8 === 2 && j > 6) { const s = j % 16 === 2 ? 1 : -1, fl = Math.round(Math.sin(a * 1.3 + ph + j) * 1); r(s > 0 ? x + sw + 2 : x + sw - 5, y - j - 2 + fl, 5, 1, AQ.KELP); r(s > 0 ? x + sw + 6 : x + sw - 6, y - j - 1 + fl, 2, 1, AQ.KELP_HI); } }
+}
+
+// ---------------------------------------------------------------- SARDINE 1's sea (push 2) ----------------------------------------------------------------
+/** A sea otter floating on its back at the surface, paws folded on a shell on its tummy, its tail and feet up, bobbing. */
+export function seaOtter(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y + Math.sin(a * 1.3) * 1);
+  const R = facing(x, y, d), c: RGB = [120, 84, 56], cd: RGB = [86, 58, 38], pale: RGB = [214, 196, 170];
+  R(-8, -2, 16, 5, c); R(-8, -2, 16, 1, M(c, K.WHITE, 0.2)); R(-7, 2, 14, 1, cd); // the body, lying back
+  R(7, -4, 6, 6, pale); R(8, -5, 4, 1, pale); R(11, -3, 1, 1, EYE); R(12, -1, 2, 1, [60, 40, 30]); R(13, 0, 1, 1, pale); R(12, 1, 3, 1, [230, 220, 200]); // the face, whiskers
+  R(-1, -4, 5, 2, [180, 190, 200]); R(0, -5, 3, 1, [210, 214, 222]); R(-2, -3, 1, 2, cd); R(4, -3, 1, 2, cd); // the shell on its tummy, paws
+  R(-12, -3, 4, 2, cd); R(-13, -4, 2, 1, cd); R(-7, -4, 2, 2, cd); R(-4, -4, 2, 2, cd); // the tail and feet sticking up
+}
+/** A harbour seal swimming: a grey spotted torpedo, big dark eyes, whiskers, flippers. */
+export function seal(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const R = facing(x, y, d), c: RGB = [132, 138, 150], cd: RGB = [96, 102, 116], bel: RGB = [186, 190, 200], kick = Math.round(Math.sin(a * 5) * 2);
+  for (let i = -12; i <= 10; i++) { const u = (i + 12) / 22, hh = Math.max(1, Math.round(4.5 * Math.sin(Math.min(1, u * 1.1) * Math.PI * 0.7))); R(i, -hh, 1, hh * 2, c); R(i, hh - 1, 1, 1, bel); }
+  R(9, -4, 5, 7, c); R(13, -2, 1, 3, cd); R(11, -3, 2, 2, EYE); R(12, -3, 1, 1, K.WHITE); R(13, 1, 2, 1, [60, 60, 70]); R(14, 0, 3, 1, [210, 214, 222]); R(14, 2, 3, 1, [210, 214, 222]); // the head
+  for (let k = 0; k < 7; k++) R(-9 + ((k * 5) % 17), -3 + ((k * 3) % 5), 1, 1, cd); // spots
+  R(2, 3, 4, 2, cd); R(-15, -2 + kick, 4, 2, cd); R(-15, 1 - kick, 4, 2, cd); // flippers
+}
+/** The curious seal's face squashed on the window: big black eyes, the nose flat on the glass, whiskers splayed, a flipper knocking. */
+export function sealOnGlass(x: number, y: number, a: number, u: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const c: RGB = [140, 146, 158], cd: RGB = [104, 110, 124], k = Math.min(1, u * 3), knock = Math.floor(a * 5) % 2;
+  if (k <= 0) return;
+  oval(x, y, Math.round(20 * k), Math.round(16 * k), c); oval(x - 2, y - 3, Math.round(15 * k), Math.round(11 * k), M(c, K.WHITE, 0.12));
+  if (k < 1) return;
+  for (const ex of [-9, 9]) { disc(x + ex, y - 4, 4, [20, 20, 28]); r(x + ex - 2, y - 7, 2, 2, K.WHITE); r(x + ex + 1, y - 3, 1, 1, [120, 130, 150]); }
+  oval(x, y + 5, 6, 4, [170, 150, 150]); r(x - 3, y + 3, 2, 3, [60, 50, 56]); r(x + 2, y + 3, 2, 3, [60, 50, 56]); // the nose, squashed
+  for (const s of [-1, 1]) for (let w = 0; w < 3; w++) line(x + s * 7, y + 7 + w * 2, x + s * (17 + w * 2), y + 5 + w * 4, [226, 230, 238]);
+  for (let s = 0; s < 6; s++) r(x - 8 + s * 3, y + 10, 1, 1, cd); // whisker spots
+  const fx = x + 22, fy = y + 2 + (knock ? -3 : 0); oval(fx, fy, 5, 8, cd); r(fx - 3, fy - 8, 2, 2, [80, 84, 96]); // the flipper, knocking
+  alpha(0.3, () => oval(x, y + 6, 22, 6, [220, 236, 244])); // fogging the glass
+}
+/** A seahorse curled round a kelp stalk: kelp-green (you can hardly see it) until a ping lights it up, then gold with a shimmer. */
+export function seahorse(x: number, y: number, a: number, shown: number): void {
+  x = Math.round(x); y = Math.round(y + Math.sin(a * 1.2) * 1);
+  const c = M(AQ.KELP, [255, 190, 70], shown), cd = M(AQ.KELP, [200, 130, 40], shown);
+  r(x, y - 6, 3, 3, c); r(x + 3, y - 5, 3, 1, c); r(x + 1, y - 6, 1, 1, shown > 0.5 ? EYE : cd); // the head and snout
+  r(x - 1, y - 3, 3, 5, c); r(x, y + 2, 2, 2, c); r(x + 1, y + 4, 2, 1, cd); r(x + 2, y + 3, 1, 1, cd); // the belly and the curled tail
+  r(x - 2, y - 2, 1, 3, cd); // the fin
+  if (shown > 0.05) { alpha(shown * (0.6 + 0.4 * Math.sin(a * 8)), () => lit(() => { r(x - 3, y - 8, 1, 1, [255, 240, 170]); r(x + 5, y - 7, 1, 1, [255, 240, 170]); r(x + 3, y + 4, 1, 1, [255, 240, 170]); })); Gd(x + 1, y - 1, 8, [255, 214, 90], 0.25 * shown); }
+}
+/** The garibaldi: bright orange, a rounded tail, cross. */
+export function garibaldi(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const R = facing(x, y, d), c: RGB = [255, 120, 30], ch: RGB = [255, 170, 70], wag = Math.floor(a * 7) % 2;
+  R(-4, -3, 9, 6, c); R(-3, -4, 7, 1, c); R(-3, -3, 6, 1, ch); R(4, -1, 1, 1, EYE); R(3, -2, 1, 1, [255, 236, 200]);
+  R(-7, -3 + wag, 3, 6 - wag, c); R(-1, -5, 3, 1, c); R(0, 3, 3, 1, c);
+}
+/** A leopard shark cruising low: bronze-grey with dark saddles and spots. */
+export function leopardShark(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const R = facing(x, y, d), c: RGB = [150, 136, 110], cd: RGB = [70, 60, 50], bel: RGB = [214, 206, 190], wag = Math.round(Math.sin(a * 4) * 2);
+  for (let i = -18; i <= 16; i++) { const u = (i + 18) / 34, hh = Math.max(1, Math.round(3.5 * Math.sin(Math.min(1, u * 1.15) * Math.PI * 0.64))); R(i, -hh, 1, hh * 2, c); R(i, hh - 1, 1, 1, bel); }
+  for (const s of [-12, -4, 4, 11]) { R(s, -3, 3, 2, cd); } for (let k = 0; k < 8; k++) R(-14 + k * 4, 0 + (k % 2), 1, 1, cd);
+  R(-2, -7, 4, 4, c); R(-12, -5, 3, 2, c); R(-22, -5 + wag, 4, 4, c); R(-22, 1 + wag, 3, 3, c); R(15, -1, 1, 1, EYE); R(6, 3, 5, 2, c);
+}
+/** The reef's octopus: a lump of rock (you'd never know) until a ping shows it, then red, with eyes and arms curling. */
+export function octopusRock(x: number, y: number, a: number, shown: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const rock = [96, 90, 104] as RGB, c = M(rock, [214, 80, 70], shown), cd = M(shade(rock, 0.8), [160, 50, 50], shown);
+  oval(x, y - 3, 7, 5, c); r(x - 5, y - 7, 6, 1, M(c, K.WHITE, 0.2)); for (let k = 0; k < 5; k++) r(x - 5 + k * 2, y - 4 + (k % 2) * 2, 1, 1, cd);
+  const wv = Math.floor(a * 3) % 2;
+  for (let i = 0; i < 6; i++) { const ax = x - 7 + i * 3; r(ax, y + 1, 2, 2, cd); if (shown > 0.3) r(ax + ((i + wv) % 2 ? 1 : -1), y + 3, 1, 1, cd); }
+  if (shown > 0.3) { r(x - 3, y - 4, 2, 2, K.WHITE); r(x + 2, y - 4, 2, 2, K.WHITE); r(x - 2, y - 3, 1, 1, EYE); r(x + 3, y - 3, 1, 1, EYE); }
+  if (shown > 0.05) alpha(shown * (0.5 + 0.5 * Math.sin(a * 8)), () => lit(() => { r(x - 9, y - 9, 1, 1, [255, 200, 200]); r(x + 8, y - 6, 1, 1, [255, 200, 200]); }));
+}
+/** THE GIANT GROUPER's great mottled face out of its hole in the wreck (`out` 0..1), mouth opening and shutting. */
+export function grouper(x: number, y: number, a: number, out: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const c: RGB = [120, 104, 80], cd: RGB = [86, 72, 56], lip: RGB = [150, 132, 104], o = Math.round(out * 12), mo = Math.floor(a * 1.5) % 2;
+  if (o <= 0) return;
+  r(x - 2, y - 8, o + 2, 16, c); r(x - 2, y - 8, o + 2, 1, M(c, K.WHITE, 0.2));
+  for (let k = 0; k < 6; k++) r(x + ((k * 5) % Math.max(1, o)), y - 6 + ((k * 3) % 12), 2, 1, cd);
+  if (o > 6) { r(x + o - 5, y - 5, 3, 3, [230, 220, 190]); r(x + o - 4, y - 4, 1, 1, EYE); r(x + o - 1, y + 1, 3, 4 + mo * 2, [40, 28, 26]); r(x + o - 1, y, 3, 1, lip); r(x + o - 1, y + 5 + mo * 2, 3, 1, lip); }
+}
+/** A lanternfish: a tiny dark fish, with a row of glowing dots (only seen in the dark). */
+export function lanternfish(x: number, y: number, a: number, k: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const on = (a * 1.7 + k * 0.37) % 1 < 0.8;
+  r(x - 2, y, 5, 2, [20, 30, 40]);
+  if (on) { lit(() => { r(x - 1, y + 1, 1, 1, SEA_LAN); r(x + 1, y + 1, 1, 1, SEA_LAN); r(x + 2, y, 1, 1, [220, 255, 255]); }); Gd(x, y + 1, 4, SEA_LAN, 0.5); }
+}
+const SEA_LAN: RGB = [122, 232, 255];
+/** THE HUMPBACK WHALE: 150 px of dark blue-grey, a knobbly head, throat grooves, long white flippers, the flukes going up and down. */
+export function humpback(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const R = facing(x, y, d), c: RGB = [44, 58, 80], cd: RGB = [30, 40, 58], ch: RGB = [66, 84, 110], w: RGB = [214, 222, 232], beat = Math.sin(a * 0.9);
+  for (let i = -70; i <= 64; i++) {
+    const u = (i + 70) / 134, hh = Math.max(2, Math.round(20 * Math.sin(Math.min(1, u * 1.05) * Math.PI * 0.62))), yo = Math.round(beat * 4 * (1 - Math.min(1, u * 2)));
+    R(i, -hh + yo, 1, hh * 2, c); R(i, -hh + yo, 1, 1, ch); if (i > 10) R(i, hh - 6 + yo, 1, 6, M(c, w, 0.25)); if (i > 14 && i % 3 === 0) R(i, hh - 5 + yo, 1, 4, cd); // the throat grooves
+  }
+  for (let k = 0; k < 9; k++) R(40 + k * 3, -16 + (k % 3), 2, 2, cd); // the knobbles on its head
+  R(60, -2, 4, 1, cd); R(52, -6, 2, 2, K.WHITE); R(52, -6, 1, 1, EYE); // mouth line and eye
+  const fl = Math.round(Math.sin(a * 0.6) * 5); for (let j = 0; j < 36; j++) R(28 - j, 10 + Math.round(j * 0.35) + Math.round(fl * j / 36), 3, 3, j < 4 ? c : w); // the long white flipper
+  R(-6, -22, 8, 4, c); // the little dorsal fin
+  const fy = Math.round(beat * 12); R(-80, -4 + fy, 12, 7, c); R(-92, -12 + fy, 14, 6, c); R(-92, 5 + fy, 14, 6, c); R(-92, -12 + fy, 14, 1, ch); // the flukes
+}
+/** THE ANGLERFISH: its glowing lure on a stalk; `lit` shows the rest of it, startled: a round dark body, huge jaws, needle teeth. */
+export function anglerfish(x: number, y: number, d: number, a: number, lit2: boolean): void {
+  x = Math.round(x); y = Math.round(y);
+  const R = facing(x, y, d), lx = d > 0 ? x + 9 : x - 9, ly = y - 11 + Math.round(Math.sin(a * 2.2) * 1.5);
+  lit(() => { r(lx - 1, ly - 1, 3, 3, [154, 255, 224]); r(lx, ly, 1, 1, K.WHITE); }); Gd(lx, ly, 7, [154, 255, 224], 0.6); Gd(lx, ly, 3, K.WHITE, 0.5);
+  if (!lit2) return;
+  const c: RGB = [58, 50, 60], cd: RGB = [36, 30, 40];
+  oval(x, y, 10, 8, c); r(x - 8, y - 7, 8, 1, M(c, K.WHITE, 0.2));
+  for (let j = 0; j < 8; j++) R(2 + Math.round(j * 0.4), -9 + j, 1, 1, [90, 84, 96]); // the stalk
+  R(3, 0, 9, 5, [20, 10, 16]); for (let t = 0; t < 4; t++) { R(4 + t * 2, 0, 1, 2, K.WHITE); R(5 + t * 2, 3, 1, 2, K.WHITE); } // the jaws, the teeth
+  R(3, -4, 2, 2, [230, 230, 200]); R(4, -3, 1, 1, EYE); R(-13, -3, 4, 6, cd); R(-2, 7, 4, 2, cd);
+}
+/** THE DUMBO OCTOPUS: pale pink, two ear-fins flapping, a skirt of short arms. */
+export function dumbo(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const c: RGB = [248, 196, 190], cd: RGB = [214, 150, 150], f = Math.floor(a * 3) % 2;
+  oval(x, y - 2, 7, 6, c); r(x - 4, y - 7, 6, 1, M(c, K.WHITE, 0.4));
+  r(x - 11, y - 6 - f, 5, 3, cd); r(x + 7, y - 6 - f, 5, 3, cd); // the ear-fins
+  for (let i = 0; i < 5; i++) r(x - 5 + i * 3, y + 3, 2, 3 + (i % 2), cd);
+  r(x + (d > 0 ? 1 : -3), y - 4, 2, 2, EYE);
+}
+/** A YETI CRAB: white, with hairy arms, on the warm vents. */
+export function yetiCrab(x: number, y: number, d: number, a: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const c: RGB = [236, 232, 222], cd: RGB = [196, 190, 176], w = Math.floor(a * 2) % 2;
+  r(x - 3, y - 3, 6, 3, c); r(x - 2, y - 4, 4, 1, c); r(x - 1, y - 5, 1, 1, EYE); r(x + 1, y - 5, 1, 1, EYE);
+  for (const s of [-1, 1]) { r(x + s * 4 - (s < 0 ? 3 : 0), y - 4 - w, 4, 3, c); for (let h = 0; h < 4; h++) r(x + s * (4 + h) - (s < 0 ? 1 : 0), y - 1 - w + (h % 2), 1, 1, cd); }
+  for (const lx of [-3, -1, 1, 3]) r(x + lx, y, 1, 2, cd);
+}
+/** THE GIANT SQUID on the hull: arms slapped across the window (window coords: the pane span x0..x1, y0..y1), suckers on the glass, `u` = how long it's been there. */
+export function squidOnGlass(x0: number, y0: number, x1: number, y1: number, a: number, u: number): void {
+  const k = Math.min(1, u * 1.5), c: RGB = [196, 70, 84], cd: RGB = [124, 34, 52], hi: RGB = [232, 118, 124], sk: RGB = [244, 190, 194];
+  // the arms, pressed on the glass (so it's their sucker side we see): [x, y, heading (rad), length, thickness]. Some hang from the top
+  // of the window, the long ones reach in from the sides; they writhe, and their tips curl
+  const ARMS: [number, number, number, number, number][] = [
+    [x0 + 50, y0 - 4, 1.1, 150, 9], [x0 + 270, y0 - 4, 2.0, 140, 10], [x0 + 490, y0 - 4, 1.0, 150, 9], [x0 + 640, y0 - 4, 2.2, 130, 8],
+    [x0 - 4, y0 + 40, 0.12, 330, 10], [x0 - 4, y0 + 95, -0.15, 260, 8], [x1 + 4, y0 + 70, Math.PI + 0.08, 330, 10], [x1 + 4, y0 + 25, Math.PI - 0.18, 240, 8],
+  ];
+  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < ARMS.length; i++) {
+    const [sx, sy, h0, L, th] = ARMS[i], len = L * k, curl = i % 2 ? 1 : -1;
+    let x = sx, y = sy;
+    for (let s = 0; s < len; s += 2) {
+      const t = s / Math.max(1, len), h = h0 + Math.sin(t * 3 + i * 1.7 + a * 1.1) * 0.35 + (t > 0.72 ? curl * ((t - 0.72) / 0.28) ** 1.5 * 4.5 : 0);
+      x += Math.cos(h) * 2; y += Math.sin(h) * 2;
+      const w = Math.max(2, th * (1 - t * 0.8)), hw = w / 2;
+      if (pass === 0) { r(x - hw - 1, y - hw - 1, w + 2, w + 2, cd); continue; } // (the outline, all arms first)
+      r(x - hw, y - hw, w, w, c); r(x - hw + 1, y - hw + 1, Math.max(1, w / 3), 1, hi);
+      if (w > 4 && Math.round(s) % 6 === 0) for (const side of [-1, 1]) { const nx = Math.cos(h + Math.PI / 2) * side * w / 4, ny = Math.sin(h + Math.PI / 2) * side * w / 4; r(Math.round(x + nx) - 1, Math.round(y + ny) - 1, 2, 2, sk); }
+    }
+  }
+  if (k >= 1) { // THE EYE, pressed up to a pane, looking round (and blinking)
+    const ex = Math.round(x0 + (x1 - x0) * 0.66 + Math.sin(a * 0.4) * 20), ey = y0 + 40, look = Math.round(Math.sin(a * 0.9) * 3), blink = (a * 0.3) % 1 < 0.05;
+    disc(ex, ey, 16, cd); disc(ex, ey, 14, c); disc(ex, ey, 11, [230, 220, 120]);
+    if (blink) r(ex - 12, ey - 2, 24, 4, c); else { disc(ex + look, ey + 1, 6, [20, 10, 14]); r(ex + look - 5, ey - 5, 3, 3, K.WHITE); }
+  }
+}
+/** THE BABY OCTOPUS suckered onto the glass: a pink blob with big eyes, eight curly arms spread out, the suckers showing, blinking. */
+export function babyOctopusOnGlass(x: number, y: number, a: number, u: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const c: RGB = [255, 130, 150], cd: RGB = [214, 86, 116], sk: RGB = [255, 206, 214], k = Math.min(1, u * 2), blink = (a * 0.5) % 1 < 0.06;
+  if (k <= 0) return;
+  for (let arm = 0; arm < 8; arm++) {
+    const an = (arm / 8) * Math.PI * 2 + 0.2, len = 12 * k;
+    for (let s = 3; s < len; s++) { const t = s / len, cx = Math.round(x + Math.cos(an + t * 1.4 + Math.sin(a + arm) * 0.1) * s), cy = Math.round(y + 3 + Math.sin(an + t * 1.4) * s * 0.8); r(cx, cy, 2, 2, cd); if (s % 3 === 0) r(cx, cy, 1, 1, sk); }
+  }
+  oval(x, y - 2, 7, 6, c); r(x - 4, y - 7, 5, 1, M(c, K.WHITE, 0.4));
+  if (blink) { r(x - 4, y - 2, 3, 1, EYE); r(x + 2, y - 2, 3, 1, EYE); }
+  else { r(x - 4, y - 4, 3, 4, K.WHITE); r(x + 2, y - 4, 3, 4, K.WHITE); r(x - 3, y - 3, 2, 2, EYE); r(x + 3, y - 3, 2, 2, EYE); }
+  r(x - 1, y + 1, 2, 1, cd);
+}
+
+// ---------------------------------------------------------------- treasure on the seabed ----------------------------------------------------------------
+/** A find lying at (x, y) (its bottom), for the window and the CLAW CAM: `k` = scale (the claw cam draws them bigger), `a` = time. */
+export function drawFind(kind: string, x: number, y: number, a: number, note = 0): void {
+  x = Math.round(x); y = Math.round(y);
+  const glint = (gx: number, gy: number) => { if ((a * 0.7 + gx * 0.013) % 1 < 0.12) lit(() => { r(gx, gy - 1, 1, 3, K.WHITE); r(gx - 1, gy, 3, 1, K.WHITE); }); };
+  switch (kind) {
+    case 'coins': for (let k = 0; k < 6; k++) { const cx = x - 5 + ((k * 3) % 9), cy = y - 1 - Math.floor(k / 3) * 2; r(cx, cy, 4, 2, [230, 180, 50]); r(cx, cy, 4, 1, [255, 226, 110]); } glint(x - 2, y - 4); break;
+    case 'pearl': lit(() => { disc(x, y - 3, 2, [244, 240, 236]); r(x - 1, y - 4, 1, 1, K.WHITE); }); Gd(x, y - 3, 5, [255, 250, 240], 0.3); break;
+    case 'bottle': { const g: RGB = [70, 140, 90]; r(x - 6, y - 4, 10, 4, g); r(x + 4, y - 3, 3, 2, g); r(x + 7, y - 3, 1, 2, [150, 110, 70]); r(x - 5, y - 4, 8, 1, M(g, K.WHITE, 0.4)); r(x - 3, y - 3, 5, 2, [240, 230, 200]); glint(x - 4, y - 4); break; }
+    case 'chest': { const w: RGB = [120, 76, 44], wd: RGB = [84, 52, 30]; r(x - 7, y - 8, 14, 8, w); r(x - 7, y - 10, 14, 3, wd); r(x - 7, y - 8, 14, 1, M(w, K.WHITE, 0.2)); r(x - 5, y - 10, 2, 10, [70, 70, 80]); r(x + 3, y - 10, 2, 10, [70, 70, 80]); r(x - 1, y - 6, 3, 3, [240, 190, 60]); lit(() => r(x - 2, y - 11, 5, 1, [255, 214, 90])); glint(x + 5, y - 9); break; }
+    case 'duck': case 'rduck': { const c: RGB = [255, 214, 60]; r(x - 4, y - 4, 7, 4, c); r(x + 1, y - 7, 4, 4, c); r(x + 5, y - 5, 2, 1, [255, 130, 40]); r(x + 3, y - 6, 1, 1, EYE); r(x - 4, y - 4, 6, 1, [255, 240, 170]); if (kind === 'rduck') { r(x - 5, y - 11, 1, 7, [120, 120, 130]); r(x - 4, y - 11, 4, 3, [230, 60, 60]); } break; }
+    case 'cone': { const o: RGB = [255, 120, 30]; for (let i = 0; i < 9; i++) r(x - 5 + i, y - 1 - Math.round((i / 9) * 4), 1, 1 + Math.round((i / 9) * 4), i % 4 === 2 ? K.WHITE : o); r(x - 6, y - 1, 12, 1, [40, 40, 44]); break; }
+    case 'phone': r(x - 4, y - 2, 8, 2, [30, 30, 36]); if ((a * 1.2) % 1 < 0.5) { lit(() => r(x - 3, y - 3, 6, 1, [140, 220, 255])); Gd(x, y - 3, 5, [140, 220, 255], 0.35); } break;
+    case 'gnome': r(x - 2, y - 5, 5, 5, [60, 110, 200]); r(x - 2, y - 7, 5, 2, [240, 210, 180]); r(x - 2, y - 5, 5, 2, K.WHITE); for (let j = 0; j < 5; j++) r(x - 2 + Math.floor(j / 2), y - 8 - j, Math.max(1, 5 - j), 1, [220, 50, 50]); break;
+    case 'shades': r(x - 5, y - 3, 4, 3, [20, 20, 28]); r(x + 1, y - 3, 4, 3, [20, 20, 28]); r(x - 1, y - 3, 2, 1, [20, 20, 28]); r(x - 4, y - 3, 1, 1, [140, 160, 200]); break;
+    case 'trumpet': { const b: RGB = [220, 170, 60]; r(x - 7, y - 2, 12, 2, b); r(x + 4, y - 4, 3, 6, b); r(x - 3, y - 4, 1, 2, b); r(x - 1, y - 4, 1, 2, b); r(x - 7, y - 2, 12, 1, [255, 226, 130]); glint(x + 5, y - 4); break; }
+    case 'tyre': oval(x, y - 3, 6, 3, [30, 30, 34]); oval(x, y - 3, 3, 1, [60, 70, 80]); break;
+    case 'globe': r(x - 3, y - 2, 6, 2, [120, 80, 50]); disc(x, y - 5, 3, [200, 230, 250]); lit(() => { r(x - 1, y - 6, 1, 1, K.WHITE); r(x + 1, y - 4, 1, 1, K.WHITE); }); break;
+    case 'present': r(x - 4, y - 7, 8, 7, [220, 50, 60]); r(x - 1, y - 7, 2, 7, [255, 214, 90]); r(x - 4, y - 4, 8, 1, [255, 214, 90]); r(x - 3, y - 9, 2, 2, [255, 214, 90]); r(x + 1, y - 9, 2, 2, [255, 214, 90]); break;
+    case 'bell': { const b: RGB = [200, 150, 60]; r(x - 5, y - 3, 10, 3, b); r(x - 4, y - 7, 8, 4, b); r(x - 3, y - 9, 6, 2, b); r(x - 1, y - 11, 2, 2, [150, 110, 40]); r(x - 4, y - 7, 2, 4, [255, 214, 120]); r(x - 1, y - 1, 2, 2, [120, 90, 40]); glint(x - 3, y - 8); break; }
+    case 'boot': { const c: RGB = [112, 78, 52], cd: RGB = [82, 56, 38]; r(x - 2, y - 10, 6, 8, c); r(x - 7, y - 3, 11, 4, c); r(x - 7, y, 11, 1, cd); r(x - 7, y - 2, 2, 2, cd); r(x - 2, y - 10, 6, 1, M(c, K.WHITE, 0.25)); for (let i = 0; i < 3; i++) r(x - 1, y - 8 + i * 2, 4, 1, [196, 180, 150]); break; }
+    case 'can': r(x - 4, y - 3, 8, 3, [210, 40, 50]); r(x - 4, y - 3, 8, 1, [240, 110, 110]); r(x + 3, y - 3, 1, 3, [200, 200, 210]); r(x - 2, y - 2, 3, 1, K.WHITE); break;
+    case 'bag': alpha(0.7, () => { const s = Math.round(Math.sin(a * 1.4) * 1); r(x - 5, y - 6 + s, 10, 5, [230, 236, 240]); r(x - 5, y - 8 + s, 2, 2, [230, 236, 240]); r(x + 3, y - 8 + s, 2, 2, [230, 236, 240]); }); break;
+    case 'crisps': r(x - 4, y - 4, 8, 4, [60, 120, 220]); r(x - 4, y - 4, 8, 1, [200, 210, 220]); r(x - 2, y - 3, 4, 2, [255, 214, 90]); break;
+  }
+  void note;
 }

@@ -10,12 +10,12 @@ import { PX, mk, r, M, shade, outline, withCtx, lit, alpha } from '../engine/pix
 export interface Look { c: number; hat: number; face: number; fit: number; sp: number; /** index into PETS (0 none) */ pet?: number; /** Your Dev Den desk setup: a bitmask of DESK_ITEMS, shown on whichever desk you sit at. */ desk?: number }
 /** Things you can put on your desk in the Dev Den (bit i = item i). */
 export const DESK_ITEMS = ['2ND MONITOR', 'PLANT', 'MUG', 'LAVA LAMP', 'FAIRY LIGHTS', 'DRAGON FIGURE', 'STICKERS'] as const;
-export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT', 'PENGUIN', 'MOON ROVER'] as const;
+export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT', 'PENGUIN', 'MOON ROVER', 'BABY OCTOPUS'] as const;
 /** What each pet says now and then (same order as PETS). */
-export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON: 'COO', CAT: 'MEOW', CRAB: 'SNIP', DUCK: 'QUACK', GHOST: 'BOO', BAT: 'SQUEAK', PENGUIN: 'NOOT', 'MOON ROVER': 'BEEP' };
+export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON: 'COO', CAT: 'MEOW', CRAB: 'SNIP', DUCK: 'QUACK', GHOST: 'BOO', BAT: 'SQUEAK', PENGUIN: 'NOOT', 'MOON ROVER': 'BEEP', 'BABY OCTOPUS': 'BLUB' };
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT', "CAPTAIN'S HAT", 'SHARK FIN'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT', "CAPTAIN'S HAT", 'SHARK FIN', 'DIVING HELMET'] as const;
 export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE', 'LAB GOGGLES', 'SNORKEL'] as const;
 /** The chem lab's safety goggles (free from its dispenser). */
 export const FACE_LAB_GOGGLES = 9;
@@ -28,7 +28,7 @@ export type Slot = 'hat' | 'face' | 'fit' | 'pet';
  * The CROWN is in the Crypt's chest, the PIGEON comes from feeding the pigeons; everything
  * else is a claw machine prize (Arcade). Keep CLAW in step with supabase/migrations/0006_arcade.sql.
  */
-export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS', 'fit:10': 'GRID 80%+ IN A REACTOR SHIFT', 'face:9': 'THE CHEM LAB\'S GOGGLES DISPENSER' };
+export const EARNED: Record<string, string> = { 'hat:5': 'OPEN THE CRYPT CHEST', 'pet:1': 'FEED THE PIGEONS', 'hat:12': 'HAUNTED CRYPT CANDLES (OCTOBER)', 'hat:13': 'SCORE 120 IN A DINER SHIFT', 'hat:14': 'FLY TO THE SPACE STATION', 'fit:8': 'SCORE 90+ IN KARAOKE', 'pet:8': 'ASSAY 5 MOON CRYSTALS', 'fit:10': 'GRID 80%+ IN A REACTOR SHIFT', 'face:9': 'THE CHEM LAB\'S GOGGLES DISPENSER', 'hat:20': '10 KINDS IN THE SEA LIFE LOG (SARDINE 1)', 'pet:9': 'A STOWAWAY ON A SARDINE 1 DIVE' };
 /** Claw machine prizes and their weights (common 10, uncommon 6, rare 3, legendary 1). */
 export const CLAW: [string, number, string?][] = [
   ['hat:6', 10], ['face:4', 10], ['fit:4', 10], ['pet:4', 10], ['pet:3', 10],
@@ -274,7 +274,7 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 }
 
 /** Hats that hide the critter's antenna. */
-const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17, 18, 19]);
+const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17, 18, 19, 20]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
 /** The HAZMAT SUIT's yellows, its boots, the HI-VIS VEST's orange and its reflective stripes. */
 const HZ: RGB = [242, 194, 48], HZ_DK: RGB = [196, 146, 28], HZ_HI: RGB = [255, 226, 120], BOOT: RGB = [34, 34, 40], VIS: RGB = [255, 122, 34], VIS_DK: RGB = [210, 90, 20], STRIPE: RGB = [226, 230, 236];
@@ -288,7 +288,7 @@ function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void
   lit(() => { for (let k = 0; k < 5; k++) { const x = x0 + ((k * 7 + ph * 3) % Math.max(1, x1 - x0)), y = y0 + ((k * 5 + ph) % Math.max(1, y1 - y0)); R(x, y, 1, 1, k % 2 ? K.WHITE : SEQ_HI); } });
 }
 /** How far each prize hat (6..10) rises above its brim row. */
-const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16, 8, 14];
+const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16, 8, 14, 13];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
 
 /** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
@@ -376,6 +376,26 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
       const w = Math.max(1, Math.round(10 * (1 - j / 12))), x0 = -d * Math.round((j * j) / 26) - Math.floor(w / 2);
       R(x0, b - 2 - j, w, 1, g); R(d > 0 ? x0 + w - 1 : x0, b - 2 - j, 1, 1, gl); if (w > 3) R(d > 0 ? x0 : x0 + w - 1, b - 2 - j, 1, 1, gd);
     }
+    return null;
+  }
+  if (hat === 20) { // DIVING HELMET: a round brass dome with a glass faceplate (the face shows through), a ring of bolts round it, a side port,
+    // a valve on top, a bolted collar, and a black air hose curling off the back. `b` below -24 = Clawd (a bigger dome, a wider faceplate)
+    const wide = b < -24, R2 = wide ? 17 : 15, cy = b + 5, fx = d - (wide ? 0 : 1), fy = wide ? -20 : -18, fr = wide ? 10 : 7;
+    const BR: RGB = [214, 160, 64], BH: RGB = [246, 214, 130], BD: RGB = [150, 104, 36], HOSE: RGB = [40, 44, 54];
+    for (let j = 0; j < 8; j++) { const hx = -d * (R2 + Math.round(Math.sin(j * 0.7) * 2)), hy = cy + j * 2; R(hx - 1, hy, 3, 2, HOSE); if (j % 2) R(hx - 1, hy, 1, 1, [80, 86, 98]); } // the hose, behind
+    for (let y = cy - R2; y <= cy + R2 - 5; y++) {
+      const hw = Math.round(R2 * Math.sqrt(Math.max(0, 1 - ((y - cy) / R2) ** 2))); if (hw <= 0) continue;
+      const row = (x0: number, x1: number) => { if (x1 <= x0) return; const c = y > cy + R2 - 9 ? BD : BR; R(x0, y, x1 - x0, 1, c); if (x0 === -hw) R(x0, y, Math.min(3, x1 - x0), 1, y < cy ? BH : c); if (x1 === hw) R(x1 - 2, y, 2, 1, BD); };
+      const g = y - fy, half = Math.abs(g) < fr ? Math.sqrt(fr * fr - g * g) : -1;
+      if (half < 0) row(-hw, hw); else { row(-hw, Math.max(-hw, Math.ceil(fx - half))); row(Math.min(hw, Math.floor(fx + half) + 1), hw); }
+    }
+    R(-Math.round(R2 * 0.55), cy - R2 + 2, 4, 1, BH); R(-Math.round(R2 * 0.7), cy - R2 + 4, 2, 2, BH); // the shine on the dome
+    for (let k = 0; k < 24; k++) { const an = (k / 24) * Math.PI * 2, x = Math.round(fx + Math.cos(an) * (fr + 0.5)), y = Math.round(fy + Math.sin(an) * (fr + 0.5)); R(x, y, 1, 1, k % 6 === 0 ? BH : BD); } // the faceplate's rim, four bolts
+    alpha(0.22, () => { for (let y = fy - fr + 1; y < fy + fr; y++) { const h = Math.floor(Math.sqrt(fr * fr - (y - fy) ** 2)); R(fx - h, y, h * 2 + 1, 1, [170, 226, 250]); } });
+    R(fx - fr + 3, fy - fr + 3, 2, 1, K.WHITE); R(fx - fr + 2, fy - fr + 4, 1, 2, K.WHITE); // the glass's glint
+    const px = -d * (R2 - 4); R(px - 2, cy - 2, 4, 4, BD); R(px - 1, cy - 1, 2, 2, [150, 206, 230]); // the side port
+    R(-2, cy - R2 - 2, 4, 2, BD); R(-1, cy - R2 - 3, 2, 1, BH); // the valve on top
+    const cyB = cy + R2 - 5; R(-R2 + 1, cyB, R2 * 2 - 2, 3, BR); R(-R2 + 1, cyB, R2 * 2 - 2, 1, BH); for (let x = -R2 + 3; x < R2 - 2; x += 5) R(x, cyB + 1, 1, 1, BD); // the collar, bolted
     return null;
   }
   if (hat === 14) { // space helmet: a glass fishbowl over the whole head (antenna and all) on a metal collar

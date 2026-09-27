@@ -13,6 +13,7 @@ import { COOKS_MAX, type DinerState } from '../game/diner';
 import { SONGS, type KaraokeState } from '../game/karaoke';
 import { CREW_MAX, SHIFT_S as REACTOR_S, faults as reactorFaults, type ReactorState } from '../game/reactor';
 import { FX_MAX, okMix, rxById } from '../game/chem';
+import { SEA_D, SEA_W, SNAP_MAX, troublesOf, type DiveState } from '../game/sub';
 
 export interface PeerState { id: string; name: string; look: Look; x: number; y: number; dir: 1 | -1; moving: boolean }
 /**
@@ -62,7 +63,8 @@ export type StateVal =
   | { k: 'moonbest'; v: { name: string; ms: number } }
   | { k: 'reactor'; v: ReactorState } | { k: 'reactbest'; v: { name: string; score: number } }
   | { k: 'chemlog'; v: ChemLog }
-  | { k: 'aq'; v: { n: number } };
+  | { k: 'aq'; v: { n: number } }
+  | { k: 'dive'; v: DiveState };
 /** THE CHEM LAB's EXPERIMENTS board: how many mixes, and the latest discovery (a reaction id, see game/chem.ts) and who made it. */
 export interface ChemLog { n: number; rx: string; by: string }
 /**
@@ -94,8 +96,18 @@ export type MsgEvent = { [K in MsgType]: { type: K } & NonNullable<ReturnType<(t
 export interface Outgoing {
   emote: { kind: EmoteKind }; state: StateMsg; draw: DrawMsg; note: { i: number; n: number }; pong: PongMsg; cook: { st: number };
   kart: KartMsg; tank: TankMsg; junk: { n: number }; kscore: KScore; snowball: SnowballMsg; flat: FlatMsg; world: HideSeek;
-  rx: { st: number; d: number }; grid: GridMsg; chem: ChemMsg; fx: FxMsg; scoop: { x: number };
+  rx: { st: number; d: number }; grid: GridMsg; chem: ChemMsg; fx: FxMsg; scoop: { x: number }; helm: HelmMsg; sub: SubMsg;
 }
+/** SARDINE 1's helm: where the sub is and which way the stick's pushed (sx, sy in -1..1); `off` = let go (the autopilot takes over from here). */
+export interface HelmMsg { x: number; y: number; vx: number; vy: number; sx: number; sy: number; off?: 1 }
+/**
+ * Something done aboard SARDINE 1 (features/sub.ts): a SNAP (v = what it got: game/sub.ts SNAP_*), a sonar PING (x, y = where the sub was),
+ * a GRAB (v = the find), a FIX (v = the trouble), the LIGHTS (v = on), TEA (v = the depth), the HORN, the CLAW moving (x = along, y = down),
+ * a BONK on the trench floor (x, y). The skipper folds them into room state 'dive'.
+ */
+export interface SubMsg { e: SubEvent; v: number; x?: number; y?: number }
+export const SUB_EVENTS = ['snap', 'ping', 'grab', 'fix', 'lights', 'tea', 'horn', 'claw', 'bonk'] as const;
+export type SubEvent = (typeof SUB_EVENTS)[number];
 /** THE CHEM LAB: "I mixed `m` (a bitmask of reagents, 2 or 3 of them) at bench `b`, at wall time `at` (ms)". */
 export interface ChemMsg { b: number; m: number; at: number }
 /** "I'm under effect `k` (a potion, a frazzle; 0 = none: see game/chem.ts FX) for `s` more seconds". */
@@ -362,6 +374,13 @@ export interface Api {
     /** Buy a piece of clothing at the GIFT SHOP (once each). */
     buy(item: string): Promise<{ item: string; tokens: number }>;
   };
+  /** SARDINE 1 (0024_sub.sql). */
+  sub: {
+    /** Pay for the dive that just surfaced (the server checks its own clock: once a dive, 24 a day): 1 + finds (up to 4) + 3 for the mission. */
+    pay(finds: number, mission: boolean): Promise<{ tokens: number; paid: number }>;
+    /** THE OTHER BOOT goes to the aquarium, next to the OLD BOOT (the first one only): true if yours is the one. */
+    boot(): Promise<boolean>;
+  };
   /** Tips paid for a performance (the server caps them). */
   tips: {
     /** Karaoke: tips for a song you performed (score 0..100 incl. the hype bonus; capped by the server). */
@@ -551,6 +570,7 @@ const STATE: { [K in StateVal['k']]: (v: unknown) => Extract<StateVal, { k: K }>
   reactbest: (x) => { const v = obj(x); if (!v) return null; const name = cleanName(v.name), score = int(v.score, 0, 100); return name && score !== null ? { name, score } : null; },
   chemlog: (x) => { const v = obj(x); if (!v) return null; const n = int(v.n, 0, 1e7), rx = v.rx === '' || (typeof v.rx === 'string' && rxById(v.rx)) ? (v.rx as string) : null; return n === null || rx === null ? null : { n, rx, by: cleanName(v.by) }; },
   aq: (x) => { const v = obj(x); if (!v) return null; const n = num(v.n, 0, 1e13); return n === null ? null : { n }; },
+  dive: (x) => { const v = obj(x); return v && parseDive(v); },
 };
 export function parseState(p: unknown): { id: string; s: StateMsg } | null {
   const o = obj(p);
@@ -601,6 +621,30 @@ function parseReactor(v: Record<string, unknown>): ReactorState | null {
   const want = reactorFaults({ t0, seed, lvl }).length, fx = v.fixed;
   if (!Array.isArray(fx) || fx.length !== want || !fx.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t < 1e14)) return null;
   return { host: v.host, t0, seed, lvl, ids, names: names(nm), rods, pumps, turb, scram, fixed: fx as number[], at, heat, sat: Math.min(sat, secs), secs, hot, melt, mops, fixes };
+}
+function parseDive(v: Record<string, unknown>): DiveState | null {
+  if (!isId(v.sk)) return null;
+  const n = int(v.n, 0, 1e9), at = num(v.at, 0, 1e11), x = num(v.x, 0, SEA_W), y = num(v.y, 0, SEA_D), vx = num(v.vx, -200, 200), vy = num(v.vy, -200, 200);
+  const li = int(v.li, 0, 1), lt = num(v.lt, 0, 1e11), lp = num(v.lp, 0, 1e11), va = num(v.va, 0, 1e11), vk = int(v.vk, 0, 2);
+  const got = int(v.got, 0, 0xffff), kinds = int(v.kinds, 0, (1 << 20) - 1), m = int(v.m, 0, 31), oct = int(v.oct, 0, 1);
+  if (n === null || at === null || x === null || y === null || vx === null || vy === null || li === null || lt === null || lp === null || va === null || vk === null || got === null || kinds === null || m === null || oct === null) return null;
+  const fx = v.fx; if (!Array.isArray(fx) || fx.length !== troublesOf(n).length || !fx.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t < 1e11)) return null;
+  return { n, sk: v.sk, at, x, y, vx, vy, li, lt, lp, fx: fx as number[], va, vk, got, kinds, m, oct };
+}
+export function parseHelm(p: unknown): { id: string; h: HelmMsg } | null {
+  const o = obj(p), x = num(o?.x, 0, SEA_W), y = num(o?.y, 0, SEA_D), vx = num(o?.vx, -200, 200), vy = num(o?.vy, -200, 200), sx = num(o?.sx, -1, 1), sy = num(o?.sy, -1, 1);
+  if (!o || !isId(o.id) || x === null || y === null || vx === null || vy === null || sx === null || sy === null) return null;
+  return { id: o.id, h: { x, y, vx, vy, sx, sy, ...(o.off === 1 ? { off: 1 as const } : {}) } };
+}
+export function parseSub(p: unknown): { id: string; s: SubMsg } | null {
+  const o = obj(p), e = oneOf(o?.e, SUB_EVENTS);
+  if (!o || !isId(o.id) || !e) return null;
+  const max = e === 'snap' ? SNAP_MAX : e === 'grab' ? 15 : e === 'fix' ? 3 : e === 'lights' ? 1 : e === 'tea' ? SEA_D : 0, v = int(o.v, 0, max);
+  if (v === null) return null;
+  const s: SubMsg = { e, v };
+  if (o.x !== undefined) { const x = num(o.x, -100, SEA_W); if (x === null) return null; s.x = x; }
+  if (o.y !== undefined) { const y = num(o.y, -100, SEA_D); if (y === null) return null; s.y = y; }
+  return { id: o.id, s };
 }
 export function parseRx(p: unknown): { id: string; st: number; d: number } | null {
   const o = obj(p), st = int(o?.st, 0, 14), d = int(o?.d, -1, 1);
@@ -732,6 +776,8 @@ export function parseLobby(p: unknown): LobbyPerson | null {
  *   chem    ChemMsg                      THE CHEM LAB: "I mixed m at bench b" (every browser works out the same reaction from it)
  *   fx      FxMsg                        "I'm under a potion (or a frazzle) for s more seconds": sent on drinking, and again whenever anyone arrives
  *   scoop   { x }                        THE CITY AQUARIUM at feeding time: "I threw a scoop of food into the big tank at x"
+ *   helm    HelmMsg                      SARDINE 1: whoever's at the helm, where the sub is and the stick (when it changes, and twice a second)
+ *   sub     SubMsg                       SARDINE 1: a snap, a ping, a grab, a fix, the lights, tea, the horn, the claw moving, a bonk
  */
 export const MESSAGES = {
   move: { parse: parseMove, on: 'room' },
@@ -754,6 +800,8 @@ export const MESSAGES = {
   chem: { parse: parseChem, on: 'room' },
   fx: { parse: parseFx, on: 'room' },
   scoop: { parse: parseScoop, on: 'room' },
+  helm: { parse: parseHelm, on: 'room' },
+  sub: { parse: parseSub, on: 'room' },
 } as const satisfies Record<string, { parse: (p: unknown) => { id: string } | null; on: 'room' | 'srv' | 'lobby' }>;
 export type MsgType = keyof typeof MESSAGES;
 export const MSG_TYPES = Object.keys(MESSAGES) as MsgType[];

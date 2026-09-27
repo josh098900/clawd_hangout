@@ -6,11 +6,11 @@
 
 import { cap, errText, game, now } from '../app/game';
 import { GAL, GALLERY, feeding, FEED_BELL, FEED_EVERY } from '../game/aquarium';
-import { dive, SUB_BOARD, SUB_DOWN, SUB_HORN, SUB_UP } from '../game/sub';
+import { backIn, dive, hatchOpen, SUB_BOARD, SUB_DOWN, SUB_HORN, SUB_UP } from '../game/sub';
 import { FISH } from '../game/fish';
 import { quests } from '../game/quests';
 import { save } from '../game/save';
-import { AQR, AQUA, SPOT } from '../world/aquarium';
+import { AQR, AQUA, GANGWAY, SPOT } from '../world/aquarium';
 import { FLAT } from '../world/flat';
 import { FURN } from '../world/furniture';
 import { itemName } from '../entities/critter';
@@ -101,7 +101,7 @@ export function onScoop(x: number): void {
 }
 
 // ---------- every frame ----------
-let fedKey = -1, bellKey = -1, discoWas = false, discoToast = -99, subKey = '', feedEmote = 0, pierFetch = 0;
+let gangwayToast = -9, fedKey = -1, bellKey = -1, discoWas = false, discoToast = -99, subKey = '', feedEmote = 0, pierFetch = 0;
 export function aqEntered(): void { GAL.dirty = true; triedAt = 0; AQUA.scoops.length = 0; }
 export function aqStep(): void {
   const id = game.room.id, t = now();
@@ -124,11 +124,14 @@ export function aqStep(): void {
   if (disco && !discoWas && t - discoToast > 30) { discoToast = t; SFX.disco(); toast('JELLY DISCO! The jellies are dancing with you', 3500); }
   discoWas = disco;
   // SARDINE 1 in the pen: the horn a half minute before, the hatch, the ballast; bubbles as it comes back up
+  // SARDINE 1: who's aboard (the dive board), and the stowed gangway saying when it's back if you walk up to it
+  AQUA.crew = game.lobby.filter((p) => p.room === 'sub').length;
+  if (!hatchOpen() && game.playing && Math.abs(game.me.x - GANGWAY) < 14 && game.me.y < 532 && game.input.axis().y < 0 && t - gangwayToast > 4) { gangwayToast = t; toast(dive().phase === 'submerge' ? 'Diving now! SARDINE 1 is back in ' + mmss(backIn()) : 'SARDINE 1 is out on a dive: back in ' + mmss(backIn()), 3000); }
   const d = dive(), key = d.n + ':' + (d.k >= SUB_UP ? 'up' : d.k >= SUB_DOWN ? 'out' : d.k >= SUB_BOARD ? 'down' : d.k >= SUB_HORN ? 'horn' : 'in'), near = game.me.x > AQR.pen - 200;
   if (key !== subKey) {
     const first = subKey === ''; subKey = key;
     if (!first && near) {
-      if (key.endsWith('horn')) { SFX.foghorn(); toast('SARDINE 1 dives in 30 seconds (SEA TRIALS: no passengers yet)', 3500); }
+      if (key.endsWith('horn')) { SFX.foghorn(); toast('SARDINE 1 dives in 30 seconds! All aboard: up the gangway', 3500); }
       else if (key.endsWith('down')) { SFX.clang(); setTimeout(() => SFX.gurgle(), 400); }
       else if (key.endsWith('up')) { SFX.gurgle(); setTimeout(() => SFX.splash(), 1200); }
     }

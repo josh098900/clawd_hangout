@@ -14,7 +14,8 @@ import { PX, mk, r, line, disc, oval, ring, txt, tw, lit, alpha, G, Gd, M, shade
 import { h1, clamp } from '../engine/math';
 import { mmss } from '../engine/format';
 import { GALLERY, GAL, feeding } from '../game/aquarium';
-import { dive, penSink, backIn } from '../game/sub';
+import { dive, penSink, backIn, hatchOpen, missionOf, MISSIONS } from '../game/sub';
+import { SUB_ARRIVE } from './sub';
 import { FISH } from '../game/fish';
 import { drawCatch, sitsOnBottom, whaleShark, manta, turtle, reefShark, clownfish, shoal, moray, diver, jelly, kelp, boneFish, snowflake } from './sealife';
 import { dayness } from './plaza';
@@ -29,7 +30,9 @@ export const AQR = { door: 80, shop: 180, gallery: 340, tank0: 770, tank1: 1230,
 /** The FISH GALLERY's twelve tanks: two rows of six. */
 const TANK_X0 = 356, TANK_PITCH = 66, TANK_W = 56, TANK_H = 27, TANK_Y = [369, 418];
 /** SARDINE 1 afloat: its waterline, and the moon pool's water; the gangway down to its deck, beside the conning tower. */
-const WATERLINE = 500, POOL_Y0 = FL + 2, POOL_Y1 = 514, GANGWAY = AQR.sub - 44;
+const WATERLINE = 500, POOL_Y0 = FL + 2, POOL_Y1 = 514;
+/** The gangway down to SARDINE 1's hatch (the way aboard while it boards). */
+export const GANGWAY = AQR.sub - 44;
 
 /** What the room draws from (features/aquarium.ts keeps it up to date). */
 export const AQUA = {
@@ -37,6 +40,8 @@ export const AQUA = {
   scoops: [] as { x: number; t0: number }[],
   /** How many are dancing in the jelly room right now (three or more = the jelly disco). */
   jellyDancers: 0,
+  /** How many are aboard SARDINE 1 (the dive board says, while it's out). */
+  crew: 0,
   /** The part of the room the camera shows (so the busy parts only draw when they're seen). */
   view: { x0: 0, x1: W, y0: 0, y1: H },
 };
@@ -313,7 +318,8 @@ function subPen(a: number): void {
     txt('SARDINE 1', bx - tw('SARDINE 1') / 2, 391, [255, 214, 90]); r(bx - 38, 398, 76, 1, [60, 40, 10]);
     txt(status, bx - tw(status) / 2, 401, d.phase === 'board' && d.left < 20 && Math.floor(a * 3) % 2 ? [255, 90, 60] : amber);
     txt(when, bx - tw(when) / 2, 409, amber);
-    txt('SEA TRIALS', bx - tw('SEA TRIALS') / 2, 419, [120, 220, 255]); txt('NO PASSENGERS YET', bx - tw('NO PASSENGERS YET') / 2, 427, [120, 220, 255]);
+    const top = d.phase === 'board' ? 'TODAY\'S MISSION' : 'CREW ' + AQUA.crew + ' · MISSION', mis = MISSIONS[missionOf(d.n)].name;
+    txt(top, bx - tw(top) / 2, 419, [120, 220, 255]); txt(mis, bx - tw(mis) / 2, 427, [255, 214, 90]);
   });
   G(AQR.board - 42, 388, 84, 48, [255, 170, 60], 0.08);
 }
@@ -444,9 +450,11 @@ const railing = stillProp(POOL_Y1 + 8, { x0: AQR.pool0 - 2, y0: POOL_Y1 - 20, x1
   const y = POOL_Y1 + 6, gap0 = GANGWAY - 15, gap1 = GANGWAY + 15;
   for (let x = AQR.pool0; x <= AQR.pool1; x += 28) if (x < gap0 || x > gap1) { r(x, y - 22, 3, 22, AQ.HAZ); r(x, y - 22, 1, 22, [255, 230, 140]); }
   for (const ry of [y - 22, y - 12]) { r(AQR.pool0, ry, gap0 - AQR.pool0, 2, AQ.HAZ); r(gap1, ry, AQR.pool1 + 3 - gap1, 2, AQ.HAZ); }
-  // the chain across the gangway's foot: SEA TRIALS (push 1)
+}, () => { // the chain across the gangway's foot while SARDINE 1's away (with when it's back); unhooked, hanging off its post, while it boards
+  const y = POOL_Y1 + 6, gap0 = GANGWAY - 15;
+  if (hatchOpen()) { for (let k = 0; k <= 9; k++) r(gap0 + 1 + (k > 6 ? k - 6 : 0), y - 18 + k * 2, 1, 1, [150, 156, 166]); return; }
   for (let k = 0; k <= 14; k++) r(gap0 + 2 + k * 2, y - 16 + Math.round(Math.sin(k / 14 * Math.PI) * 4), 1, 1, [150, 156, 166]);
-  r(GANGWAY - 13, y - 12, 26, 11, K.WHITE); r(GANGWAY - 13, y - 12, 26, 2, [230, 60, 60]); txt('SEA', GANGWAY - tw('SEA') / 2, y - 9, [40, 40, 50]); txt('TRIALS', GANGWAY - tw('TRIALS') / 2, y - 3, [40, 40, 50]);
+  const t = mmss(backIn()); r(GANGWAY - 15, y - 13, 30, 12, K.WHITE); r(GANGWAY - 15, y - 13, 30, 2, [230, 60, 60]); txt('BACK IN', GANGWAY - tw('BACK IN') / 2, y - 10, [40, 40, 50]); txt(t, GANGWAY - tw(t) / 2, y - 4, [40, 40, 50]);
 });
 /** A coil of rope and a toolbox on the dock. */
 const rope = stillProp(540, { x0: 1438, y0: 524, x1: 1476, y1: 542 }, () => { const x = 1452, y = 540; for (let k = 0; k < 4; k++) ring(x, y - 3 - k * 2, 11 - k, 3, [190, 160, 110]); r(x + 9, y - 4, 10, 2, [190, 160, 110]); });
@@ -462,6 +470,7 @@ export const AQ_SPOTS: Spot[] = [
   { kind: 'touch', x: AQR.touch, y: 594, sx: AQR.touch, sy: 594, lift: 0, label: 'TOUCH', area: { x0: AQR.touch - 50, y0: 556, x1: AQR.touch + 50, y1: 584 } }, // 6
   { kind: 'feedfish', x: AQR.ladder - 16, y: 486, sx: AQR.ladder - 16, sy: 486, lift: 0, label: 'FEED', area: { x0: AQR.ladder - 12, y0: 380, x1: AQR.ladder + 10, y1: 470 } }, // 7
   seat(1316, 547, 6, JELLY_VIEW), seat(1344, 547, 6, JELLY_VIEW), // 8-9
+  { kind: 'sealog', x: AQR.board, y: 492, sx: AQR.board, sy: 492, lift: 0, label: 'THE SEA LIFE LOG', area: { x0: AQR.board - 42, y0: 386, x1: AQR.board + 42, y1: 438 } }, // 10: THE DIVE BOARD: read your SEA LIFE LOG
 ];
 export const SPOT = { DONATE: 0, SHOP: 1, TOUCH: 6, FEED: 7 };
 const T_ = (id: string, name: string, verb: string, x: number, y: number, sx: number, lines: string[]): Talker => ({ id: 'aq-' + id, name, verb, x, y, sx, sy: 486, lines });
@@ -475,7 +484,6 @@ const TALK: Talker[] = [
   T_('jelly', 'MOON JELLIES', 'LOOK', 1330, 360, 1330, ['moon jellies: 95% water, 5% vibes', 'they say if three people dance in here the jellies dance too']),
   T_('gate', 'SEA GATE', 'READ', 1592, 368, 1560, ['the SEA GATE: under the water it opens out to the ocean. SARDINE 1 comes and goes through it', 'a green light means the gate is open']),
   T_('ring', 'LIFE RING', 'LOOK', AQR.pen + 32, 400, AQR.pen + 32, ['a life ring. in case of pool', 'SARDINE 1 has an escape hatch too. it shoots you up in a rubber ring']),
-  T_('board', 'DIVE BOARD', 'READ', AQR.board, 388, AQR.board, ['SARDINE 1 dives every 8 minutes: 90 seconds to board, then 6 and a half under', 'SEA TRIALS: no passengers yet. soon!']),
   T_('lockers', 'LOCKERS', 'LOOK', AQR.board - 11, 442, AQR.board - 30, ['wetsuits, flippers, and one very old sandwich', 'CREW ONLY. the sign is laminated, so it must be true']),
 ];
 
@@ -495,7 +503,11 @@ export function makeAquarium(): Room {
       { x0: AQR.pool0 - 4, y0: FL, x1: AQR.pool1 + 4, y1: POOL_Y1 + 6 }, // the moon pool
       { x0: 1442, y0: 534, x1: 1466, y1: 542 }, { x0: 1760, y0: 550, x1: 1780, y1: 558 }, // rope, toolbox
     ],
-    doors: [{ trigger: { x0: AQR.door - 18, y0: FL + 8, x1: AQR.door + 18, y1: FL + 16 }, to: 'pier', arrive: AQ_ARRIVE, label: 'THE PIER', area: { x0: AQR.door - 34, y0: 374, x1: AQR.door + 34, y1: FL + 8 } }],
+    doors: [
+      { trigger: { x0: AQR.door - 18, y0: FL + 8, x1: AQR.door + 18, y1: FL + 16 }, to: 'pier', arrive: AQ_ARRIVE, label: 'THE PIER', area: { x0: AQR.door - 34, y0: 374, x1: AQR.door + 34, y1: FL + 8 } },
+      // up the gangway into SARDINE 1, while it's boarding
+      { trigger: { x0: GANGWAY - 12, y0: POOL_Y1 + 6, x1: GANGWAY + 12, y1: POOL_Y1 + 14 }, to: 'sub', arrive: SUB_ARRIVE, label: 'SARDINE 1', area: { x0: GANGWAY - 16, y0: 450, x1: GANGWAY + 16, y1: POOL_Y1 + 6 }, route: () => (hatchOpen() ? { to: 'sub', arrive: SUB_ARRIVE, label: 'SARDINE 1' } : null) },
+    ],
     spots: AQ_SPOTS, inUse: new Map(),
     onState(s: StateMsg) { if (s.k === 'aq') GAL.dirty = true; },
     spawn: { x: AQR.door, y: 500 },

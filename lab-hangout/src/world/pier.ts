@@ -11,7 +11,7 @@ import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import { bakeDayNight, type Room, type Prop, type Spot } from './room';
 import { scoreboard } from './contest';
-import { SUB_BOARD, SUB_DOWN, SUB_HOME, SUB_UP, dive, penSink } from '../game/sub';
+import { SUB_BOARD, SUB_DOWN, SUB_HOME, SUB_UP, dive, hatchOpen, penSink, periscopeOut } from '../game/sub';
 import { feeding } from '../game/aquarium';
 
 const W = 1900, H = 720, HORIZON = 380, SHORE = 548;
@@ -140,10 +140,11 @@ function aqBack(a: number, day: number): void {
   Gd(pc, 488, 18, [60, 170, 170], 0.12);
   // the beacon: it turns while the sub comes and goes
   const busy = (d.k > SUB_BOARD - 12 && d.k < SUB_DOWN + 30) || d.k > SUB_UP - 30, on = busy && Math.cos(a * 6) > 0;
+  if (hatchOpen(d)) lit(() => { r(pc - 24, 507, 48, 14, [16, 18, 24]); if (Math.floor(a * 2) % 3) { txt('BOARDING', pc - tw('BOARDING') / 2, 509, [255, 214, 90]); txt('NOW', pc - tw('NOW') / 2, 515, [255, 214, 90]); } }); // (over DIVES EVERY 8 MINUTES)
   lit(() => { r(pc - 2, 424, 5, 4, on ? [255, 190, 70] : [150, 100, 40]); if (on) r(pc + (Math.sin(a * 6) > 0 ? 3 : -5), 425, 3, 2, [255, 230, 150]); });
   if (busy) Gd(pc, 426, 12, [255, 170, 60], on ? 0.5 : 0.15);
   // out at sea: SARDINE 1's periscope, heading out as a dive starts and coming home as it ends
-  const out = d.k >= SUB_DOWN && d.k < SUB_DOWN + 44 ? (d.k - SUB_DOWN) / 44 : d.k >= SUB_UP - 44 && d.k < SUB_UP ? 1 - (d.k - (SUB_UP - 44)) / 44 : -1;
+  const out = periscopeOut(d.k);
   if (out >= 0) {
     const px = Math.round(x0 - 10 - out * 110 + Math.sin(out * 5) * 8), py = Math.round(546 - out * 140), fade = Math.min(1, out / 0.08, out > 0.85 ? (1 - out) / 0.15 : 1);
     alpha(fade, () => { r(px, py - 7, 2, 7, [70, 76, 90]); r(px, py - 8, 4, 2, [70, 76, 90]); lit(() => r(px + 3, py - 8, 1, 1, [200, 240, 255]));

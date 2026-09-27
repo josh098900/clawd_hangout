@@ -77,6 +77,11 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Donate a catch (City Aquarium, past the lighthouse) | E at the CURATOR'S DESK, then DONATE on a fish you've caught | the DONATE button |
 | Buy at the aquarium's gift shop | E at the till | the SHOP button |
 | Help at feeding time (every 15 min) | E at the step by the ocean tank's ladder | the FEED! button |
+| Go on a dive in SARDINE 1 (every 8 min, from the aquarium's SUB PEN) | walk up the gangway while it boards (the horn goes a minute and a half before it dives) | the same |
+| Steer SARDINE 1 | E at the helm, then ← → astern / ahead, ↑ ↓ up / down, Space the horn, E lets go (the Cap'n flies her the rest of the time) | the d-pad, HORN |
+| Work the sub's stations | E at the CAMERA (snap what's in the window), SONAR (ping), LIGHTS, PERISCOPE (← → to look round), the galley (tea), the SEA LIFE LOG, the TREASURE BIN; when something goes wrong, E where the red marker blinks | tap them |
+| The sub's claw | E at the CLAW, then ← → slide it, ↓ lower, ↑ raise, Space grabs, E steps away | the d-pad, GRAB |
+| Get off a dive early | E twice at the ESCAPE HATCH (you pop up on the Pier, in a rubber ring) | the same |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
@@ -143,6 +148,9 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 23. `supabase/migrations/0023_aquarium.sql`: THE CITY AQUARIUM: the FISH GALLERY (donate your biggest catch of each kind;
     a bigger one takes the tank's plaque; your first of each kind pays a thank-you), the gift shop (four clothes, and
     prices for its four pieces of furniture), the donate and feeding quests, and the CURATOR badge
+24. `supabase/migrations/0024_sub.sql`: SARDINE 1's pay for a dive (the server checks it's just surfaced; once a dive, a token
+    plus one a find (up to 4) plus 3 for the dive's mission, 24 a day), THE OTHER BOOT's plaque in the FISH GALLERY, the dive
+    quest and the MARINE BIOLOGIST badge
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`
