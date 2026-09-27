@@ -87,7 +87,7 @@ Guiding rules (from what already works):
 ## Phase 8 — The next plan (one step at a time, polished: see docs/PLAN.md and ART_STYLE §9)
 - [x] 16. The map: fast travel between rooms, and where your friends are
 - [x] 17. The Science Wing: the reactor control room (co-op, cartoon meltdowns, HAZMAT suit) + the chemistry bench (THE CHEM LAB)
-- [ ] 18. Submarine + City Aquarium (the aquarium on the Pier, the sub dives from it; crew stations)  ← next (to discuss)
+- [x] 18. Submarine + City Aquarium (the aquarium on the Pier, and SARDINE 1 diving from it: crew stations, the SEA LIFE LOG)
 - [ ] 19. The Airport (check-in, X-ray scanner, baggage carousel, departures board) + its first destinations
 - [ ] 20. Carnival on the Pier
 - [ ] 21. Mini golf

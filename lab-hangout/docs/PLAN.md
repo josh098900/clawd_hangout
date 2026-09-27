@@ -217,7 +217,7 @@ BUBBLES, FLOATY) that follow you through doors; two-chemist reactions (ELEPHANT 
 CONFETTI CANNON); the RECIPE BOOK (20 entries, the CHEMIST badge), LAB GOGGLES from the dispenser, the safety shower,
 BONEY, SIR BUBBLES, PROF. FIZZ part-time; the map's annex, the fume stack; a daily quest (migration `0022_chem.sql`).
 
-## 18. Submarine + City Aquarium: push 1 (THE CITY AQUARIUM) done; push 2 (the submarine) built, awaiting its live check
+## 18. Submarine + City Aquarium: done and confirmed (THE CITY AQUARIUM and SARDINE 1)
 Brief: docs/briefs/18-aquarium-sub.md (§6 is the submarine). Migrations `0023_aquarium.sql`, `0024_sub.sql`.
 Josh picked: dives on a timetable that anyone can steer, shared donations, all four dive jobs (photos, claw treasure,
 cartoon trouble, a mission each dive) and all four prizes (the DIVING HELMET, a BABY OCTOPUS pet, a gift shop, quests + badges).
