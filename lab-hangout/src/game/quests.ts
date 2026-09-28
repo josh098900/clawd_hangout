@@ -52,6 +52,9 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   donate: { text: 'Donate a fish to the City Aquarium', goal: 1 },
   feeding: { text: 'Help out at feeding time in the City Aquarium', goal: 1 },
   dive: { text: 'Go on a dive in SARDINE 1 (the City Aquarium\'s sub pen)', goal: 1 },
+  fly: { text: 'Fly to Iceland (LAB AIR, from the AIRPORT on the Subway)', goal: 1 },
+  hotdog: { text: 'Eat ONE WITH EVERYTHING at Reykjavik\'s hot dog stand', goal: 1 },
+  aurora: { text: 'Photograph the northern lights over Reykjavik\'s bay', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -81,6 +84,8 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'chemist', name: 'CHEMIST', hint: 'Fill in the chem lab\'s whole recipe book', earned: () => found(save.data.chem) >= REACTIONS.length },
   { id: 'curator', name: 'CURATOR', hint: 'Donate all 12 kinds of catch to the City Aquarium', earned: () => donatedKinds() >= GALLERY.length },
   { id: 'biologist', name: 'MARINE BIOLOGIST', hint: 'Photograph all 20 kinds of sea life from SARDINE 1', earned: () => LOG.every((c) => save.data.sea.includes(c.id)) },
+  { id: 'flyer', name: 'FREQUENT FLYER', hint: 'Fly LAB AIR 10 times (there and back counts twice)', earned: () => stat('planes') >= 10 },
+  { id: 'aurora', name: 'AURORA HUNTER', hint: 'Photograph an aurora STORM (KP 7 or more) over Reykjavik', earned: () => stat('auroraStorm') >= 1 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

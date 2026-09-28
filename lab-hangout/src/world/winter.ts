@@ -16,6 +16,7 @@ import { h1 } from '../engine/math';
 import { POND, onWater } from './park';
 import { vnoise } from './space';
 import { OUTDOORS } from './weather';
+import { iceDay } from './iceland';
 import { stringLights, wallDoors, type LightStyle } from './dressing';
 import type { Ornament, TreeGift } from '../net/transport';
 import type { Prop, Room, RoomId, Spot } from './room';
@@ -222,6 +223,7 @@ function snowLayer(room: Room): HTMLCanvasElement {
 const XTREES: Partial<Record<RoomId, [number, number][]>> = {
   lab: [[520, 452]], den: [[700, 452]], cinema: [[940, 464]], stage: [[186, 496]], arcade: [[1060, 488]], diner: [[760, 492]], lofts: [[820, 500]], station: [[1000, 488]],
   wing: [[1050, 476]], chem: [[1080, 478]], aquarium: [[176, 490]], sub: [[716, 546]],
+  airport: [[1790, 492]], kef: [[905, 490]], reykjavik: [[396, 494]],
 };
 function smallTree(x: number, y: number, a: number): void {
   r(x - 3, y - 8, 6, 8, [110, 70, 40]); r(x - 9, y - 4, 18, 4, [214, 44, 56]); r(x - 9, y - 4, 18, 1, [240, 90, 96]);
@@ -231,6 +233,46 @@ function smallTree(x: number, y: number, a: number): void {
   present(x - 12, y + 2, (x / 10) % 6 | 0, 0); present(x + 11, y + 1, (x / 7 + 2) % 6 | 0, 1);
 }
 const BULBS: RGB[] = [[255, 70, 70], [124, 242, 156], [255, 214, 90], [90, 180, 255], [255, 255, 255]];
+
+/**
+ * REYKJAVÍK's YULE CAT (Jólakötturinn): a giant cat made of white lights in the square, from the old story (it comes for anyone
+ * without new clothes at Christmas). Sitting, facing the town, drawn as strings of bulbs along its outline, its eyes glowing;
+ * brighter after dark (Iceland's own clock).
+ */
+const YULE = { x: 1424, y: 492 };
+const yulePaths = ((): [number, number][][] => {
+  const { x, y } = YULE, arc = (cx: number, cy: number, rx: number, ry: number, t0: number, t1: number): [number, number][] => { const out: [number, number][] = []; for (let k = 0; k <= 24; k++) { const t = t0 + ((t1 - t0) * k) / 24; out.push([cx + Math.cos(t) * rx, cy + Math.sin(t) * ry]); } return out; };
+  const qc = (p0: [number, number], c: [number, number], p1: [number, number]): [number, number][] => Array.from({ length: 13 }, (_, k) => { const u = k / 12; return [(1 - u) * (1 - u) * p0[0] + 2 * (1 - u) * u * c[0] + u * u * p1[0], (1 - u) * (1 - u) * p0[1] + 2 * (1 - u) * u * c[1] + u * u * p1[1]]; });
+  return [
+    arc(x + 4, y - 22, 20, 22, -Math.PI * 0.42, Math.PI * 1.06), // the body (the head hides its top left)
+    arc(x - 12, y - 50, 12, 11, 0, Math.PI * 2), // the head
+    [[x - 22, y - 56], [x - 24, y - 70], [x - 15, y - 60]], [[x - 8, y - 60], [x - 2, y - 71], [x - 2, y - 55]], // the ears
+    [[x - 8, y - 38], [x - 8, y]], [[x - 1, y - 36], [x - 1, y]], // the front legs
+    qc([x + 22, y - 6], [x + 40, y - 22], [x + 28, y - 46]), qc([x + 28, y - 46], [x + 22, y - 52], [x + 26, y - 56]), // the tail, curling up the far side
+  ];
+})();
+const yuleCatProp: Prop = { y: YULE.y, draw(a) {
+  const night = 1 - iceDay(), { x, y } = YULE;
+  // the frame's wire, faint, then the bulbs every few pixels along it (a few twinkling), warm white, glowing after dark
+  for (const p of yulePaths) for (let i = 0; i < p.length - 1; i++) alpha(0.35, () => line(Math.round(p[i][0]), Math.round(p[i][1]), Math.round(p[i + 1][0]), Math.round(p[i + 1][1]), [150, 150, 140]));
+  let n = 0;
+  for (const p of yulePaths) {
+    let left = 0;
+    for (let i = 0; i < p.length - 1; i++) {
+      const [x0, y0] = p[i], [x1, y1] = p[i + 1], len = Math.hypot(x1 - x0, y1 - y0);
+      for (let d = left; d < len; d += 4, n++) {
+        const u = d / len, bx = Math.round(x0 + (x1 - x0) * u), by = Math.round(y0 + (y1 - y0) * u), on = (a * 1.1 + h1(n * 1.7)) % 1 > 0.08;
+        lit(() => r(bx, by, 2, 2, on ? [255, 250, 226] : [140, 136, 120])); if (on && n % 3 === 0) Gd(bx + 1, by + 1, 5, [255, 244, 210], 0.12 + 0.2 * night);
+      }
+      left = (left - len) % 4; if (left < 0) left += 4;
+    }
+  }
+  // the eyes: narrow and glowing (it's looking for you), whiskers, and a soft light over it all after dark
+  lit(() => { for (const ex of [x - 18, x - 8]) { r(ex, y - 53, 4, 2, [255, 220, 80]); r(ex + 1, y - 53, 1, 2, [60, 40, 10]); } r(x - 13, y - 47, 2, 1, [255, 180, 170]); });
+  Gd(x - 16, y - 52, 4, [255, 220, 80], 0.35 + 0.3 * night); Gd(x - 6, y - 52, 4, [255, 220, 80], 0.35 + 0.3 * night);
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) alpha(0.6, () => line(x - 12 + s * 4, y - 45 + k, x - 12 + s * 14, y - 47 + k * 2, [230, 226, 210]));
+  if (night > 0.1) Gd(x, y - 34, 40, [255, 244, 214], 0.07 * night);
+} };
 const WINTER_LIGHTS: LightStyle = { bulbs: BULBS, sag: 12, offEvery: 6, wire: [30, 70, 40], off: (c) => shade(c, 0.35), dy: 1 };
 /** A wreath over the middle of every door (not the open edges of a set). */
 function wreaths(room: Room): void {
@@ -335,6 +377,7 @@ export function installWinter(rooms: Record<RoomId, Room>, labTracks?: import('.
   rooms.park.blockers.push({ x0: SNOWMAN.x - 14, y0: SNOWMAN.y - 6, x1: SNOWMAN.x + 14, y1: SNOWMAN.y + 2 });
   freezePond(rooms.park);
   if (labTracks && rooms.lab.music) rooms.lab.music.tracks = labTracks;
+  rooms.reykjavik.talkers?.push({ id: 'yule-cat', name: 'THE YULE CAT', x: YULE.x, y: YULE.y - 44, sx: YULE.x + 2, sy: YULE.y + 26, verb: 'LOOK', lines: ['New clothes this Christmas? The Yule Cat checks. (A LOPAPEYSA counts.)', 'THE YULE CAT: an old Icelandic story. It prowls at Christmas, looking for anyone without new clothes.', 'Thousands of little white lights. It still looks hungry.'] });
 }
 
 // ---------- drawing ----------
@@ -361,6 +404,7 @@ export function winterProps(id: RoomId): Prop[] {
     out.push({ y: 604, draw: (a) => { const x = 1000; r(x - 1, 570, 3, 34, [110, 70, 40]); r(x - 16, 560, 32, 14, [236, 242, 250]); r(x - 16, 560, 32, 1, K.WHITE); txt('SNOWBALL', x - tw('SNOWBALL') / 2, 562, [90, 130, 230]); txt('FIGHT!', x - tw('FIGHT!') / 2, 568, [214, 44, 56]); const f = WINTER.snowfight; if (f && Date.now() - f.t0 < 90000) lit(() => r(x - 2, 554 - Math.round(Math.abs(Math.sin(a * 5)) * 2), 4, 4, [255, 90, 90])); } });
   }
   if (id === 'park') out.push(snowmanProp);
+  if (id === 'reykjavik') out.push(yuleCatProp);
   for (const [x, y] of XTREES[id] ?? []) out.push({ y, draw: (a) => smallTree(x, y, a) });
   return out;
 }

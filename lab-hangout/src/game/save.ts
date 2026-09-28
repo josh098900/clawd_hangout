@@ -22,6 +22,8 @@ export interface SaveData {
   chem: string[];
   /** SARDINE 1's SEA LIFE LOG: the creatures you've photographed (ids from game/sub.ts LOG; the MARINE BIOLOGIST badge wants all 20). */
   sea: string[];
+  /** THE PASSPORT (step 19): each place you've been stamped at, and the day you first were (days since 1970). Merging keeps the earliest. */
+  stamps: Record<string, number>;
   /** Today's quest progress (see game/quests.ts): the day, and a count per quest. */
   q: { day: string; c: Record<string, number> };
   /** Lifetime counts for badges: commits, pongWins, rides, helped, harvests, quests, tricks. */
@@ -47,9 +49,11 @@ function counts(v: unknown): { day: string; c: Record<string, number> } {
 export function clean(v: unknown): SaveData {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const friends = Array.isArray(o.friends) ? o.friends.filter((f): f is [string, string] => Array.isArray(f) && typeof f[0] === 'string' && f[0].length <= 64 && typeof f[1] === 'string').slice(0, 100).map(([id, nm]) => [id, nm.slice(0, 16)] as [string, string]) : [];
-  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), sky: strs(o.sky, 64, 24), crops: strs(o.crops, 16, 16), places: strs(o.places, 48, 12, /^[a-z]{2,12}$/), chem: strs(o.chem, 32, 16, /^[a-z]{2,16}$/), sea: strs(o.sea, 32, 16, /^[a-z0-9]{2,16}$/), q: counts(o.q), stats: tally(o.stats) };
+  return { unlocks: strs(o.unlocks, 200, 12, ITEM), friends, feeds: n(o.feeds, 1e6), hi: n(o.hi, 1e7), fish: strs(o.fish, 64, 24), stars: strs(o.stars, 64, 24), sky: strs(o.sky, 64, 24), crops: strs(o.crops, 16, 16), places: strs(o.places, 48, 12, /^[a-z]{2,12}$/), chem: strs(o.chem, 32, 16, /^[a-z]{2,16}$/), sea: strs(o.sea, 32, 16, /^[a-z0-9]{2,16}$/), stamps: tally(o.stamps), q: counts(o.q), stats: tally(o.stats) };
 }
 const maxOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = Math.max(o[k] ?? 0, v); return o; };
+/** Keep the earliest of each (a first-visit day), ignoring zeros. */
+const minOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = o[k] && v ? Math.min(o[k], v) : o[k] || v; return o; };
 export function merge(a: SaveData, b: SaveData): SaveData {
   const fr = new Map(a.friends); for (const [id, nm] of b.friends) fr.set(id, nm);
   return {
@@ -57,6 +61,7 @@ export function merge(a: SaveData, b: SaveData): SaveData {
     feeds: Math.max(a.feeds, b.feeds), hi: Math.max(a.hi, b.hi),
     fish: [...new Set([...a.fish, ...b.fish])], stars: [...new Set([...a.stars, ...b.stars])], sky: [...new Set([...a.sky, ...b.sky])], crops: [...new Set([...a.crops, ...b.crops])], places: [...new Set([...a.places, ...b.places])], chem: [...new Set([...a.chem, ...b.chem])], sea: [...new Set([...a.sea, ...b.sea])],
     q: a.q.day === b.q.day ? { day: a.q.day, c: maxOf(a.q.c, b.q.c) } : a.q.day > b.q.day ? a.q : b.q,
+    stamps: minOf(a.stamps, b.stamps),
     stats: maxOf(a.stats, b.stats),
   };
 }

@@ -237,10 +237,21 @@ UP PERISCOPE (the city seen from the sea), tea at the galley. Cartoon troubles (
 SQUID, LIGHTS OUT, a JELLY IN THE INTAKE) the Cap'n sorts out if nobody does; a mission each dive (10 kinds); THE BABY
 OCTOPUS that follows you home; the whale; THE DIVE REPORT and its pay; the ESCAPE HATCH (a rubber ring); a daily quest.
 
+## 19. The Airport + Iceland: push 1 built (waiting for its SQL and Josh's live check)
+Brief: docs/briefs/19-airport-iceland.md ("as built" for push 1). Migration `0025_airport.sql`.
+Josh picked: 4 pushes, the airport first; a tour bus and an ICELAND map page; a free flight every 10 minutes, about 3 minutes
+in the air; Iceland on its own clock, with long nights and the aurora's strength changing night by night.
+**Built, push 1:** the Subway's fifth stop, AIRPORT. THE AIRPORT: check-in (a boarding pass), SECURITY (the X-ray shows what
+you're holding, the arch beeps for metal), the split-flap DEPARTURES board, the aurora forecast TV, DUTY FREE (the NECK PILLOW),
+the café, and GATE A1 with the jet outside on its timetable. LAB AIR: the cabin, the seatbelt sign, PENNY's safety demo and
+drinks trolley, CAPTAIN WINGS on the PA, bumpy air, and the view the whole way. KEFLAVÍK: PASSPORT CONTROL, the carousel, the
+skyr bar, the aurora through the window. REYKJAVÍK, on Iceland's own clock: the rainbow street up to the church and the view
+from its TOWER, the PUFFIN SHOP (the LOPAPEYSA, the VIKING HELMET, furniture), the bakery, the hot dog stand, HARPA, the SUN
+VOYAGER, the elf house, the cat, and the aurora bench and camera. THE PASSPORT (5 stamps now, 17 in all), the map's airport and
+ICELAND page, winter's YULE CAT, three daily quests and two badges.
+**Next: push 2,** THE SOUTH COAST by tour bus (its full brief section first).
+
 ## Later (order to be decided)
-- **19. The Airport:** check-in, a security X-ray that shows what you're holding, a baggage carousel
-  game, a departures board on the clock; each flight opens a new destination (beach island, ski
-  mountain, a city abroad), so it's how the world keeps growing.
 - **20. Carnival on the Pier.**  **21. Mini golf.**
 - **22. One rank for everything:** a lab-coat rank that fishing, mining, karaoke, cooking all feed.
 - **23. World events:** a surprise meteor shower, blackout or pigeon invasion across the server.

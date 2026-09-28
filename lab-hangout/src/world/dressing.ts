@@ -24,6 +24,13 @@ export const LIGHT_LINES: Partial<Record<RoomId, Line[]>> = {
   aquarium: [[4, 340, 176, 340], [344, 336, 548, 336], [556, 336, 756, 336], [776, 318, 1224, 318], [1430, 342, 1700, 342]],
   // SARDINE 1: along the top of the window, between the ribs
   sub: [[156, 331, 300, 331], [320, 331, 466, 331], [534, 331, 680, 331], [700, 331, 846, 331]],
+  // THE AIRPORT: over the trolleys, the check-in desks, security, the shops, and along the top of the big window; the plane: on
+  // the overhead bins; KEFLAVÍK: over the welcome banner, passports and baggage, the skyr bar; REYKJAVÍK: along the houses' eaves
+  airportstn: STATION_LIGHTS,
+  airport: [[14, 362, 180, 362], [190, 364, 560, 364], [600, 364, 880, 364], [1090, 368, 1356, 368], [1370, 350, 1790, 350]],
+  plane: [[204, 360, 580, 360], [580, 360, 956, 360]],
+  kef: [[480, 366, 760, 366], [770, 366, 1160, 366], [1166, 366, 1276, 366]],
+  reykjavik: [[230, 388, 400, 388], [604, 388, 1000, 388], [1004, 388, 1240, 388]],
 };
 
 /** How a season's lights look: bulb colours (in turn), how far they sag, every nth bulb blinks off, the wire. */

@@ -154,5 +154,37 @@ export const SFX = {
   putter: () => { noise(150, 1.2, 0.06, 0.03); tone('square', 68, 58, 0.05, 0.01); },
   creak: () => { tone('sawtooth', 92, 70, 1.3, 0.018); noise(280, 2, 0.9, 0.03); },
   rivet: () => { tone('sine', 2600, 2200, 0.08, 0.04); tone('sine', 2400, 2000, 0.05, 0.03, 0.22); tone('sine', 2300, 1900, 0.04, 0.02, 0.38); },
+  // THE AIRPORT and ICELAND (step 19)
+  /** The seatbelt sign coming on (or the call button). */
+  ding: () => tone('sine', 1175, 1175, 0.45, 0.045),
+  /** The departures board's split flaps clattering over. */
+  flaps: () => { for (let i = 0; i < 10; i++) noise(2400, 4, 0.02, 0.05, i * 0.035); },
+  /** THE ARCH: the metal detector's beep (something metal), or its friendly ding (clear). */
+  archBeep: () => { for (let i = 0; i < 3; i++) tone('square', 1480, 1480, 0.12, 0.03, i * 0.18); },
+  clear: () => tone('triangle', 880, 1320, 0.18, 0.04),
+  /** The X-ray belt's hum as a tray goes through. */
+  hum: () => { tone('sawtooth', 110, 110, 2.6, 0.012); noise(400, 1, 2.6, 0.012); },
+  /** OFFICER GUNNI's stamp coming down: THUMP. */
+  stamp: () => { noise(160, 1, 0.12, 0.2); tone('sine', 90, 50, 0.16, 0.08); },
+  /** The engines: spooling up for the take-off roll, and the roar as it goes. */
+  spool: () => { tone('sawtooth', 120, 420, 3.0, 0.02); noise(900, 0.6, 3.0, 0.03); },
+  roar: () => { noise(300, 0.4, 4.0, 0.08); tone('sawtooth', 70, 90, 4.0, 0.03); },
+  /** The gear coming down (a thunk), and touchdown. */
+  thunk: () => { noise(120, 1, 0.2, 0.14); tone('sine', 70, 40, 0.25, 0.06); },
+  /** The drinks trolley rattling down the aisle. */
+  rattle: () => { for (let i = 0; i < 6; i++) noise(3000, 6, 0.03, 0.03, i * 0.09); },
+  /** The lavatory, doing its thing. */
+  flush: () => { noise(800, 0.5, 1.4, 0.07, 0, 300); tone('sine', 400, 160, 1.2, 0.02, 0.2); },
+  /** The carousel's buzzer as it starts, and the belt's rumble. */
+  buzzer: () => { tone('square', 220, 220, 0.8, 0.03); noise(90, 1, 1.2, 0.04, 0.3); },
+  /** Hallgrimskirkja's organ: one warm chord. */
+  organ: () => [131, 196, 262, 330, 392].forEach((f, i) => { tone('sine', f, f, 2.4, 0.018, i * 0.02); tone('triangle', f * 2, f * 2, 2.2, 0.006, i * 0.02); }),
+  /** The northern lights' shimmer (a soft, high chime that drifts). */
+  shimmer: () => [1568, 2093, 2637, 3136].forEach((f, i) => tone('sine', f, f * 1.01, 1.6, 0.008, i * 0.22)),
+  /** A gull's cry, a cat's purr. */
+  gull: () => { tone('sawtooth', 1400, 900, 0.25, 0.02); tone('sawtooth', 1300, 800, 0.3, 0.018, 0.3); },
+  purr: () => { for (let i = 0; i < 8; i++) tone('sawtooth', 48, 44, 0.09, 0.02, i * 0.1); },
+  /** A camera's click and whirr (the aurora camera). */
+  click: () => { noise(4000, 2, 0.03, 0.12); tone('square', 600, 900, 0.18, 0.012, 0.05); },
   jingleShort: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone('triangle', f, f, 0.16, 0.04, i * 0.07)),
 };

@@ -65,6 +65,11 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 .plate.chem { --pa: rgba(16, 40, 30, .95); --pb: rgba(40, 120, 80, .9); --edge: #B6F25A; --sub: #D8FFC0; --big: #FFFFFF; --glow: 0 3px 0 #0C2818, 0 0 14px rgba(182, 242, 90, .7); }
 .plate.aquarium { --pa: rgba(8, 24, 52, .95); --pb: rgba(30, 110, 170, .9); --edge: #9FEFFF; --sub: #CFF6FF; --big: #FFFFFF; --glow: 0 3px 0 #06183A, 0 0 14px rgba(95, 231, 255, .7); }
 .plate.sub { --pa: rgba(10, 30, 50, .95); --pb: rgba(196, 150, 40, .92); --edge: #F2C230; --sub: #FFF0C0; --big: #FFE27A; --glow: 0 3px 0 #3A2A06, 0 0 14px rgba(242, 194, 48, .7); }
+.plate.airportstn { --pa: rgba(30, 60, 90, .95); --pb: rgba(90, 150, 200, .9); --edge: #E6BE28; --sub: #D6EEF7; --big: #FFFFFF; --glow: 0 3px 0 #10243A, 0 0 14px rgba(160, 210, 255, .6); }
+.plate.airport { --pa: rgba(19, 114, 112, .95); --pb: rgba(242, 140, 40, .9); --edge: #FFD23F; --sub: #E6FFFC; --big: #FFFFFF; --glow: 0 3px 0 #0A3A38, 0 0 14px rgba(76, 198, 194, .7); }
+.plate.plane { --pa: rgba(34, 63, 110, .95); --pb: rgba(70, 121, 191, .9); --edge: #F28C28; --sub: #DDEBFF; --big: #FFFFFF; --glow: 0 3px 0 #101E38, 0 0 14px rgba(120, 170, 255, .6); }
+.plate.kef { --pa: rgba(30, 44, 64, .95); --pb: rgba(60, 111, 176, .9); --edge: #BFE3F2; --sub: #D5DEE8; --big: #FFFFFF; --glow: 0 3px 0 #0E1826, 0 0 14px rgba(191, 227, 242, .6); }
+.plate.reykjavik { --pa: rgba(158, 47, 37, .95); --pb: rgba(47, 140, 138, .9); --edge: #E0B23A; --sub: #FFF0DC; --big: #FFFFFF; --glow: 0 3px 0 #3A120E, 0 0 14px rgba(224, 178, 58, .6); }
 #clawcam { width: 240px; height: 140px; image-rendering: pixelated; border: 3px solid #26282C; box-shadow: 0 0 0 2px #9C7026; background: #081418; }
 
 #deco { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 6px); transform: translateX(-50%); width: min(960px, 96vw); background: rgba(20, 16, 28, .94); border-top: 3px solid #FFD65A; padding: 6px 8px 8px; z-index: 5; display: none; flex-direction: column; gap: 6px; font-family: 'Press Start 2P', ui-monospace, monospace; }
@@ -258,3 +263,7 @@ body:has(#start:not(.hidden)) :is(#bar, #hud, #log) { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   #fade, #toast, #log div { transition: none; }
 }
+/* the map's pages: CITY and ICELAND */
+.maptabs { display: flex; gap: 4px; }
+.maptabs button { font-family: 'Press Start 2P', monospace; font-size: 9px; padding: 7px 12px; border: 0; background: rgba(255, 255, 255, .08); color: #EDE6F4; cursor: pointer; }
+.maptabs button.on { background: #FFD65A; color: #231A30; }

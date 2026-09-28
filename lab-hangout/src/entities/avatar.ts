@@ -42,6 +42,8 @@ export const HOLD_MOONROCK = 18;
 /** The chem lab: a potion in a corked flask, 19-24 (game/chem.ts FX 1-6: TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY). Q drinks it. */
 export const HOLD_POTION = 19;
 export const isPotion = (hold: number): boolean => hold >= HOLD_POTION && hold < HOLD_POTION + 6;
+/** Iceland (step 19): Reykjavík's hot dog (ONE WITH EVERYTHING), a pot of skyr from Keflavík's bar, a cinnamon swirl from the bakery, and your suitcase off the carousel (it rolls behind you; Q puts it away). */
+export const HOLD_PYLSA = 25, HOLD_SKYR = 26, HOLD_SWIRL = 27, HOLD_SUITCASE = 28;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 /**
  * Everything you can hold (MoveMsg.hold): how many sips / bites it has, what the Q button says for it (Q sips it,
@@ -60,6 +62,10 @@ export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 
   [HOLD_SNOWBALL]: { q: 'THROW' },
   [HOLD_MOONROCK]: { q: 'DROP' },
   [HOLD_COCOA]: { uses: 5, q: 'SIP', done: "Cocoa all gone. There's more at the coffee machine" },
+  [HOLD_PYLSA]: { uses: 4, q: 'EAT', done: 'The best hot dog in town. Gone. Worth it.' },
+  [HOLD_SKYR]: { uses: 4, q: 'EAT', done: 'Skyr finished. Very Icelandic of you' },
+  [HOLD_SWIRL]: { uses: 3, q: 'EAT', done: 'Cinnamon swirl gone. Sticky fingers' },
+  [HOLD_SUITCASE]: { q: 'PUT AWAY' },
   ...Object.fromEntries([0, 1, 2, 3, 4, 5].map((k) => [HOLD_POTION + k, { q: 'DRINK' as const }])),
 };
 /** Sips / bites in each thing you can finish. */
@@ -476,6 +482,24 @@ function drawHotdog(x: number, y: number, d: number): void {
   r(X, Y + 1, 10, 4, [226, 170, 100]); r(X, Y + 1, 10, 1, [246, 200, 130]); r(X - 1, Y, 12, 2, [196, 90, 70]); r(X - 1, Y, 12, 1, [226, 120, 90]);
   for (let k = 0; k < 5; k++) r(X + k * 2, Y + (k % 2), 1, 1, [255, 214, 60]);
 }
+/** Reykjavík's hot dog, ONE WITH EVERYTHING: the bun, the sausage, crispy onions on top, and the mustard and remoulade squiggles. */
+function drawPylsa(x: number, y: number, d: number): void {
+  const X = Math.round(x) - (d > 0 ? 1 : 9), Y = Math.round(y) - 3;
+  r(X, Y + 1, 11, 4, [232, 186, 120]); r(X, Y + 1, 11, 1, [248, 214, 150]); r(X - 1, Y, 13, 2, [180, 80, 60]); r(X - 1, Y, 13, 1, [214, 110, 86]);
+  for (let k = 0; k < 6; k++) r(X + k * 2, Y - 1, 1, 1, [150, 96, 40]); // (crispy onions)
+  for (let k = 0; k < 5; k++) r(X + 1 + k * 2, Y + (k % 2), 1, 1, [230, 200, 60]); for (let k = 0; k < 4; k++) r(X + 2 + k * 2, Y + 1 - (k % 2), 1, 1, [244, 236, 190]); // (sweet mustard, remoulade)
+}
+/** A pot of skyr: a little white tub with a blue label and a spoon in it. */
+function drawSkyr(x: number, y: number): void { const X = Math.round(x) - 3, Y = Math.round(y) - 6; r(X, Y, 7, 7, [240, 242, 246]); r(X, Y + 2, 7, 3, [70, 110, 170]); r(X, Y, 7, 1, [255, 255, 255]); r(X + 5, Y - 3, 1, 4, [180, 184, 192]); }
+/** A cinnamon swirl, iced. */
+function drawSwirl(x: number, y: number): void { const X = Math.round(x), Y = Math.round(y) - 3; disc(X, Y, 3, [196, 132, 66]); r(X - 1, Y - 1, 2, 1, [150, 90, 40]); r(X, Y, 2, 1, [150, 90, 40]); r(X - 2, Y - 2, 3, 1, [250, 244, 230]); }
+/** Your suitcase off the carousel, on its wheels: its handle up to your hand, the case trailing behind you on the floor. */
+function drawSuitcase(hx: number, hy: number, av: Avatar, d: number): void {
+  const fy = Math.round(av.y), bx = Math.round(hx) - d * 10, top = fy - 16, c: RGB = BODY[av.look.c]?.c ?? [200, 70, 60];
+  line(Math.round(hx), Math.round(hy), bx, top, [60, 64, 72]); // (the telescopic handle)
+  r(bx - 6, top, 12, 14, c); r(bx - 6, top, 12, 2, M(c, [255, 255, 255], 0.3)); r(bx - 6, top + 6, 12, 1, M(c, [0, 0, 0], 0.3)); r(bx - 1, top + 2, 2, 8, [255, 214, 60]); // (the case, with your yellow ribbon)
+  disc(bx - 4, fy, 1, [30, 30, 36]); disc(bx + 4, fy, 1, [30, 30, 36]);
+}
 /**
  * A kite on a long string from the hand, flying on the shared wind (world/weather.ts) so every
  * browser draws it in the same place without any messages. Colour = the flyer's body colour.
@@ -639,6 +663,10 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_MOONROCK) { const x = Math.round(mx), y = Math.round(my); r(x - 3, y - 1, 7, 3, OUTLINE); r(x - 2, y - 1, 5, 2, MN.REG_DK); lit(() => { r(x - 2, y - 5, 2, 4, MN.CRYSTAL); r(x, y - 7, 2, 6, MN.CRYSTAL); r(x + 2, y - 4, 1, 3, MN.CRYSTAL); r(x, y - 7, 1, 1, MN.CRYSTAL_HI); }); Gd(x, y - 4, 7, MN.CRYSTAL, 0.25); }
     else if (av.hold === HOLD_SNOWBALL) { const x = Math.round(mx), y = Math.round(my); r(x - 2, y - 3, 5, 5, OUTLINE); r(x - 1, y - 2, 3, 3, [240, 244, 250]); r(x - 1, y - 2, 1, 1, K.WHITE); r(x + 1, y, 1, 1, [200, 212, 230]); }
     else if (av.hold === HOLD_KITE) drawKite(mx, my, av, a);
+    else if (av.hold === HOLD_PYLSA) drawPylsa(mx, my, P.dir > 0 ? 1 : -1);
+    else if (av.hold === HOLD_SKYR) drawSkyr(mx, my);
+    else if (av.hold === HOLD_SWIRL) drawSwirl(mx, my);
+    else if (av.hold === HOLD_SUITCASE) drawSuitcase(mx, my, av, P.dir > 0 ? 1 : -1);
     else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);
     else if (isPotion(av.hold)) drawPotion(mx, my, av.hold, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);

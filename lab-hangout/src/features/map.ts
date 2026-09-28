@@ -4,6 +4,8 @@
 //   * Space keeps its rides: from Earth, ORBIT or the Moon take you to the Rooftop's spaceport (the card says
 //     when the rocket boards); from the station, the Moon takes you to the LANDER BAY, and Earth to the rocket's
 //     hatch (or down the ESCAPE POD, straight to the Park); from the Moon, anywhere else is the lander's pad.
+//   * So does ICELAND (the map's other page): from anywhere on Earth it's LAB AIR from the AIRPORT's GATE A1, and
+//     from Iceland, anywhere else is the flight home from Keflavík's GATE D4.
 //   * Leaving by map is leaving by a door (game.leaveTo: the buggy parks itself, the kite goes back...).
 //   * Your save keeps the places you've been: the ? stickers, and the EXPLORER badge.
 // The WHO'S ONLINE "GO" button goes by the same rules (goToRoom).
@@ -16,6 +18,9 @@ import { placeOfRoom } from '../game/places';
 import { quests } from '../game/quests';
 import { save } from '../game/save';
 import { placeById, type Zone } from '../world/map';
+import type { MapPage } from '../world/mapmarks';
+import { AIR_ARRIVE, TOUCH_S, air, closesIn, doorOpenAt, flying, nextBoarding, type AirEnd } from '../game/air';
+import { auroraNow, forecast, iceDay, iceP, iceWeather } from '../world/iceland';
 import { CYCLE, DEPART, DOCK_ARRIVE, LAND, PAD_ARRIVE, UP_S, flight } from '../world/space';
 import { L_CYCLE, L_TOUCH, MOON_PAD_ARRIVE, lander } from '../world/moon';
 import { LANDER_BAY_ARRIVE } from '../world/lander';
@@ -45,6 +50,7 @@ export type Route = { ok: true; to: RoomId; at: At | null; note: string; ride: b
 const VIA: Partial<Record<RoomId, RoomId>> = {
   lab: 'plaza', den: 'lab', roof: 'den', plaza: 'lab', arcade: 'plaza', cinema: 'plaza', stage: 'plaza', subway: 'plaza', crypt: 'plaza', lofts: 'plaza', pier: 'plaza',
   park: 'parkstn', parkstn: 'park', diner: 'dinerstn', dinerstn: 'diner', karts: 'kartstn', kartstn: 'karts', station: 'spacewalk', moon: 'moonbase', moonbase: 'moon', wing: 'lab', reactor: 'wing', chem: 'wing', aquarium: 'pier',
+  airport: 'airportstn', airportstn: 'airport', kef: 'reykjavik', reykjavik: 'kef',
 };
 function frontDoor(id: RoomId): At | null {
   const from = VIA[id], d = from ? game.rooms[from].doors.find((x) => x.to === id) : undefined;
@@ -53,9 +59,11 @@ function frontDoor(id: RoomId): At | null {
 /** The ESCAPE POD's landing spot in the Park (the station's pod door). */
 function podLanding(): At | null { return game.rooms.station.doors.find((d) => d.to === 'park')?.arrive ?? null; }
 
-/** Where you are, as far as the map's concerned: on Earth, up in orbit, on the Moon, or mid-flight in the rocket or the lander. */
+/** Where you are, as far as the map's concerned: on Earth, up in orbit, on the Moon, in Iceland, or mid-flight in the rocket, the lander or LAB AIR (the plane counts from its doors shutting to their opening at the other end). */
 export function zoneNow(): Zone | 'flying' {
   const id = game.room.id;
+  if (id === 'plane') { const A = air(); return doorOpenAt('city', A) ? 'earth' : doorOpenAt('kef', A) ? 'iceland' : 'flying'; }
+  if (id === 'kef' || id === 'reykjavik') return 'iceland';
   if (id === 'rocket') { const p = flight().phase; return p === 'pad' ? 'earth' : p === 'docked' ? 'orbit' : 'flying'; }
   if (id === 'lander') { const p = lander().phase; return p === 'docked' ? 'orbit' : p === 'landed' ? 'moon' : 'flying'; }
   if (id === 'station' || id === 'spacewalk') return 'orbit';
@@ -73,11 +81,14 @@ export function landerOut(): string { const f = lander(); return f.phase === 'do
 /** From the Moon: when the lander lifts off. */
 export function landerHome(): string { const f = lander(); return f.phase === 'landed' ? 'BOARDING NOW · LIFTS OFF IN ' + mmss(f.left) : 'LANDS IN ' + mmss(f.k < L_TOUCH ? L_TOUCH - f.k : L_CYCLE - f.k + L_TOUCH); }
 
+/** From an airport (`end`): when LAB AIR boards there (or its doors close, if it's boarding now). */
+export function planeOut(end: AirEnd): string { const A = air(); return doorOpenAt(end, A) ? 'BOARDING NOW · DOORS CLOSE IN ' + mmss(closesIn(end, A)) : 'NEXT FLIGHT BOARDS IN ' + mmss(nextBoarding(end)); }
+
 /** Why you can't use the map to go anywhere right now (null: you can). */
 export function blockedWhy(): string | null {
   if (!game.playing || game.editing) return 'Not yet!';
   if (game.switching) return 'Hold on, still getting there...';
-  if (zoneNow() === 'flying') return "You're mid-flight! Wait until you've landed";
+  if (zoneNow() === 'flying') return game.room.id === 'plane' && !flying(air()) ? "The doors are shut! You can get off at the gate" : "You're mid-flight! Wait until you've landed";
   if (game.room.id === 'sub' && !hatchOpen()) return "You're on a dive! SARDINE 1 surfaces in " + mmss(backIn()) + ', or use the ESCAPE HATCH';
   if (hsFrozen()) return "You're IT: count first, then go and find them!";
   if (game.me.pose === POSE_BOAT) return 'Row back to the jetty first';
@@ -96,6 +107,9 @@ export function routeTo(id: RoomId, pod = false): Route {
     if (placeOfRoom(here) === id && !isFlat(here)) return { ok: false, why: 'You\'re already here!' };
     return { ok: true, to: id, at: frontDoor(id), note: 'WALK IN', ride: false };
   }
+  if (here === 'plane' && ((z === 'earth' && pl.zone === 'iceland') || (z === 'iceland' && pl.zone !== 'iceland'))) { const end: AirEnd = z === 'earth' ? 'city' : 'kef'; return { ok: false, why: 'You\'re on it! This flight goes ' + (end === 'city' ? 'to Iceland' : 'home') + ': the doors close in ' + mmss(closesIn(end)) }; }
+  if (z === 'earth' && pl.zone === 'iceland') return { ok: true, to: 'airport', at: AIR_ARRIVE.gate, note: 'BY PLANE · ' + planeOut('city'), ride: true };
+  if (z === 'iceland') return { ok: true, to: 'kef', at: AIR_ARRIVE.kef, note: 'BY PLANE HOME · ' + planeOut('kef'), ride: true };
   if (z === 'earth') return { ok: true, to: 'roof', at: PAD_ARRIVE, note: 'BY ROCKET · ' + rocketUp(), ride: true };
   if (z === 'orbit') {
     if (pl.zone === 'moon') return { ok: true, to: 'station', at: LANDER_BAY_ARRIVE, note: 'BY LANDER · ' + landerOut(), ride: true };
@@ -112,6 +126,7 @@ export function placeForPerson(room: RoomId): RoomId {
   if (room === 'rocket') return flight().phase === 'pad' ? 'roof' : 'station';
   if (room === 'lander') return lander().phase === 'landed' ? 'moon' : 'station';
   if (room === 'sub') return 'aquarium';
+  if (room === 'plane') { const A = air(); return doorOpenAt('city', A) ? 'airport' : doorOpenAt('kef', A) ? 'kef' : A.to === 'kef' ? 'kef' : 'airport'; }
   return room;
 }
 /** Go by route `rt`: through a door, as it were. A ride's door says when it goes. */
@@ -126,6 +141,7 @@ export function goToRoom(room: RoomId): void {
   if (!rt.ok) { toast(rt.why); return; }
   if (isFlat(room)) setTimeout(() => toast('They\'re in a flat: take the LIFT to knock', 4000), 450);
   if (room === 'sub') { setTimeout(() => toast(hatchOpen() ? 'They\'re aboard SARDINE 1: it\'s boarding, up the gangway!' : 'They\'re on a dive in SARDINE 1: back in ' + mmss(backIn()), 4500), 450); travel({ ...rt, at: PEN_ARRIVE }); return; }
+  if (room === 'plane') { const A = air(), open = doorOpenAt('city', A) || doorOpenAt('kef', A); setTimeout(() => toast(open ? 'They\'re on LAB AIR: it\'s boarding, walk on at the gate!' : 'They\'re flying to ' + (A.to === 'kef' ? 'Iceland' : 'the city') + ': they land in ' + mmss(Math.max(0, TOUCH_S - A.k)), 4500), 450); }
   travel(rt);
 }
 
@@ -163,9 +179,9 @@ const seenCol = new Map<string, RGB>();
 const CREAM: RGB = [232, 216, 192];
 const previews = new Map<string, HTMLCanvasElement>();
 /** Where each place's little look inside is centred (x), when the middle of the room isn't its best side. */
-const LOOK_X: Partial<Record<RoomId, number>> = { plaza: 560, roof: 1500, station: 900, lofts: 495, pier: 700, park: 700, karts: 600, moon: 700, diner: 500, reactor: 1000, chem: 636, aquarium: 1000, subway: 600, parkstn: 600, dinerstn: 600, kartstn: 600 };
+const LOOK_X: Partial<Record<RoomId, number>> = { plaza: 560, roof: 1500, station: 900, lofts: 495, pier: 700, park: 700, karts: 600, moon: 700, diner: 500, reactor: 1000, chem: 636, aquarium: 1000, subway: 600, parkstn: 600, dinerstn: 600, kartstn: 600, airportstn: 600, airport: 1600, kef: 1000, reykjavik: 700 };
 /** ...and how much higher than usual, where a room's best bits are up on the wall (a platform's name board, the Lofts' directory). */
-const LOOK_UP: Partial<Record<RoomId, number>> = { subway: 44, parkstn: 44, dinerstn: 44, kartstn: 44, lofts: 44 };
+const LOOK_UP: Partial<Record<RoomId, number>> = { subway: 44, parkstn: 44, dinerstn: 44, kartstn: 44, airportstn: 44, lofts: 44 };
 /** A little look inside a place, as it is right now: its wall and floor edge (the detailed part) with everything
  * that moves and stands there, and its lights, drawn off-screen the way the game draws a room, then shrunk. */
 export function preview(id: RoomId): HTMLCanvasElement | null {
@@ -177,7 +193,7 @@ export function preview(id: RoomId): HTMLCanvasElement | null {
   const g = full.getContext('2d')!, gg = glow.getContext('2d')!;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, sw, sh); g.globalAlpha = 1; g.imageSmoothingEnabled = false;
   gg.setTransform(1, 0, 0, 1, 0, 0); gg.globalCompositeOperation = 'source-over'; gg.clearRect(0, 0, glow.width, glow.height); gg.setTransform(0.5, 0, 0, 0.5, -sx / 2, -sy / 2); gg.globalCompositeOperation = 'lighter';
-  const keep = { ctx: PX.ctx, glow: PX.glow, dim: PX.dim, emit: PX.emit, fl: PX.fl, gmul: PX.gmul };
+  const keep = { ctx: PX.ctx, glow: PX.glow, dim: PX.dim, emit: PX.emit, fl: PX.fl, gmul: PX.gmul }, unlook = rm.lookAt?.(sx, sx + sw, sy, sy + sh);
   try {
     PX.glow = gg; PX.dim = rm.dimNow?.() ?? rm.dim; PX.emit = false; PX.fl = 0; PX.gmul = rm.glowMul?.() ?? 1;
     withCtx(g, () => {
@@ -185,17 +201,29 @@ export function preview(id: RoomId): HTMLCanvasElement | null {
       g.drawImage(rm.bg, 0, 0); const k = rm.altAlpha?.() ?? 0; if (rm.bgAlt && k > 0.001) { g.globalAlpha = k; g.drawImage(rm.bgAlt, 0, 0); g.globalAlpha = 1; }
       rm.drawBack(a); for (const pr of [...rm.props].sort((p, q) => p.y - q.y)) pr.draw(a); rm.drawFront?.(a);
     });
-  } catch (e) { console.warn('[map preview]', id, e); } finally { Object.assign(PX, keep); g.setTransform(1, 0, 0, 1, 0, 0); gg.setTransform(1, 0, 0, 1, 0, 0); gg.globalCompositeOperation = 'source-over'; }
+  } catch (e) { console.warn('[map preview]', id, e); } finally { unlook?.(); Object.assign(PX, keep); g.setTransform(1, 0, 0, 1, 0, 0); gg.setTransform(1, 0, 0, 1, 0, 0); gg.globalCompositeOperation = 'source-over'; }
   // its lights: blurred and screened over, like the game's glow layer
   g.globalCompositeOperation = 'screen'; g.globalAlpha = 0.85; g.filter = 'blur(1px)'; g.imageSmoothingEnabled = true; g.drawImage(glow, 0, 0, glow.width, glow.height, 0, 0, sw, sh); g.filter = 'none'; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   const c = mk(156, Math.round(156 * sh / sw)), cg = c.getContext('2d')!; cg.imageSmoothingEnabled = false; cg.drawImage(full, 0, 0, c.width, c.height);
   return c;
 }
-/** The line under the map's title: the server, the time of day, the weather, the season. */
-function statusLine(server: string): string {
+/** The line under the map's title: the server, the time of day, the weather, the season (in Iceland: its own clock and weather, and the lights). */
+function statusLine(server: string, page: MapPage): string {
+  if (page === 'iceland') {
+    const d = iceDay(), p = iceP(), w = iceWeather(), au = auroraNow(), fc = forecast();
+    const time = d <= 0.01 ? 'NIGHT' : d >= 0.99 ? 'DAY' : p < 0.6 ? 'DAWN' : 'DUSK';
+    return [server, time, w.kind !== 'clear' && w.k > 0.3 ? w.kind.toUpperCase() : 'CLEAR SKIES', au.vis > 0.3 ? 'NORTHERN LIGHTS OUT NOW!' : 'AURORA: ' + fc.verdict].join(' · ');
+  }
   const p = (Date.now() / 1000 / 1200) % 1, d = dayness(), w = weather();
   const time = d <= 0.01 ? 'NIGHT' : d >= 0.99 ? 'DAY' : p < 0.6 ? 'DAWN' : 'DUSK';
   return [server, time, w.kind !== 'clear' && w.k > 0.3 ? w.kind.toUpperCase() : 'CLEAR SKIES', isHalloween() ? 'HALLOWEEN' : isWinter() ? 'WINTER' : ''].filter(Boolean).join(' · ');
+}
+/** The page the map opens on: ICELAND when you're there (or on your way, or at its boards). */
+function pageNow(board: RoomId | null): MapPage {
+  const id = game.room.id;
+  if (board === 'kef' || board === 'reykjavik' || zoneNow() === 'iceland') return 'iceland';
+  if (id === 'plane') { const A = air(); return doorOpenAt('city', A) ? 'city' : A.to === 'kef' || doorOpenAt('kef', A) ? 'iceland' : 'city'; }
+  return 'city';
 }
 
 /**
@@ -209,8 +237,8 @@ export function openCityMap(board: RoomId | null, friends: Map<string, string>, 
   if (ids.length) game.net.api.flats.doors(ids).then((ds) => { const now = Date.now() / 1000; lofts.parties = ds.filter((d) => d.party && d.party > now && d.can).map((d) => ({ id: d.owner, name: game.lobby.find((p) => p.id === d.owner)?.name ?? d.name })); }).catch(() => {});
   const inPlace = (id: RoomId) => game.lobby.filter((p) => placeOfRoom(p.room) === id || (id === 'station' && p.room === 'spacewalk'));
   openMapPanel({
-    board, touch: game.isTouch,
-    status: () => statusLine(server || 'LAB HANGOUT'),
+    board, touch: game.isTouch, page: pageNow(board),
+    status: (page) => statusLine(server || 'LAB HANGOUT', page),
     live: () => {
       for (const o of game.others.values()) seenCol.set(o.id, BODY[o.look.c]?.c ?? CREAM);
       const hiding = !!hsOn();
@@ -230,6 +258,7 @@ export function openCityMap(board: RoomId | null, friends: Map<string, string>, 
       if (id === 'lofts' && z === 'earth' && !blockedWhy()) { extras.push({ label: 'YOUR FLAT', run: () => void goHome() }); for (const p of lofts.parties.slice(0, 2)) extras.push({ label: 'PARTY: ' + p.name.toUpperCase(), run: () => void visitFlat(p.id) }); }
       if (z === 'orbit' && pl.zone === 'earth' && !blockedWhy()) { const pod = routeTo(id, true); if (pod.ok) extras.push({ label: 'ESCAPE POD', run: () => travel(pod) }); }
       if (id === 'aquarium' && rt.ok && !rt.ride) { const r2 = rt; extras.push({ label: hatchOpen() ? 'SARDINE 1: BOARDING NOW' : 'SARDINE 1: BACK IN ' + mmss(backIn()), run: () => travel({ ...r2, at: PEN_ARRIVE }) }); }
+      if ((id === 'airport' || id === 'kef') && rt.ok && !rt.ride) { const r2 = rt, end: AirEnd = id === 'airport' ? 'city' : 'kef'; extras.push({ label: (end === 'city' ? 'GATE A1: ' : 'GATE D4: ') + (doorOpenAt(end) ? 'BOARDING NOW' : 'BOARDS IN ' + mmss(nextBoarding(end))), run: () => travel({ ...r2, at: end === 'city' ? AIR_ARRIVE.gate : AIR_ARRIVE.kef }) }); }
       return { cls: id, sub: rm.sub, title: pl.name, preview: () => preview(id), people, route: rt, extras };
     },
     go: (rt) => travel(rt),

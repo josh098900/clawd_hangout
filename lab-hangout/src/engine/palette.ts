@@ -206,6 +206,37 @@ export const BODY: { name: string; c: RGB }[] = [
   { name: 'CLAY', c: hex('#D97757') },
 ];
 
+/** THE AIRPORT (step 19): pale terrazzo, white walls, tall glass, LAB AIR's teal and orange, yellow-on-charcoal signs, the apron outside. */
+export const AP = table({
+  FLOOR: '#E6E2D8', FLOOR2: '#DAD5C9', FLOOR_DK: '#C4BEB0', SPECK: '#B5AE9E', INLAY: '#C9A24A', INLAY_HI: '#E8C877',
+  WALL: '#F2F0EA', WALL2: '#E4E1D8', WALL_DK: '#C9C5BA', CEIL: '#D8DCE0', TRUSS: '#B8BEC6', TRUSS_DK: '#8F97A1', SKYPANE: '#BFD9EE',
+  TEAL: '#1FA3A0', TEAL_HI: '#4CC6C2', TEAL_DK: '#137270', ORANGE: '#F28C28', ORANGE_HI: '#FFB45A', ORANGE_DK: '#C0621A',
+  SIGN: '#2B2D33', SIGN_HI: '#40434B', SIGN_TXT: '#FFD23F', DESK: '#F7F5F0', DESK_DK: '#D9D4C8', DESK_EDGE: '#B7B0A1',
+  STEEL: '#9AA3AD', STEEL_HI: '#C7CED6', STEEL_DK: '#6B737D', GLASS: '#9CCBE0', GLASS_HI: '#D6EEF7', GLASS_DK: '#6FA3BC',
+  CARPET: '#2E6F7A', CARPET2: '#285F69', CARPET_DOT: '#E8923A', SEAT: '#3A4452', SEAT_HI: '#56627A', SEAT_DK: '#262D37',
+  TARMAC: '#6E7277', TARMAC2: '#62666B', LINE_Y: '#F2C230', GRASS: '#6F9A4E', GRASS_DK: '#56793C',
+  BELT: '#2A2C31', RUBBER: '#1E1F23', XRAY: '#0A1A1E', XRAY_OR: '#F29A3A', XRAY_GR: '#5FE08A', XRAY_BL: '#4A8CF0',
+});
+/** LAB AIR 101's cabin: cream walls and bins, blue seats with orange headrest covers, a patterned carpet, the galleys' steel. */
+export const PL = table({
+  WALL: '#EDE8DC', WALL2: '#E0DACB', WALL_DK: '#C7BFAE', BIN: '#F4F1EA', BIN_DK: '#D8D2C4', BIN_EDGE: '#B8B0A0',
+  SEAT: '#2F5E9E', SEAT_HI: '#4679BF', SEAT_DK: '#223F6E', HEAD: '#F28C28', HEAD_HI: '#FFB45A',
+  CARPET: '#3B4A63', CARPET2: '#34425A', CARPET_DOT: '#5E7196', GALLEY: '#C9CDD3', GALLEY_HI: '#E6E9ED', GALLEY_DK: '#9AA0A8',
+  FRAME: '#D9D3C6', FRAME_DK: '#8E8778', SHADE: '#F4F0E6', LED: '#DDEBFF', NIGHT_LED: '#3E5BB8', TROLLEY: '#B9BEC6', EXIT: '#39D98A',
+  FUSE: '#F4F5F7', FUSE_DK: '#C9CDD4', TAIL: '#1FA3A0', STRIPE: '#F28C28',
+});
+/** ICELAND: basalt and moss, black sand, snow and ice, the town's painted houses and roofs, the church's pale concrete, the sea and sky. */
+export const IS = table({
+  BASALT: '#3F4246', BASALT_HI: '#5A5E64', BASALT_DK: '#2A2C30', MOSS: '#7FA35A', MOSS_DK: '#5C7D40', LAVA: '#2E2C2B', BLACKSAND: '#26262A',
+  SNOW: '#F2F5F8', SNOW_DK: '#D5DEE8', ICE: '#BFE3F2', ICE_DK: '#7FB8D6',
+  RED: '#C8402F', MUSTARD: '#E0B23A', TEAL: '#2F8C8A', WHITE: '#EEEDE8', BLACK: '#2A2A2E', BLUE: '#3C6FB0', GREEN: '#5E9A5A',
+  ROOF_RED: '#9E2F25', ROOF_GREEN: '#4E7A45', ROOF_GREY: '#6B7078', ROOF_BLACK: '#232428',
+  CHURCH: '#CFCBC2', CHURCH_HI: '#E4E1DA', CHURCH_DK: '#A8A399', STREET: '#55585E', STREET2: '#4C4F55', KERB: '#8C8F94', PAVE: '#9A9DA2', PAVE2: '#8F9297',
+  SEA: '#2C5E80', SEA_DK: '#1E4560', SEA_NIGHT: '#0F2236', FOAM: '#DCEAF2',
+  SKY: '#8FC0E2', SKY_LO: '#D6E8F2', SKY_NIGHT: '#050C1A', SKY_NIGHT_LO: '#11213A', GOLD: '#F6B26B', PINK: '#E98A8A',
+  MOUNTAIN: '#4B5968', MOUNTAIN_DK: '#35404D', HARPA: '#4F7C99', HARPA_HI: '#9CC6DE', HARPA_DK: '#2E4C63', STEEL: '#B9C0C8', STEEL_DK: '#7E8791',
+  BIRCH: '#E8DCC4', BIRCH_DK: '#CDBE9F', SLATE: '#5A5F66', SLATE2: '#50555C', WOOL: '#EFE7D6', WOOL_DK: '#6B5A4A',
+});
 /** Tiny confetti/particle palette (from the film's finale). */
 export const CONFETTI: RGB[] = [hex('#FFB35C'), hex('#7B61FF'), hex('#22C5A0'), hex('#5AD1FF'), hex('#FFD65A'), hex('#E86A92')];
 

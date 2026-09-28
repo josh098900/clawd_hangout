@@ -33,11 +33,11 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'], sub: ['sub', 'makeSub'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'], sub: ['sub', 'makeSub'], airport: ['airport', 'makeAirport'], plane: ['plane', 'makePlane'], kef: ['kef', 'makeKef'], reykjavik: ['reykjavik', 'makeReykjavik'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
-  rooms.subway = sub.makeStation(0); rooms.parkstn = sub.makeStation(1); rooms.dinerstn = sub.makeStation(2); rooms.kartstn = sub.makeStation(3); rooms.train = sub.makeTrain();
+  rooms.subway = sub.makeStation(0); rooms.parkstn = sub.makeStation(1); rooms.dinerstn = sub.makeStation(2); rooms.kartstn = sub.makeStation(3); rooms.airportstn = sub.makeStation(4); rooms.train = sub.makeTrain();
   for (const f of ['flat', 'flatbed', 'flatkit']) rooms[f] = flat.makeFlatRoom(f);
   const out = {};
   const A = 12.345;
@@ -110,6 +110,44 @@ const res = await p.evaluate(async () => {
     people: [{ id: 'a', name: 'SAM', col: [232, 216, 192], friend: true, room: 'pier' }, { id: 'b', name: 'ALEX', col: [90, 209, 255], friend: false, room: 'pier' }, { id: 'c', name: 'JO', col: [242, 194, 48], friend: false, room: 'train' }, { id: 'd', name: 'MO', col: [230, 86, 79], friend: true, room: 'moonbase' }, { id: 'e', name: 'KIT', col: [150, 210, 70], friend: false, room: 'flat' }] };
   for (const sn of [null, 'halloween', 'winter']) { season.setSeason(sn); out['map:live' + (sn ? ':' + sn : '')] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => mp.drawMapLive(mapLive)); }
   out['map:hiding'] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => mp.drawMapLive({ ...mapLive, hiding: true, hover: 'spacewalk', pin: null, board: null }));
+  // THE AIRPORT and ICELAND (step 19): LAB AIR at each point of its 10 minutes, seen through the terminal's window, KEF's window and the
+  // cabin's (the moving map, the seatbelt signs, PENNY's trolley, a bumpy leg with the masks down); the carousel's bags, the X-ray and the
+  // arch; REYKJAVÍK by night (each strength of aurora), dawn, day and dusk, and in each of Iceland's weathers; the map's ICELAND page and
+  // the plane on the city's; the view from the top of the church
+  season.setSeason(null);
+  { const airG = await import('/src/game/air.ts'), iceW = await import('/src/world/iceland.ts'), aprW = await import('/src/world/airport.ts'), planeW = await import('/src/world/plane.ts'), kefW = await import('/src/world/kef.ts'), rvkW = await import('/src/world/reykjavik.ts'), icm = await import('/src/world/icemap.ts'), pass = await import('/src/ui/passport.ts');
+    const atK = (k) => { airG.AIR.skew = 0; airG.AIR.skew = k - (airG.airT() % 600); };
+    const iceAt = (p, kp, sky) => { iceW.ICE.skew = 0; const p0 = iceW.iceP(); iceW.ICE.skew = ((p - p0 + 1) % 1) * 1200; if (kp !== undefined) for (let s = 0; s < 400 && iceW.kpOf(iceW.tonight()) !== kp; s++) iceW.ICE.skew += 1200; iceW.forceIceWeather(sky); };
+    const sceneOf = (room) => () => { room.drawBack(A); for (const pr of [...room.props].sort((p, q) => p.y - q.y)) pr.draw(A); room.drawFront?.(A); };
+    iceAt(0.7, undefined, 'clear');
+    for (const k of [30, 95, 110, 120, 140, 585, 595]) { atK(k); out['airport:jet:' + k] = draw(rooms.airport, sceneOf(rooms.airport)); }
+    for (const k of [285, 295, 330, 395, 420, 440]) { atK(k); out['kef:jet:' + k] = draw(rooms.kef, sceneOf(rooms.kef)); }
+    for (const k of [30, 95, 110, 120, 140, 200, 270, 292, 330]) { atK(k); out['plane:' + k] = draw(rooms.plane, sceneOf(rooms.plane)); }
+    { let n = 0; while (!(airG.masksDrop(n) && n % 2 === 0)) n++; const [t0] = airG.turbWindow(n); airG.AIR.skew = 0; airG.AIR.skew = n * 300 + t0 + 3 - airG.airT(); out['plane:masks'] = draw(rooms.plane, sceneOf(rooms.plane)); }
+    atK(200); planeW.PLANEW.penny = { x: 500, y: 530 }; out['plane:trolley'] = draw(rooms.plane, sceneOf(rooms.plane)); planeW.PLANEW.penny = null;
+    kefW.KEFW.bags = [{ u: 0.1, col: [200, 70, 60], mine: false }, { u: 0.3, col: [60, 110, 200], mine: true }, { u: 0.55, col: [0, 0, 0], mine: false, odd: 'kayak' }, { u: 0.85, col: [0, 0, 0], mine: false, odd: 'cooler' }]; kefW.KEFW.stamp = performance.now() / 1000 - 0.1;
+    atK(330); out['kef:bags'] = draw(rooms.kef, sceneOf(rooms.kef)); kefW.KEFW.bags = []; kefW.KEFW.stamp = -99;
+    aprW.AIRW.xray = { hold: 19, t0: performance.now() / 1000 - 1 }; aprW.AIRW.arch = { t: performance.now() / 1000 - 0.3, beep: true }; atK(200); out['airport:security'] = draw(rooms.airport, sceneOf(rooms.airport));
+    aprW.AIRW.xray = { hold: -1, t0: -99 }; aprW.AIRW.arch = { t: -99, beep: false };
+    for (const [name, p, kp, sky] of [['night0', 0.2, 0, 'clear'], ['night4', 0.2, 4, 'clear'], ['night6', 0.2, 6, 'clear'], ['storm', 0.2, 8, 'clear'], ['dawn', 0.5, undefined, 'clear'], ['day', 0.7, undefined, 'clear'], ['dusk', 0.93, undefined, 'clear'], ['snow', 0.2, 6, 'snow'], ['cloudy', 0.7, undefined, 'cloudy'], ['drizzle', 0.7, undefined, 'drizzle'], ['gale', 0.7, undefined, 'gale']]) { iceAt(p, kp, sky); out['reykjavik:' + name] = draw(rooms.reykjavik, sceneOf(rooms.reykjavik)); }
+    iceAt(0.2, 6, 'clear'); rvkW.REYKW.elfOpen = performance.now() / 1000 - 1; rvkW.REYKW.pet = performance.now() / 1000 - 0.5; out['reykjavik:elf'] = draw(rooms.reykjavik, sceneOf(rooms.reykjavik)); rvkW.REYKW.elfOpen = -99; rvkW.REYKW.pet = -99;
+    for (const day of [false, true]) { const c = px.mk(mp.MAP_W, mp.MAP_H); icm.paintIceland(c.getContext('2d'), day); out['icemap:' + (day ? 'day' : 'night')] = H(c); }
+    const iceLive = { ...mapLive, me: { col: [34, 197, 160], room: 'reykjavik' }, hover: 'kef', pin: null, board: 'reykjavik', seen: new Set(['kef']), people: [{ id: 'a', name: 'SAM', col: [232, 216, 192], friend: true, room: 'plane' }, { id: 'b', name: 'ALEX', col: [90, 209, 255], friend: false, room: 'kef' }] };
+    for (const [name, k, p, kp, sky, hov] of [['in', 250, 0.2, 6, 'clear', null], ['kef', 330, 0.7, undefined, 'clear', 'skoga'], ['out', 440, 0.2, 8, 'snow', null], ['gale', 200, 0.7, undefined, 'gale', 'geysir'], ['drizzle', 200, 0.7, undefined, 'drizzle', null]]) { atK(k); iceAt(p, kp, sky); out['icemap:live:' + name] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => icm.drawIcelandLive(iceLive, hov)); }
+    for (const k of [30, 105, 120, 135, 580, 595]) { atK(k); out['map:jet:' + k] = draw({ w: mp.MAP_W, h: mp.MAP_H, dim: 0 }, () => mp.drawMapLive({ ...mapLive, people: [{ id: 'a', name: 'SAM', col: [232, 216, 192], friend: true, room: 'plane' }] })); }
+    for (const [name, p, kp] of [['day', 0.7], ['night', 0.2, 6]]) { iceAt(p, kp, 'clear'); out['tower:' + name] = draw({ w: 640, h: 90, dim: 0 }, () => { for (let i = 0; i < 4; i++) { const g = px.PX.ctx; g.save(); g.translate(i * 160, 0); pass.towerView(i * 160, A); g.restore(); } }); }
+    // LAB AIR's timetable, every second of its 10 minutes: the phases known, the doors open at one end at a time and never in the
+    // air, the route and the height in bounds; 10,000 legs' bumpy air inside the cruise; and Iceland's weather and KP tables
+    const PH = ['board', 'push', 'taxi', 'roll', 'climb', 'cruise', 'descend', 'land']; let bad = 0, sig = '';
+    for (let k = 0; k < 600; k++) { const a = airG.airAt(k + 0.5), open = airG.doorOpenAt('city', a) || airG.doorOpenAt('kef', a);
+      if (!PH.includes(a.phase) || !(a.u >= 0 && a.u <= 1) || !(a.alt >= 0 && a.alt <= 1) || (open && airG.flying(a)) || (airG.doorOpenAt('city', a) && airG.doorOpenAt('kef', a)) || (airG.flying(a) && (airG.onGroundAt('city', a) || airG.onGroundAt('kef', a)))) bad++;
+      sig += a.phase[0] + (open ? 'o' : '') + Math.round(a.u * 9) + Math.round(a.alt * 9); }
+    let tsig = 0; for (let n = 0; n < 10000; n++) { const w = airG.turbWindow(n); if (w && !(w[0] >= airG.CRUISE_S && w[1] <= airG.DESCEND_S)) bad++; tsig = (tsig * 31 + (w ? w[0] * 17 + w[1] : 1) + (airG.masksDrop(n) ? 7 : 0)) >>> 0; }
+    if (bad) throw new Error('LAB AIR: ' + bad + ' bad seconds / legs in the timetable');
+    out.air = sig.length + ':' + [...sig].reduce((x, ch) => (x * 31 + ch.charCodeAt(0)) >>> 0, 0) + ':' + tsig;
+    let ws = 0, ks = 0; for (let s2 = 0; s2 < 3000; s2++) ws = (ws * 31 + iceW.iceRoll(s2)) >>> 0; for (let n = 0; n < 3000; n++) { const kp = iceW.kpOf(n); if (!(kp >= 0 && kp <= 9)) throw new Error('KP ' + kp); ks = (ks * 31 + kp) >>> 0; }
+    out.ice = ws + ':' + ks;
+    airG.AIR.skew = 0; iceW.ICE.skew = 0; iceW.forceIceWeather(null); }
   season.setSeason('halloween');
   // pure maths
   const wx = await import('/src/world/weather.ts'), dn = await import('/src/game/diner.ts'), kt = await import('/src/game/kart.ts'), sp = await import('/src/world/space.ts'), ct = await import('/src/world/contest.ts'), gd = await import('/src/world/garden.ts'), fm = await import('/src/engine/format.ts');
@@ -206,6 +244,8 @@ Object.assign(res, await p2.evaluate(async () => {
   };
   const L = (n) => Array.from({ length: n }, (_, i) => i);
   await grid('holds', L(18).map((h) => [{}, (a) => { a.hold = h; }]));
+  await grid('holds25', [25, 26, 27, 28].map((h) => [{}, (a) => { a.hold = h; }])); // (step 19: a hot dog, a skyr, a cinnamon swirl, a suitcase)
+  await grid('airpose', ['checkin', 'xray', 'forecast', 'lav', 'drinks', 'passport', 'carousel', 'skyr', 'pylsa', 'bakery', 'tower', 'voyager', 'auroracam', 'cat', 'elf'].map((u) => [{}, (a) => { a.use = 0; }, u]));
   await grid('poses', L(6).map((pz) => [{}, (a) => { a.pose = pz; }]).concat(['sit', 'desk', 'instrument', 'hammock', 'scope', 'rack', 'board', 'coffee', 'arcade', 'kart', 'mission'].map((u) => [{}, (a) => { a.use = 0; }, u])));
   await grid('moving', L(12).map((i) => [{ c: i % 9 }, (a) => { a.moving = true; a.walkDist = i * 7; a.dir = i % 2 ? 1 : -1; }]));
   for (const sp of [0, 1]) {

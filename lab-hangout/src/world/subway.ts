@@ -4,15 +4,17 @@
 // it together), with the tunnel and then the city rushing past the windows, and an EXIT that
 // opens at each station.
 //
-// The line is a loop: SQUARE -> PARK -> DINER -> KARTS -> (back to the SQUARE). Stations without a room yet are OPENING SOON: the train
+// The line is a loop: SQUARE -> PARK -> DINER -> KARTS -> AIRPORT -> (back to the SQUARE). Stations without a room yet are OPENING SOON: the train
 // stops but keeps its doors shut. Each station takes STOP_S seconds (4 s pulling in, doors open,
 // 4 s pulling out) and the ride to the next one takes RIDE_S.
 
 import { K, CONFETTI, type RGB } from '../engine/palette';
-import { PX, mk, r, line, txt, tw, lit, G, Gd, M, bake } from '../engine/pixel';
+import { PX, mk, r, line, txt, tw, lit, alpha, G, Gd, M, bake } from '../engine/pixel';
 import { h1 } from '../engine/math';
 import { dayness } from './plaza';
 import { boardGlow } from './boards';
+import { drawJet } from './jet';
+import { AIR_ARRIVE } from '../game/air';
 import type { Door, Prop, Room, RoomId, Spot } from './room';
 
 /** The stops. `room` = its station room (null = OPENING SOON), `exit` = where its stairs go up to, `tile` = wall tiles. */
@@ -21,6 +23,7 @@ export const STATIONS: { name: string; room: RoomId | null; arrive: { x: number;
   { name: 'PARK', room: 'parkstn', arrive: { x: 0, y: 500 }, exit: { to: 'park', arrive: { x: 170, y: 668 } }, tile: [206, 226, 200], tileLn: [172, 196, 166] },
   { name: 'DINER', room: 'dinerstn', arrive: { x: 0, y: 500 }, exit: { to: 'diner', arrive: { x: 70, y: 650 } }, tile: [236, 206, 200], tileLn: [206, 170, 164] },
   { name: 'KARTS', room: 'kartstn', arrive: { x: 0, y: 500 }, exit: { to: 'karts', arrive: { x: 110, y: 612 } }, tile: [226, 226, 234], tileLn: [70, 70, 84] },
+  { name: 'AIRPORT', room: 'airportstn', arrive: { x: 0, y: 500 }, exit: { to: 'airport', arrive: AIR_ARRIVE.airport }, tile: [206, 228, 244], tileLn: [168, 200, 226] },
 ];
 const IN_S = 4, OPEN_S = 16, OUT_S = 4, STOP_S = IN_S + OPEN_S + OUT_S, RIDE_S = 28, LEG = STOP_S + RIDE_S;
 export type TrainPhase = 'in' | 'open' | 'out' | 'ride';
@@ -74,11 +77,23 @@ function buildStation(this: Room, n: number): void {
     r(0, PLAT + 3, SW, 7, [230, 190, 40]); for (let x = 2; x < SW; x += 5) r(x, PLAT + 5, 2, 2, [200, 160, 30]);
     for (let i = 0; i < 400; i++) r(Math.floor(h1(i * 1.7) * SW), PLAT + 12 + Math.floor(h1(i * 3.1) * (SH - PLAT - 12)), 1, 1, [94, 96, 102]);
     for (let x = 0; x < SW; x += 64) r(x, PLAT + 12, 1, SH - PLAT - 12, [96, 98, 104]);
+    if (st.name === 'AIRPORT') airportTiles();
     // stairs up to the Square (front left): a stairwell going up out of the floor
     r(14, 636, 70, 64, [60, 62, 70]); for (let k = 0; k < 6; k++) r(18, 640 + k * 10, 62, 4, [130, 132, 140]);
     r(12, 628, 4, 72, BAND); r(82, 628, 4, 72, BAND); r(12, 628, 74, 4, BAND);
   });
 }
+/** AIRPORT STATION's own touches: little aeroplanes set into the tiles, a suitcase mural, the way up to DEPARTURES. */
+function airportTiles(): void {
+  const PLANE: RGB = [120, 160, 200];
+  for (let x = 250; x < SW - 60; x += 240) { if (x > 300 && x < 600) continue; const y = 372; r(x, y + 4, 26, 4, PLANE); r(x + 22, y + 5, 6, 2, PLANE); r(x + 10, y - 2, 6, 14, PLANE); r(x + 2, y + 1, 3, 9, PLANE); r(x, y + 1, 7, 2, PLANE); }
+  // the suitcase mural: a pile of painted cases with travel stickers
+  const cases: [number, number, number, number, RGB][] = [[610, 366, 44, 24, [226, 90, 70]], [650, 360, 34, 30, [70, 120, 200]], [690, 370, 40, 20, [240, 190, 60]], [620, 344, 30, 22, [90, 170, 110]], [654, 340, 26, 20, [200, 120, 190]]];
+  for (const [x, y, w, h, c] of cases) { r(x, y, w, h, c); r(x, y, w, 2, M(c, [255, 255, 255], 0.3)); r(x + w / 2 - 4, y - 3, 8, 3, [60, 60, 66]); r(x + 4, y + 6, 6, 5, [255, 255, 255]); r(x + w - 10, y + h - 9, 6, 5, [255, 214, 90]); }
+  // DEPARTURES up the stairs
+  r(96, 398, 116, 16, [30, 34, 40]); r(96, 398, 116, 1, [60, 64, 72]); lit(() => txt('< DEPARTURES', 101, 403, [255, 210, 63]));
+}
+const lostTrolley: Prop = { y: 566, draw() { const x = 860, y = 566; r(x - 24, y - 12, 48, 3, [150, 156, 166]); r(x - 22, y - 30, 2, 18, [110, 116, 126]); r(x + 20, y - 24, 2, 12, [110, 116, 126]); r(x - 18, y - 28, 30, 14, [226, 90, 70]); r(x - 18, y - 28, 30, 2, [240, 130, 110]); r(x - 12, y - 36, 16, 8, [70, 120, 200]); r(x - 7, y - 39, 6, 3, [40, 40, 44]); r(x - 26, y - 2, 6, 6, [40, 40, 44]); r(x + 20, y - 2, 6, 6, [40, 40, 44]); } };
 /** The train, drawn at horizontal offset `dx` (0 = stopped at the platform). `open` = 0..1 doors apart. */
 function drawTrain(dx: number, open: number, a: number): void {
   const x0 = TRAIN_X0 + dx, x1 = x0 + TRAIN_W, top = TRAIN_TOP, bot = PLAT - 6;
@@ -179,7 +194,7 @@ export function makeStation(n: number): Room {
     bg: mk(SW, SH),
     build: () => buildStation.call(room, n),
     drawBack: (a: number) => stationBack(a, n),
-    props: [bench(420, 590), bench(980, 590), snacks, gates],
+    props: [bench(420, 590), bench(980, 590), snacks, gates, ...(st.name === 'AIRPORT' ? [lostTrolley] : [])],
   };
   return room;
 }
@@ -207,6 +222,20 @@ function buildCar(this: Room): void {
     r(0, 346, CW, 2, [170, 176, 186]); // the grab rail
   });
 }
+/** Out past the airport (the ride to and from it): grass behind the perimeter fence, the runway's lights, a windsock, and a LAB AIR jet climbing away. */
+function airportView(travel: number, day: number, u: number): void {
+  const Y0 = DOOR_TOP, Y1 = WIN_Y1, sky0: RGB = day > 0.5 ? [120, 180, 230] : [16, 20, 50], sky1: RGB = day > 0.5 ? [196, 224, 242] : [50, 44, 86];
+  for (let y = Y0; y < Y1; y += 4) r(0, y, CW, 4, M(sky0, sky1, (y - Y0) / (Y1 - Y0)));
+  r(0, Y1 - 24, CW, 24, day > 0.5 ? [110, 150, 80] : [20, 34, 30]); r(0, Y1 - 12, CW, 3, day > 0.5 ? [100, 104, 110] : [36, 38, 44]);
+  const o = travel * 0.5;
+  for (let i = 0; i < 30; i++) { const x = ((i * 70 - o) % 2100 + 2100) % 2100 - 100; if (day < 0.5) lit(() => r(Math.round(x), Y1 - 11, 2, 1, [80, 140, 255])); }
+  { const x = ((1400 - o) % 2100 + 2100) % 2100 - 100; r(Math.round(x), Y1 - 40, 2, 28, [200, 200, 204]); r(Math.round(x) + 2, Y1 - 40, 12, 5, [255, 120, 40]); }
+  // the fence close by, rushing past: posts and a diamond mesh
+  const f = travel * 1.4; for (let x = -((f % 40) + 40) % 40; x < CW; x += 40) r(Math.round(x), Y0 + 20, 2, Y1 - Y0 - 20, [120, 124, 132]);
+  alpha(0.35, () => { for (let x = -((f % 8) + 8) % 8; x < CW; x += 8) { line(Math.round(x), Y0 + 20, Math.round(x) + 20, Y1, [150, 154, 162]); line(Math.round(x) + 20, Y0 + 20, Math.round(x), Y1, [150, 154, 162]); } });
+  // a jet climbing away across the windows, mid-ride
+  if (u > 0.35 && u < 0.7) { const k = (u - 0.35) / 0.35; drawJet(Math.round(CW - k * CW * 1.1), Math.round(Y1 - 30 - k * 60), 120, -1, 0, { gear: k < 0.3, flaps: true, pitch: -14, night: day < 0.5 }); }
+}
 /** The view out of the windows (clipped to them): a station, the tunnel, or the city. */
 function carView(): void {
   const tr = train(), g = PX.ctx, H = WIN_Y1 - WIN_Y0;
@@ -229,9 +258,10 @@ function carView(): void {
       for (let k = -1; k < 4; k++) { const cx = 180 + k * 400 - off; r(cx - 60, Y0 + 24, 120, 16, [255, 214, 90]); txt('OPENING SOON', cx - tw('OPENING SOON') / 2, Y0 + 29, [40, 36, 30]); for (let j = 0; j < 6; j++) r(cx - 60 + j * 20, Y0 + 42, 10, 4, j % 2 ? [255, 214, 90] : [40, 36, 30]); }
     }
   } else { // tunnel -> the city at dusk or noon -> tunnel
-    const inCity = tr.u > 0.25 && tr.u < 0.75, day = dayness();
+    const inCity = tr.u > 0.25 && tr.u < 0.75, day = dayness(), byAir = STATIONS[tr.next].name === 'AIRPORT' || STATIONS[tr.at].name === 'AIRPORT';
     r(0, Y1, CW, CFLOOR - Y1, [16, 18, 22]);
-    if (inCity) {
+    if (inCity && byAir) airportView(travel, day, tr.u);
+    else if (inCity) {
       const sky0: RGB = day > 0.5 ? [120, 180, 230] : [20, 24, 60], sky1: RGB = day > 0.5 ? [190, 220, 240] : [60, 50, 90];
       for (let y = Y0; y < Y1; y += 4) r(0, y, CW, 4, M(sky0, sky1, (y - Y0) / (Y1 - Y0)));
       for (let layer = 0; layer < 2; layer++) {

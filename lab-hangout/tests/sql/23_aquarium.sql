@@ -10,7 +10,7 @@ insert into private.catches (user_id, name, fish, rarity, cm) values
   ('bbbbbbbb-0000-0000-0000-000000000002', 'BEN', 'MACKEREL', 'COMMON', 38), ('bbbbbbbb-0000-0000-0000-000000000002', 'BEN', 'MACKEREL', 'COMMON', 22);
 select pg_temp.ok('the donate and feeding quests are in the pool, as ordinary quests', (select count(*) from private.quest_pool where id in ('donate', 'feeding') and not checked) = 2);
 select pg_temp.ok('the CURATOR badge is on the list', exists (select 1 from private.badge_list where id = 'curator'));
-select pg_temp.ok('the gift shop sells four clothes', (select count(*) from private.gift_items) = 4);
+select pg_temp.ok('the gift shop sells four clothes', (select count(*) from private.gift_items where item in ('hat:18', 'hat:19', 'face:10', 'fit:12')) = 4);
 select pg_temp.ok('its furniture is in the catalogue', (select count(*) from private.furniture where id in ('plush', 'jlamp', 'bottle', 'aqposter') and price > 0) = 4);
 set role authenticated;
 select set_config('test.uid', 'cccccccc-0000-0000-0000-000000000003', false);

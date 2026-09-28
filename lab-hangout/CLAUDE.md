@@ -1,7 +1,7 @@
 # CLAUDE.md — Lab Hangout
 
 A multiplayer 2D pixel hangout. Players are little "lab critters" (or Clawd) who walk around
-32 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
+37 rooms, chat in speech bubbles, emote (plus an emote wheel), sit, dance, eat and drink,
 play party games and mini-games, make music together, and hang out with NPCs.
 
 Room map (doors):
@@ -19,7 +19,9 @@ Room map (doors):
                                                                                   ├── right edge → PIER ── boardwalk (past the lighthouse) → THE CITY AQUARIUM ── gangway (while it boards) → SARDINE 1
                                                                                   └── stairs → SUBWAY (Square station) ── train ── PARK station → CITY PARK
                                                                                                                     ├── DINER station → THE GREASY BYTE
-                                                                                                                    └── KARTS station → THE KART TRACK
+                                                                                                                    ├── KARTS station → THE KART TRACK
+                                                                                                                    └── AIRPORT station → THE AIRPORT ── jet bridge (while it boards) → LAB AIR
+                                                                                                                                          LAB AIR (every 10 min) ── ICELAND: KEFLAVÍK ── the bus → REYKJAVÍK
 ```
 
 **The plan lives in `docs/ROADMAP.md`** (phases, what's done, what must happen before a
@@ -65,6 +67,11 @@ Handy URLs while developing:
   Aboard SARDINE 1: `sub()` shows the dive (its state, where the sub is, who's skipper / at the helm, the claw, the log), `subGo(x, y)` puts
   the sub there at once, `subPeek()` lists what a photo would get now, `subHorn()` sounds the horn. To pick a dive with something in it (a
   mission, the octopus, a visitor), set `SUB.skew` so `subT()` = n × 480 + k (game/sub.ts's pure functions say which n has what).
+- THE AIRPORT and ICELAND (`?debug`): `__hangout.airAt(k)` jumps LAB AIR's 10-minute loop to k s in (0-90 boarding at the city's
+  GATE A1, 116 the take-off, 290 touchdown at Keflavík, 300-390 boarding at GATE D4, 590 home), `air()` shows it (and the X-ray, the arch,
+  the carousel's bags), `iceAt(p)` moves Iceland's own 20-minute day to p (0-0.45 night, then dawn, day from 0.575, dusk from 0.875),
+  `iceSky(kind)` pins Iceland's weather (`?iceweather=snow` too), `stamps()` lists your passport's stamps, `passport()` opens it. Each
+  night's aurora strength is `kpOf(tonight())` in world/iceland.ts: step `ICE.skew` by 1200 to try the next night.
 - `?season=winter` (or `halloween`) previews a season in this browser; `?nye=N` (LOCAL/dev) = New Year in N seconds
 - `?weather=rain|storm|fog|snow|clear` pins the weather in this browser (any mode; the server still
   decides whether rain waters the gardens). `?debug` adds `weather(k)`, `crews()` and `danceBots(x, y)`
@@ -92,8 +99,10 @@ src/
                        the Pier for the catch toast's BIGGER THAN THE AQUARIUM'S), sub (SARDINE 1: a dive for everyone aboard: the helm and
                        the autopilot (every browser flies it from the skipper's snapshot; the pilot's `helm` messages), the stations (camera,
                        sonar, lights, claw + CLAW CAM, periscope, tea, the fixes), the troubles and visitors, CAP'N BARNACLE's lines, the
-                       report and the pay). Each owns its state; main calls what it exports (spots,
-                       per-frame steps, banners, net events)
+                       report and the pay), air (THE AIRPORT and ICELAND: check-in's boarding pass, the X-ray, the arch, the plane's
+                       crew and announcements on the flight's clock, the seatbelt sign, PENNY's trolley, the carousel's bags, the stamps,
+                       the hot dog, the tower view, the aurora photo, the cat, the elf door). Each owns its state; main calls what it
+                       exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
     palette.ts         all colour tokens (K, LK, BODY, CONFETTI)
@@ -149,7 +158,7 @@ src/
                        server), plant sprites per seed + stage, GARDEN.plots (fetched every 15 s while on the roof)
     subway.ts          THE SUBWAY: the timetable (train(), all from the wall clock), SQUARE STATION (1300x700) with
                        the train pulling in, and THE TRAIN carriage (1000x650) with the view going by; STATIONS
-                       lists the stops (room: null = OPENING SOON, doors stay shut)
+                       lists the stops (5: SQUARE, PARK, DINER, KARTS, AIRPORT; room: null = OPENING SOON, doors stay shut)
     park.ts            CITY PARK (1600x760, day/night): pond (onWater, ducks, fountain, dock), kite stand, bandstand
                        music, hot dogs, picnic blankets, the shared sandbox (room state 'sand'), OAK
     weather.ts         the wall-clock sky: the wind (kites) and the WEATHER over the outdoor rooms (15-min slots: clear,
@@ -168,10 +177,15 @@ src/
     arcade.ts          THE ARCADE (1100x612, down the stairwell on the Square): claw machine, 2-player Pong table
                        (watchable live), SLOP INVADERS cabinet, prize counter, air hockey, PIXEL
     voxels.ts          oblique voxel creations (castle, coaster, dragon), cached + shine
-    map.ts             THE CITY MAP (480x300): the whole world as a pixel diorama (PLACES: each place's hit rects, where people
-                       stand, its zone earth/orbit/moon, its ? sticker), baked by night and by day (paintMap), and the live layer
-                       (drawMapLive: signs, the train / rocket / lander on their timetables, weather, seasons, people, friends' tags,
-                       YOU, stickers, hover brackets, the pin); spotOf(room) is where someone in that room is drawn
+    map.ts             THE CITY MAP (560x300): the whole world as a pixel diorama (PLACES: each place's hit rects, where people
+                       stand, its zone earth/orbit/moon/iceland, its ? sticker), baked by night and by day (paintMap), and the live layer
+                       (drawMapLive: signs, the train / rocket / lander / LAB AIR on their timetables, weather, seasons, the marks);
+                       spotOf(room) is where someone in that room is drawn. THE AIRPORT sits past the Kart Track, by the sea
+    icemap.ts          the map's ICELAND page: the island drawn from real latitudes and longitudes (paintIceland), KEFLAVIK and
+                       REYKJAVIK (ICE_PLACES), the tour bus's sights to come (grey stickers, sightAt), and the live layer (the aurora,
+                       Iceland's weather, the lights, LAB AIR's route in, tonight's forecast panel)
+    mapmarks.ts        what both map pages share: MAP_W/MAP_H, MapPlace, MapLive, and drawMarks (people, friends' tags, YOU,
+                       the YOU ARE HERE star, ? stickers, hover brackets, the pin)
     wing.ts            THE SCIENCE WING (1200x640): the corridor off the Lab's right edge: lockers, the REACTOR's blast door (its porthole
                        glows with the pool), the RADIATION display, posters, notice board, trophy case, the CHEM LAB's glass door (the lab's
                        green glows through it), eyewash, water cooler, two OPENING SOON doors, the floor robot (robotAt); everything says a line (talkers)
@@ -204,6 +218,21 @@ src/
     grid.ts            GRID: whether a reactor shift is on and the last meltdown (from the lobby's 'grid'): the Square's POWERED BY sign,
                        its brownout, the corridor's RADIATION display, the map's cooling tower, meltGlow (everyone in the wing glows green)
     boards.ts          BOARD.near: you're at this room's map board (the Square's kiosk, a platform's line map, the station's chart)
+    airport.ts         THE AIRPORT (1900x614, the Subway's AIRPORT stop): the escalator up from the trains, the trolleys, the info
+                       pillar (a map board), LAB AIR's check-in desks, SECURITY (the X-ray shows what you're holding, the arch beeps
+                       for metal), the DEPARTURES board (split flaps), the aurora forecast TV, DUTY FREE, the café, and GATE A1: seats,
+                       the desk, THE BIG WINDOW (the apron and the runway live: jetOnApron) and the jet bridge (Door.route)
+    jet.ts             LAB AIR's jet (drawJet: any size, gear, flaps, pitch, lights) and its day at an airport (jetOnApron: the stand,
+                       pushback, taxi, take-off, landing, taxi in) for the windows
+    plane.ts           THE PLANE (1200x614): the cabin (12 seats, the lavatory, the galleys, PENNY's trolley, the moving-map screen,
+                       the seatbelt signs, the L1 door onto either gate while it boards), the windows' view of the whole trip
+    iceland.ts         ICELAND's sky (pure, plus the drawing everyone shares): its own 20-minute day, 7 minutes ahead (iceP, iceDay,
+                       long nights), its weather (15-min slots), each night's aurora (kpOf, auroraNow, forecast), drawAurora, mountains
+    kef.ts             KEFLAVÍK (1400x614): GATE D4, the window (the jet, Iceland's sky, the aurora), the welcome posters, the travelator,
+                       PASSPORT CONTROL (OFFICER GUNNI's booth), the baggage carousel (KEFW.bags), the skyr bar, the bus to Reykjavík
+    reykjavik.ts       REYKJAVÍK (1900x614, outdoors on Iceland's clock): the bus stop and INFO kiosk (a map board), the painted houses,
+                       HALLGRÍMSKIRKJA up the rainbow street (THE TOWER), the shops (the PUFFIN SHOP, the bakery, the café), the elf
+                       house, the hot dog stand, HARPA, the SUN VOYAGER, the aurora bench and camera; the aurora live in the sky
   entities/
     critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;
                        what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)
@@ -217,8 +246,12 @@ src/
     supabaseapi.ts     net.api online: each request is a database function or table read (rpc / rpcJson / rows helpers)
     local.ts           BroadcastChannel transport for offline dev
     localapi.ts        net.api in LOCAL mode: a pretend database in localStorage with the SQL functions' rules
-  game/save.ts         your save (unlocks, friends, fish log, stars, hi score): cached per player id, synced to
-                       the `saves` table; merging is a union so nothing earned is ever lost
+  game/save.ts         your save (unlocks, friends, fish log, stars, hi score, passport stamps): cached per player id, synced to
+                       the `saves` table; merging is a union so nothing earned is ever lost (a stamp keeps its earliest day)
+  game/air.ts          LAB AIR's timetable (pure): a 10-minute loop of two legs, LA101 to Keflavík and LA102 home (air(): the phase,
+                       the route, the height), which end's door is open, bumpy air and the masks, your seat; AIR_ARRIVE (every door's
+                       arrival point); AIR.skew for tests
+  game/passport.ts     THE PASSPORT's 17 stamps (which push opens each) and stampIt (your first visit's day, in your save)
   game/places.ts       the places on the map the EXPLORER badge counts (EXPLORE), and placeOfRoom (flats are THE LOFTS; rides are no place)
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
                        quests.bump('marsh') / quests.stat('commits') and it hands quests in and claims badges
@@ -274,14 +307,18 @@ src/
     desk.ts            DESK STUFF: your Dev Den desk setup (Look.desk bits)
     overlay.ts         DOM overlays: speech bubbles, room plate, chat log, toast, fade
     chembook.ts        THE RECIPE BOOK (the chem lab's lectern): found entries with their recipe chips, the rest as riddles
-    aquarium.ts        THE FISH GALLERY panel (a row per tank: what's on show, your biggest, DONATE) and THE GIFT SHOP (the clothes on you,
-                       the furniture; clothes are GIFTS in entities/critter.ts, furniture has `shop: 'aquarium'` so DECORATE doesn't sell it)
+    aquarium.ts        THE FISH GALLERY panel (a row per tank: what's on show, your biggest, DONATE) and the gift shops (the aquarium's, DUTY
+                       FREE, the PUFFIN SHOP: the clothes on you, the furniture; clothes are GIFTS in entities/critter.ts with their shop,
+                       furniture has `shop` so DECORATE doesn't sell it)
+    passport.ts        THE PASSPORT (your portrait, the stamps inked in, COMING SOON for the rest), the BOARDING PASS, and THE VIEW FROM
+                       THE TOWER (towerView: Reykjavík all the way round, ← →)
     sealog.ts          THE SEA LIFE LOG: a page per zone, the ones you've photographed with their picture and line, the rest as dark
                        shapes with a hint
     sub.ts             SARDINE 1's panels: THE TREASURE BIN (and the notes in the bottles), UP PERISCOPE (surfaceView: the city from the sea,
                        as it is; water deeper down; the pen at the dock) and THE DIVE REPORT
-    map.ts             the CITY MAP panel: its two canvases (crisp + glow), the card for a place (live look inside, who's there,
-                       how you'd get there), the pin + zoom when you pick one; 30 fps while open. Phones: the card goes under the map
+    map.ts             the MAP panel: its pages (CITY and ICELAND, by tabs), two canvases (crisp + glow), the card for a place (live look
+                       inside, who's there, how you'd get there), the pin + zoom when you pick one; 30 fps while open. Phones: the card
+                       goes under the map
   audio/sfx.ts         synthesized blips (no audio files)
   audio/music.ts       chiptune tracks as note strings; MusicPlayer schedules against the wall clock; the Stage's
                        instrument synth (playPad, all C pentatonic); the Den's rain loop
@@ -334,7 +371,10 @@ supabase/migrations/   SQL, run in order in the SQL editor (all safe to re-run):
                        donate + feeding quests and the CURATOR badge) ·
                        0024 sub (dive_pay(finds, mission): members only, just after a dive surfaces (the server works out the dive from
                        its clock), once a dive, 1 + finds (max 4) + 3 for the mission, 24 a day; found_boot(): THE OTHER BOOT's plaque in
-                       the FISH GALLERY; the dive quest + MARINE BIOLOGIST badge)
+                       the FISH GALLERY; the dive quest + MARINE BIOLOGIST badge) ·
+                       0025 airport (the souvenirs: DUTY FREE's NECK PILLOW, the PUFFIN SHOP's LOPAPEYSA and VIKING HELMET, and its
+                       furniture's prices; the fly / hotdog / aurora quests; the FREQUENT FLYER and AURORA HUNTER badges. The flights and
+                       Iceland's sky are all worked out in the browsers)
 docs/ART_STYLE.md      the style bible (§9: the polish standard every new room follows)
 docs/briefs/           each step's design brief (written and agreed before any code)
 ```
@@ -392,6 +432,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | submarine | room state `dive` (the skipper's, the lowest id aboard: the dive n, a snapshot of where the sub is at `at`, the lights, when each trouble was fixed, the visitor, finds taken, kinds photographed, mission bits, the octopus; merged, not replaced: bits OR'd, the earliest fix, the newest snapshot; re-sent every 3 s) + broadcast `helm` `{ x, y, vx, vy, sx, sy, off? }` (whoever's at the helm, on each stick change and every 0.5 s; everyone else flies the sub on from it) and `sub` `{ e, v, x?, y? }` (snap / ping / grab / fix / lights / tea / horn / claw / bonk: every browser applies it the same way); RPCs `dive_pay(finds, mission)` at surfacing, `found_boot()` | see game/sub.ts |
 | aquarium | RPCs `aquarium_tanks()` (the plaques, your biggest catch of each kind, what you've donated), `donate_fish(fish)`, `gift_shop(item)` (and `buy_furniture` for its furniture); room state `aq` `{ n }` ("the gallery changed: look again"); broadcast `scoop` `{ id, x }` (a scoop of food thrown into the ocean tank at feeding time); feeding time and SARDINE 1's dives from the clock | `{ plaque, cm, first, paid, tokens, prev }` |
 | chem lab | broadcast `chem` `{ id, b, m, at }` ("I mixed m, a bitmask of 2-3 reagents, at bench b": every browser works out the same reaction with `outcome`; the same discovery at both benches within 3 s by two players = a two-chemist reaction) + `fx` `{ id, k, s }` ("I'm under potion / frazzle k for s more seconds": sent when you drink, and again whenever anyone arrives); room state `chemlog` (the EXPERIMENTS board); no server calls | see game/chem.ts |
+| airport / iceland | none: LAB AIR (`air()`), Iceland's clock, weather and each night's aurora are all from the clock; the X-ray shows the `hold` you already send, the arch reads your `look`; your passport's stamps are in your save; the souvenirs are `gift_shop` / `buy_furniture` | see game/air.ts, world/iceland.ts |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
 | tokens | RPCs `my_tokens`, `claim_coin(0..5)` (once per 5-min window), `claim_daily` (+5); table `wallets` is read-only to players | balance |
@@ -408,7 +449,8 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 (`sp` 0 = critter, 1 = Clawd; both bodies draw every hat/face/outfit, each fitted to its shape).
 `pose` 3 = a sheet ghost (Halloween trick; walking doesn't clear it). `use` = index into `room.spots` you're using (-1 none); `hold` = what's in your hand (0 none,
 1 mug, 2 popcorn, 3 soda, 4-6 marshmallow raw/toasted/burnt, 7 kite (drawn flying on the shared wind),
-8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 cocoa, 18 a moon rock, 19-24 a chem lab potion: TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
+8 hot dog, 9-15 the Diner's kitchen: patty raw/cooked/burnt, burger, frozen fries, fries, shake, 16 snowball, 17 cocoa, 18 a moon rock, 19-24 a chem lab potion: TINY, HUGE, RAINBOW, GLOWING, BUBBLES, FLOATY, 25 a Reykjavík hot dog, 26 a skyr, 27 a
+cinnamon swirl, 28 your suitcase off the carousel); `pose` = 0 normal, 1 dancing, 2 sitting on the floor (cleared when you move), 3 ghost,
 4 rowing a boat (moves only where `room.water()` is true), 5 floating up high (weightless: SPACE pushed you off the floor; walking
 doesn't clear it, it ends after FLOAT_S; in moon gravity it's a big slow jump, JUMP_S), 6 driving a moon buggy. Weightless rooms (`room.zeroG()`) move you with momentum (`drift` in main.ts) and
 avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) puts helmets on and SPACE fires a jetpack.
@@ -417,7 +459,8 @@ avatar.ts's `ENV` makes everyone bob and swim; `room.freeFloat` (the spacewalk) 
 meltdown everyone in the Science Wing glows green for a minute (`ENV.glow`). FITS 10 HAZMAT SUIT (earned: 80% grid), 11 HI-VIS VEST (free). FACES 9 LAB GOGGLES (free, from the chem
 lab's dispenser). A drunk potion (or a KA-BOOM, or SARDINE 1's ESCAPE HATCH: the RUBBER RING, FX 8) is `Avatar.fx` `{ k, t0, t1 }`: drawAvatar scales,
 recolours, lights, floats or frazzles anyone with one, in any room. PETS 9 BABY OCTOPUS (a dive's stowaway: photograph it on the glass);
-HATS 20 DIVING HELMET (10 creatures in the SEA LIFE LOG).
+HATS 20 DIVING HELMET (10 creatures in the SEA LIFE LOG). From the shops in step 19: HATS 21 VIKING HELMET and FITS 13 LOPAPEYSA (the PUFFIN
+SHOP), FITS 14 NECK PILLOW (DUTY FREE).
 Spot lists are append-only, like look options.
 
 **Shared time without a server:** the weather, group-dance routines, NPC routines, the Square's day/night (20 min loop), the
@@ -488,7 +531,8 @@ Remote avatars are drawn 140 ms in the past and interpolated (`stepRemote`).
 - New shared room value: add a variant to `StateVal` + its check in `STATE` (transport.ts; the compiler asks for it), then keep a
   display copy in that room's `onState` (like `DEN_INFO`/`LAB_INFO`). Catch-up for newcomers is automatic.
 - Room hooks worth knowing: `music` (a `juke` spot cycles its tracks), `talkers` (non-avatar
-  things you TALK to, like the duck), `watch` (camera target while seated), `dimNow`/`bgAlt`/`glowMul`.
+  things you TALK to, like the duck), `watch` (camera target while seated), `dimNow`/`bgAlt`/`glowMul`, `lookAt` (rooms that only
+  draw what's in the camera's view: point the view somewhere else for a map card's look inside).
 - Things that must line up for everyone but never change (NPC days, day/night, films, fireworks
   on the hour, slop waves, pomodoro): compute them from `Date.now()`, don't send messages.
 - New room checklist: `world/<name>.ts` exporting `make<Name>()` → add the id to `RoomId`/`ROOM_IDS`

@@ -67,6 +67,7 @@ export function openGiftShop(i: number): void {
     buyFurn: (id) => game.net.api.flats.buy(id).then((r) => { game.setTokens(r.tokens); if (FLAT.owned) FLAT.owned[id] = r.n; SFX.score(); toast('A ' + (FURN.get(id)?.name ?? id) + " for your flat! It's in DECORATE's MY STUFF", 4000); return r.n; })
       .catch((e: unknown) => { SFX.nope(); toast(cap(errText(e)), 3500); return 0; }),
     wear: (item) => game.wear(item),
+    shop: (['aquarium', 'duty', 'puffin'] as const)[game.room.spots[i]?.n ?? 0] ?? 'aquarium',
   }, game.closeSpot(i));
 }
 

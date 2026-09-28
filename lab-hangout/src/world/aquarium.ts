@@ -491,6 +491,7 @@ export function makeAquarium(): Room {
   const room: Room = {
     id: 'aquarium', title: 'THE CITY AQUARIUM', sub: 'PAST THE LIGHTHOUSE',
     w: W, h: H,
+    lookAt: (x0, x1, y0, y1) => { const keep = AQUA.view; AQUA.view = { x0, x1, y0, y1 }; return () => { AQUA.view = keep; }; },
     floor: { x0: 14, y0: FL + 8, x1: W - 14, y1: 596 },
     blockers: [
       { x0: 124, y0: 514, x1: 176, y1: 526 }, // the ticket desk

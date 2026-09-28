@@ -23,7 +23,7 @@ export interface Furn {
   /** Only in the shop in this season (you keep it after). */
   season?: string;
   /** Sold somewhere in the world instead of DECORATE's SHOP ('aquarium': the City Aquarium's gift shop). */
-  shop?: 'aquarium';
+  shop?: 'aquarium' | 'duty' | 'puffin';
   /** Seats as [dx from centre, lift]. */
   seats?: [number, number][];
   use?: FurnUse; label?: string;
@@ -177,6 +177,30 @@ export const FURNITURE: Furn[] = [
     for (let k = 0; k < 6; k++) r(x - 7 + k * 3, y - 24 + (k % 2) * 2, 1, 1, [210, 230, 245]); r(x - 7, y - 21, 12, 1, [150, 170, 196]);
     for (let k = 0; k < 4; k++) r(x - 9 + k * 5, y - 33 + (k % 2) * 2, 1, 1, [200, 240, 255]);
     txt('DORIS', x - tw('DORIS') / 2, y - 9, [255, 214, 90]); } },
+  // ---------- Reykjavík's PUFFIN SHOP (step 19: sold there, not in DECORATE's SHOP) ----------
+  { id: 'puffplush', name: 'PUFFIN PLUSH', price: 8, w: 20, h: 24, layer: 'floor', shop: 'puffin', draw(x, y, f) {
+    const q = R(x, f), bk: RGB = [34, 34, 40], wh: RGB = [244, 244, 248], or: RGB = [240, 120, 40];
+    oval(x, y - 9, 7, 8, bk); oval(x + (f ? 1 : -1), y - 7, 4, 5, wh); // (the body, the white front)
+    oval(x, y - 18, 5, 5, bk); q(-3, y - 19, 4, 4, wh); q(-2, y - 18, 1, 1, bk); // (the head, the white face, an eye)
+    q(-9, y - 18, 5, 3, or); q(-8, y - 16, 4, 1, [210, 70, 40]); q(-6, y - 19, 2, 1, [250, 200, 60]); // (the big stripy beak)
+    q(-4, y - 1, 3, 2, or); q(1, y - 1, 3, 2, or); q(5, y - 11, 2, 6, [50, 50, 58]); // (the feet, a wing)
+  } },
+  { id: 'sheeprug', name: 'SHEEPSKIN RUG', price: 12, w: 46, h: 12, layer: 'rug', shop: 'puffin', draw(x, y) {
+    for (let j = -5; j <= 5; j++) { const w = Math.round(22 * Math.sqrt(1 - (j / 6) ** 2)); r(x - w, y - 6 + j, w * 2, 1, [242, 236, 222]); }
+    for (let k = 0; k < 22; k++) { const an = (k / 22) * Math.PI * 2; r(x + Math.round(Math.cos(an) * 22), y - 6 + Math.round(Math.sin(an) * 5), 2, 2, [226, 216, 196]); } // (the curly edge)
+    for (let k = 0; k < 12; k++) r(x - 18 + Math.floor(h1(k * 3.1) * 36), y - 9 + Math.floor(h1(k * 1.7) * 6), 2, 1, [252, 250, 244]);
+  } },
+  { id: 'isflag', name: 'ICELANDIC FLAG', price: 6, w: 32, h: 24, layer: 'wall', shop: 'puffin', draw(x, y) {
+    r(x - 15, y - 23, 30, 21, [30, 70, 160]); r(x - 7, y - 23, 7, 21, K.WHITE); r(x - 15, y - 16, 30, 7, K.WHITE); // (the blue, the white cross)
+    r(x - 6, y - 23, 5, 21, [214, 36, 48]); r(x - 15, y - 15, 30, 5, [214, 36, 48]); // (the red cross inside it)
+    r(x - 16, y - 24, 1, 23, [120, 90, 60]); r(x - 15, y - 24, 30, 1, M([30, 70, 160], K.WHITE, 0.3));
+  } },
+  { id: 'lavalamp', name: 'LAVA LAMP', price: 10, w: 14, h: 36, layer: 'floor', shop: 'puffin', draw(x, y, _f, c) {
+    r(x - 6, y - 6, 12, 6, [60, 60, 72]); r(x - 5, y - 8, 10, 2, [80, 80, 94]); r(x - 4, y - 34, 8, 4, [60, 60, 72]); // (the base, the cap)
+    lit(() => { for (let j = 0; j < 24; j++) { const w = 3 + Math.round(Math.sin((j / 24) * Math.PI) * 2); r(x - w, y - 31 + j, w * 2, 1, [250, 150, 60]); }
+      for (let k = 0; k < 3; k++) { const t = (c.a * 0.12 + k / 3) % 1, by = y - 10 - Math.round(Math.sin(t * Math.PI) * 18); disc(x + Math.round(Math.sin(c.a + k) * 1), by, 2 + (k % 2), [255, 220, 90]); } });
+    Gd(x, y - 20, 18, [255, 140, 50], 0.35);
+  } },
   { id: 'pframe', name: 'PHOTO FRAME', price: 10, w: 40, h: 40, layer: 'wall', draw(x, y, _f, c) {
     r(x - 20, y - 40, 40, 38, [120, 84, 54]); r(x - 19, y - 39, 38, 36, [184, 136, 90]); r(x - 18, y - 38, 36, 34, [250, 248, 240]);
     if (c.photo) PX.ctx.drawImage(c.photo, x - 16, y - 36); else { r(x - 16, y - 36, 32, 30, [200, 204, 214]); txt('PHOTO', x - tw('PHOTO') / 2, y - 26, [120, 126, 140]); txt('WALL', x - tw('WALL') / 2, y - 19, [120, 126, 140]); }

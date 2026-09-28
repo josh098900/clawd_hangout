@@ -285,6 +285,20 @@ export const AQUA_TRACK: Track = {
   bass: 'A2 . . . . . E2 . F2 . . . . . C2 . D2 . . . . . A2 . E2 . . . . . B2 .',
   drums: 'k . . . . . h . . . . . s . . . k . . . . . h . . . h . s . . .',
 };
+/** THE AIRPORT's music, DEPARTURE LOUNGE: laid-back and a bit jazzy, a soft bossa shuffle for waiting at the gate. */
+export const LOUNGE_TRACK: Track = {
+  name: 'DEPARTURE LOUNGE', bpm: 92, wave: 'triangle', leadVol: 0.03,
+  lead: 'F#5 - A5 . C#6 - B5 . A5 - F#5 . D5 - - . G5 - E5 . B4 - D5 . C#5 - E5 - A4 - - .',
+  bass: 'D2 . . A2 . . D2 . B1 . . F#2 . . B1 . E2 . . B2 . . E2 . A1 . . E2 . . A1 .',
+  drums: 'k . h . s h . h k . h . s h . h k . h . s h . h k . h . s h h h',
+};
+/** REYKJAVÍK's music, NORTHERN LIGHTS: slow and dreamy, a glockenspiel over long soft chords. */
+export const ICE_TRACK: Track = {
+  name: 'NORTHERN LIGHTS', bpm: 70, wave: 'sine', leadVol: 0.04,
+  lead: 'B5 . E6 . G5 . B5 . A5 . D6 . F#5 . A5 . G5 . C6 . E5 . G5 . F#5 . B5 . D#5 . F#5 .',
+  bass: 'E2 - - - - - - - D2 - - - - - - - C2 - - - - - - - B1 - - - - - - -',
+  drums: 'k . . . . . . . . . . . h . . . k . . . . . . . . . . . h . h .',
+};
 /** SARDINE 1's music, TWENTY THOUSAND BEEPS: slow and pinging, a sonar blip on the beat. Lower and slower as you go deeper (the shallows, the blue, the deep). */
 export const SUB_TRACK: Track[] = [
   { name: 'TWENTY THOUSAND BEEPS', bpm: 84, wave: 'triangle', leadVol: 0.03,

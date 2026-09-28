@@ -31,6 +31,67 @@ interface NpcDef { id: string; name: string; room: RoomId; look: Look; speed: nu
 export const fizzInChem = (T: number): boolean => T % 1200 >= 840;
 
 const DEFS: NpcDef[] = [
+  // ---- THE AIRPORT and ICELAND (step 19): the crew keep to the plane's clock (game/air.ts: a leg every 300 s), everyone else to a gentle routine ----
+  {
+    id: 'npc-dot', name: 'DOT', room: 'airport', speed: 30, cycle: 240,
+    look: { c: 3, hat: 0, face: 0, fit: 2, sp: 0 },
+    stops: [{ x: 370, y: 474, wait: 150, say: ['next, please!', 'window or aisle? the computer decides'] }, { x: 250, y: 474, wait: 40, say: ['desk one, open!'] }, { x: 370, y: 474, wait: 30 }],
+    chat: ['check in at any desk: your BOARDING PASS prints right away', 'LAB AIR: we\'ve tested flying. several times', 'pack a jumper. iceland is not warm. ever', 'the flight\'s free! the pretzels are free! the legroom is... there'],
+  },
+  {
+    id: 'npc-buzz', name: 'OFFICER BUZZ', room: 'airport', speed: 26, cycle: 180,
+    look: { c: 5, hat: 0, face: 3, fit: 11, sp: 0 },
+    stops: [{ x: 884, y: 498, wait: 120, say: ['arms up if it beeps!', 'next!'] }, { x: 786, y: 498, wait: 30, say: ['nice and orderly, folks'] }, { x: 884, y: 498, wait: 20 }],
+    chat: ['walk through the arch. anything metal and it beeps', 'the x-ray shows what\'s in your hands. one lady had a MOON ROCK', 'no liquids over 100 ml. potions count. i don\'t make the rules', 'it\'s always the hat. always'],
+  },
+  {
+    id: 'npc-ray', name: 'RAY', room: 'airport', speed: 30, cycle: 600,
+    look: { c: 8, hat: 0, face: 0, fit: 2, sp: 0 },
+    stops: [{ x: 1420, y: 474, wait: 500, say: ['now boarding LA101 to keflavik!', 'last call for LA101!', 'next flight soon: grab a coffee'] }, { x: 1470, y: 480, wait: 60, say: ['anyone lost a neck pillow?'] }, { x: 1420, y: 474, wait: 10 }],
+    chat: ['GATE A1: LA101 to keflavik. the jet bridge opens when it boards', 'a flight every ten minutes. never late. mostly', 'stay aboard when you land and you fly straight back', 'the window seats see the northern lights on the night flights'],
+  },
+  {
+    id: 'npc-wings', name: 'CAPTAIN WINGS', room: 'airport', speed: 40, cycle: 600, when: (T) => { const k = ((T % 600) + 600) % 600; return k >= 545 || k < 2; },
+    look: { c: 1, hat: 18, face: 3, fit: 3, sp: 0 },
+    stops: [{ x: 1260, y: 520, wait: 545 }, { x: 1830, y: 490, wait: 20, say: ['morning! lovely day for it', 'see you up there, folks'] }],
+    chat: ['i\'ve flown this route a thousand times. the lights still get me', 'no, you can\'t sit in the cockpit. ...maybe next time', 'eleven thousand metres. you can see the curve of the world'],
+  },
+  {
+    id: 'npc-penny', name: 'PENNY', room: 'plane', speed: 50, cycle: 300,
+    look: { c: 6, hat: 0, face: 0, fit: 2, sp: 0 },
+    stops: [
+      { x: 1000, y: 540, wait: 86, say: ['welcome aboard!', 'any seat, dear. well. your seat'] },
+      { x: 700, y: 546, wait: 22 },
+      { x: 110, y: 530, wait: 30, say: ['kettle\'s on'] },
+      { x: 226, y: 546, wait: 5 }, { x: 346, y: 546, wait: 10 }, { x: 466, y: 546, wait: 10 }, { x: 586, y: 546, wait: 10 }, { x: 706, y: 546, wait: 10 }, { x: 826, y: 546, wait: 10 }, { x: 930, y: 546, wait: 10 },
+      { x: 980, y: 540, wait: 1 },
+    ],
+    chat: ['press the call button and i\'ll come. eventually', 'juice, coffee, or juice?', 'the lavatory\'s at the back. mind the door, it sticks', 'your nearest exit may be behind you. i mean it'],
+  },
+  {
+    id: 'npc-gunni', name: 'OFFICER GUNNI', room: 'kef', speed: 24, cycle: 300,
+    look: { c: 2, hat: 0, face: 1, fit: 13, sp: 0 },
+    stops: [{ x: 830, y: 478, wait: 280, say: ['next!', 'godan daginn!'] }, { x: 812, y: 478, wait: 20 }],
+    chat: ['passport, please. first time? everyone gets one', 'godan daginn means good day. takk means thanks', 'purpose of your visit? hot dogs? good answer', 'the bus into town is out the doors on the right'],
+  },
+  {
+    id: 'npc-hekla', name: 'HEKLA', room: 'reykjavik', speed: 30, cycle: 240,
+    look: { c: 4, hat: 2, face: 0, fit: 13, sp: 0 },
+    stops: [{ x: 250, y: 486, wait: 170, say: ['information! ask me anything', 'look north tonight'] }, { x: 110, y: 500, wait: 30, say: ['the airport bus goes from here'] }, { x: 250, y: 486, wait: 20 }],
+    chat: ['clear and dark? look north! the lights come out a minute after dark', 'the forecast board tells you tonight\'s KP. seven or more is a STORM', 'takk means thanks. bless means bye', 'i\'m named after a volcano. she\'s quiet. mostly', 'the tour bus starts soon: waterfalls, black beaches, glaciers...', 'see the church up the hill? take the lift up the tower'],
+  },
+  {
+    id: 'npc-sigga', name: 'SIGGA', room: 'reykjavik', speed: 20, cycle: 200,
+    look: { c: 9, hat: 13, face: 0, fit: 0, sp: 0 },
+    stops: [{ x: 1320, y: 486, wait: 180, say: ['one with everything?', 'hot dogs! the best in town'] }, { x: 1300, y: 486, wait: 20 }],
+    chat: ['one with everything: crispy onions, raw onions, ketchup, sweet mustard, remoulade', 'a famous visitor once had one with just mustard. we don\'t talk about it', 'the gulls want your hot dog. don\'t let them have it'],
+  },
+  {
+    id: 'npc-oli', name: 'OLI', room: 'reykjavik', speed: 22, cycle: 300,
+    look: { c: 7, hat: 18, face: 4, fit: 13, sp: 0 },
+    stops: [{ x: 1872, y: 524, wait: 220, say: ['mending nets. always mending nets'] }, { x: 1740, y: 528, wait: 50, say: ['whales out there today. i can feel it'] }, { x: 1872, y: 524, wait: 30 }],
+    chat: ['if you don\'t like the weather, wait five minutes', 'the puffins come back in the spring. the whales never really leave', 'caught a cod this big once. no, BIGGER', 'the whale boat\'s going out soon. i\'ll believe it when i see it'],
+  },
   {
     id: 'npc-fizz', name: 'PROF. FIZZ', room: 'lab', speed: 40,
     look: { c: 2, hat: 0, face: 2, fit: 1, sp: 0 },

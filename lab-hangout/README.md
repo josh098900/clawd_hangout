@@ -82,6 +82,11 @@ The page opens at http://localhost:5173 in **LOCAL mode**:
 | Work the sub's stations | E at the CAMERA (snap what's in the window), SONAR (ping), LIGHTS, PERISCOPE (← → to look round), the galley (tea), the SEA LIFE LOG, the TREASURE BIN; when something goes wrong, E where the red marker blinks | tap them |
 | The sub's claw | E at the CLAW, then ← → slide it, ↓ lower, ↑ raise, Space grabs, E steps away | the d-pad, GRAB |
 | Get off a dive early | E twice at the ESCAPE HATCH (you pop up on the Pier, in a rubber ring) | the same |
+| Fly to Iceland (LAB AIR, every 10 min) | take the Subway to AIRPORT, check in at a LAB AIR desk (your boarding pass), go through security, and walk up GATE A1's jet bridge while it boards (stay aboard and you fly back) | the same |
+| On the plane | E at a seat to sit (please do when the seatbelt sign's on), the drinks trolley when PENNY comes round, the lavatory | tap them |
+| In Iceland | E at PASSPORT CONTROL for your stamp, the carousel for your bag, the skyr bar, then the BUS to Reykjavík: the church TOWER, the hot dog stand, the SUN VOYAGER, the PUFFIN SHOP, and the aurora camera after dark | tap them |
+| Your passport | the PASSPORT button in the QUESTS panel (once you have a stamp) | the same |
+| The map's ICELAND page | the ICELAND tab at the top of the map | the same |
 | Push a stone block (Crypt) | walk into it | walk into it |
 | Arcade | ←/→ move, Space fire, Esc quit | ◀ FIRE ▶ buttons |
 | Pong | W/S or ↑/↓ | drag on the court |
@@ -151,6 +156,9 @@ Run these in the Supabase **SQL Editor**, in order (all safe to re-run):
 24. `supabase/migrations/0024_sub.sql`: SARDINE 1's pay for a dive (the server checks it's just surfaced; once a dive, a token
     plus one a find (up to 4) plus 3 for the dive's mission, 24 a day), THE OTHER BOOT's plaque in the FISH GALLERY, the dive
     quest and the MARINE BIOLOGIST badge
+25. `supabase/migrations/0025_airport.sql`: THE AIRPORT and ICELAND: the souvenirs (DUTY FREE's NECK PILLOW; the PUFFIN SHOP's
+    LOPAPEYSA, VIKING HELMET and four pieces of furniture), the fly, hot dog and aurora quests, and the FREQUENT FLYER and AURORA
+    HUNTER badges. The flights and Iceland's sky need nothing from the server
 
 Then:
 - Set the invite code: `select public.set_invite_code('something-long-and-secret');`

@@ -1,8 +1,8 @@
 // A Room is a side-on "set" (like the film's sets) with a walkable floor band.
 // Positions are FEET positions in world pixels. Larger y = closer to the camera.
 
-export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor' | 'chem' | 'aquarium' | 'sub';
-export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor', 'chem', 'aquarium', 'sub'];
+export type RoomId = 'lab' | 'plaza' | 'cinema' | 'den' | 'roof' | 'crypt' | 'stage' | 'pier' | 'arcade' | 'subway' | 'train' | 'park' | 'parkstn' | 'dinerstn' | 'diner' | 'kartstn' | 'karts' | 'lofts' | 'flat' | 'flatbed' | 'flatkit' | 'rocket' | 'station' | 'spacewalk' | 'lander' | 'moon' | 'moonbase' | 'wing' | 'reactor' | 'chem' | 'aquarium' | 'sub' | 'airportstn' | 'airport' | 'plane' | 'kef' | 'reykjavik';
+export const ROOM_IDS: RoomId[] = ['lab', 'plaza', 'cinema', 'den', 'roof', 'crypt', 'stage', 'pier', 'arcade', 'subway', 'train', 'park', 'parkstn', 'dinerstn', 'diner', 'kartstn', 'karts', 'lofts', 'flat', 'flatbed', 'flatkit', 'rocket', 'station', 'spacewalk', 'lander', 'moon', 'moonbase', 'wing', 'reactor', 'chem', 'aquarium', 'sub', 'airportstn', 'airport', 'plane', 'kef', 'reykjavik'];
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -35,7 +35,10 @@ export const doorDest = (d: Door): { to: RoomId; arrive: { x: number; y: number 
  */
 export type SpotKind = 'sit' | 'coffee' | 'arcade' | 'juke' | 'board' | 'popcorn' | 'soda' | 'booth' | 'desk' | 'kanban' | 'rack' | 'deploy' | 'party' | 'hammock' | 'scope' | 'fireworks' | 'chest' | 'instrument' | 'fish' | 'marsh' | 'claw' | 'pong' | 'prizes' | 'decor' | 'treat' | 'candle' | 'bed' | 'boat' | 'kite' | 'hotdog' | 'sand' | 'cook' | 'shift' | 'kart' | 'tank' | 'lift' | 'look' | 'flatparty' | 'tray' | 'mission' | 'karaoke' | 'photos' | 'present' | 'tree' | 'snowfight' | 'advent' | 'snowman' | 'buggy' | 'rock' | 'assay' | 'map' | 'rstation' | 'rfault' | 'rshift' | 'chem' | 'recipes' | 'goggles' | 'shower' | 'donate' | 'giftshop' | 'touch' | 'feedfish'
   // SARDINE 1 (world/sub.ts): the stations, the troubles' fix spots, the galley, the treasure bin, the SEA LIFE LOG, the escape hatch
-  | 'helm' | 'subcam' | 'lights' | 'sonar' | 'subclaw' | 'periscope' | 'subfix' | 'tea' | 'bin' | 'sealog' | 'escape';
+  | 'helm' | 'subcam' | 'lights' | 'sonar' | 'subclaw' | 'periscope' | 'subfix' | 'tea' | 'bin' | 'sealog' | 'escape'
+  // THE AIRPORT and ICELAND (step 19): check-in, the X-ray, the forecast TV; the plane's lavatory and drinks trolley; passport control and the carousel;
+  // Reykjavik's treats, the tower, the Sun Voyager, the aurora camera, the cat, the elf house
+  | 'checkin' | 'xray' | 'forecast' | 'lav' | 'drinks' | 'passport' | 'carousel' | 'skyr' | 'pylsa' | 'bakery' | 'tower' | 'voyager' | 'auroracam' | 'cat' | 'elf';
 export interface Spot {
   kind: SpotKind;
   /** Feet position while using it (seats: sits 1px in front of the seat prop so it sorts over it). */
@@ -123,6 +126,11 @@ export interface Room {
   water?(x: number, y: number): boolean;
   /** Multiplier for all soft glow (lamps fade out in daylight). */
   glowMul?(): number;
+  /**
+   * Rooms that only draw what's in the camera's view (the busy ones): point that view at x0..x1 (y0..y1) instead, for a look
+   * inside from somewhere else (a map card's), and get back how to put it back.
+   */
+  lookAt?(x0: number, x1: number, y0: number, y1: number): () => void;
   /** Weightless right now (the Space Station, the rocket once its engines stop): you drift, bounce off walls, everyone bobs. */
   zeroG?(): boolean;
   /** Out in open space (the spacewalk): no floor to stand on, helmets on, SPACE fires your jetpack. */

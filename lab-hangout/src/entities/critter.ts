@@ -15,13 +15,13 @@ export const PETS = ['NONE', 'PIGEON', 'CAT', 'CRAB', 'DUCK', 'GHOST', 'BAT', 'P
 export const PET_SAY: Record<(typeof PETS)[number], string> = { NONE: '', PIGEON: 'COO', CAT: 'MEOW', CRAB: 'SNIP', DUCK: 'QUACK', GHOST: 'BOO', BAT: 'SQUEAK', PENGUIN: 'NOOT', 'MOON ROVER': 'BEEP', 'BABY OCTOPUS': 'BLUB' };
 /** Which character body. 0 = the lab critter, 1 = Clawd. Both wear every hat, face item and outfit. */
 export const SPECIES = ['CRITTER', 'CLAWD'] as const;
-export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT', "CAPTAIN'S HAT", 'SHARK FIN', 'DIVING HELMET'] as const;
+export const HATS = ['NONE', 'HARD HAT', 'BEANIE', 'HEADPHONES', 'SPROUT', 'CROWN', 'PARTY HAT', 'COWBOY', 'WIZARD', 'TOP HAT', 'HALO', 'WITCH HAT', 'PUMPKIN HEAD', 'CHEF HAT', 'SPACE HELMET', 'SANTA HAT', 'REINDEER ANTLERS', 'ELF HAT', "CAPTAIN'S HAT", 'SHARK FIN', 'DIVING HELMET', 'VIKING HELMET'] as const;
 export const FACES = ['NONE', 'GLASSES', 'GOGGLES', 'SHADES', 'MUSTACHE', 'MONOCLE', 'FANGS', 'SKULL MASK', 'RED NOSE', 'LAB GOGGLES', 'SNORKEL'] as const;
 /** The chem lab's safety goggles (free from its dispenser). */
 export const FACE_LAB_GOGGLES = 9;
 /** The City Aquarium's gift shop: a dive mask and snorkel. */
 export const FACE_SNORKEL = 10;
-export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST', 'SAILOR TOP'] as const;
+export const FITS = ['NONE', 'LAB COAT', 'SCARF', 'BOW TIE', 'HOODIE', 'CAPE', 'VAMPIRE CAPE', 'SKELETON', 'ROCK STAR', 'CHRISTMAS JUMPER', 'HAZMAT SUIT', 'HI-VIS VEST', 'SAILOR TOP', 'LOPAPEYSA', 'NECK PILLOW'] as const;
 export type Slot = 'hat' | 'face' | 'fit' | 'pet';
 /**
  * Things you have to earn. Keys are 'slot:index' (the same ids the server's inventory uses).
@@ -41,8 +41,12 @@ export const CLAW: [string, number, string?][] = [
   // Winter (1 Dec - 6 Jan): also the present hunt's prize and the advent calendar's (0018_winter.sql)
   ['hat:17', 10, 'winter'], ['face:8', 10, 'winter'], ['hat:16', 6, 'winter'], ['fit:9', 6, 'winter'], ['pet:7', 3, 'winter'], ['hat:15', 3, 'winter'],
 ];
-/** The City Aquarium's GIFT SHOP: clothes for tokens, one of each (keep in step with private.gift_items in 0023_aquarium.sql). */
-export const GIFTS: [string, number][] = [['hat:18', 15], ['hat:19', 12], ['face:10', 10], ['fit:12', 12]];
+/** The shops' clothes for tokens, one of each (keep in step with private.gift_items: 0023_aquarium.sql, 0025_airport.sql): the City Aquarium's
+ *  GIFT SHOP, the airport's DUTY FREE and Reykjavík's PUFFIN SHOP (GIFT_SHOP says which sells what). */
+export const GIFTS: [string, number][] = [['hat:18', 15], ['hat:19', 12], ['face:10', 10], ['fit:12', 12], ['fit:14', 10], ['fit:13', 15], ['hat:21', 15]];
+export type Shop = 'aquarium' | 'duty' | 'puffin';
+export const GIFT_SHOP: Record<string, Shop> = { 'hat:18': 'aquarium', 'hat:19': 'aquarium', 'face:10': 'aquarium', 'fit:12': 'aquarium', 'fit:14': 'duty', 'fit:13': 'puffin', 'hat:21': 'puffin' };
+export const SHOP_NAME: Record<Shop, string> = { aquarium: "THE AQUARIUM'S GIFT SHOP", duty: "THE AIRPORT'S DUTY FREE", puffin: "REYKJAVIK'S PUFFIN SHOP" };
 export const RARITY = (item: string): string => { const w = CLAW.find(([k]) => k === item)?.[1] ?? 0; return w >= 10 ? 'COMMON' : w >= 6 ? 'UNCOMMON' : w >= 3 ? 'RARE' : w ? 'LEGENDARY' : 'SPECIAL'; };
 /** Is this item locked until earned? */
 export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + ':' + i; return k in EARNED || CLAW.some(([c]) => c === k) || GIFTS.some(([g]) => g === k); };
@@ -50,7 +54,7 @@ export const isLocked = (slot: Slot, i: number): boolean => { const k = slot + '
 export const unlockHint = (slot: Slot, i: number): string => {
   const k = slot + ':' + i, gift = GIFTS.find(([g]) => g === k), claw = CLAW.find(([c]) => c === k);
   if (EARNED[k]) return EARNED[k];
-  if (gift) return "THE AQUARIUM'S GIFT SHOP (" + gift[1] + ' TOKENS)';
+  if (gift) return SHOP_NAME[GIFT_SHOP[k] ?? 'aquarium'] + ' (' + gift[1] + ' TOKENS)';
   return claw?.[2] === 'halloween' ? 'HALLOWEEN: TRICK-OR-TREAT OR CLAW' : claw?.[2] === 'winter' ? 'WINTER: PRESENTS, ADVENT CALENDAR OR CLAW' : 'CLAW MACHINE PRIZE';
 };
 /** Every collectable, for the collection counter. */
@@ -219,6 +223,13 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
     } else if (look.fit === 12) { // SAILOR TOP: white with navy stripes, a navy collar and a red neckerchief knot
       for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1, nv = (y + 13) % 3 === 2; R(-hw, y, hw * 2, 1, nv ? SAIL_N : SAIL_W); R(hw - 1, y, 1, 1, nv ? SAIL_N : SAIL_WD); }
       R(-hwAt(-13) - 1, -13, hwAt(-13) * 2 + 2, 1, SAIL_N); R(-2, -13, 4, 2, SAIL_R); R(-1, -11, 2, 2, SAIL_R); R(-2, -13, 1, 1, M(SAIL_R, K.WHITE, 0.35));
+    } else if (look.fit === 13) { // LOPAPEYSA: oatmeal wool, the patterned yoke round the neck (a band of little diamonds and zigzags), a ribbed hem
+      for (let y = -13; y <= -4; y++) { const hw = hwAt(y) + 1; R(-hw, y, hw * 2, 1, y === -4 ? WOOL_DK : WOOL); R(hw - 1, y, 1, 1, WOOL_DK); }
+      for (let x = -hwAt(-12) - 1; x < hwAt(-12) + 1; x++) { const k = ((x % 4) + 4) % 4; R(x, -13, 1, 1, YOKE); if (k === 1 || k === 2) R(x, -12, 1, 1, YOKE2); if (k === 0) R(x, -11, 1, 1, YOKE); R(x, -10, 1, 1, k === 2 ? YOKE : WOOL); }
+      for (let x = -hwAt(-5); x < hwAt(-5); x += 2) R(x, -5, 1, 2, WOOL_DK);
+    } else if (look.fit === 14) { // NECK PILLOW: a plump U of grey-blue plush round the neck, a stripe along it, the open ends at the front
+      const hw = hwAt(-12) + 2; R(-hw, -14, hw * 2, 4, PIL); R(-hw, -14, hw * 2, 1, PIL_HI); R(-hw, -11, hw * 2, 1, PIL_DK); R(-hw + 2, -13, hw * 2 - 4, 1, M(PIL, K.WHITE, 0.25));
+      R(-3, -12, 6, 2, body); R(-hw, -14, 2, 4, PIL_DK); R(hw - 2, -14, 2, 4, PIL_DK);
     }
     // face
     const ey = -20, ex = [-7 + d, 3 + d];
@@ -274,13 +285,15 @@ export function composeCritter(look: Look, P: Pose, dim: number): Composed {
 }
 
 /** Hats that hide the critter's antenna. */
-const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17, 18, 19, 20]);
+const COVERS = new Set([2, 6, 7, 8, 9, 11, 12, 13, 15, 17, 18, 19, 20, 21]);
 /** Sleeve colours (main, shade) for outfits with sleeves. */
 /** The HAZMAT SUIT's yellows, its boots, the HI-VIS VEST's orange and its reflective stripes. */
 const HZ: RGB = [242, 194, 48], HZ_DK: RGB = [196, 146, 28], HZ_HI: RGB = [255, 226, 120], BOOT: RGB = [34, 34, 40], VIS: RGB = [255, 122, 34], VIS_DK: RGB = [210, 90, 20], STRIPE: RGB = [226, 230, 236];
 /** The SAILOR TOP's white, its shade, the navy stripes and the red neckerchief. */
 const SAIL_W: RGB = [240, 242, 248], SAIL_WD: RGB = [200, 206, 222], SAIL_N: RGB = [36, 50, 110], SAIL_R: RGB = [220, 50, 60];
-const SLEEVES: Record<number, [RGB, RGB]> = { 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]], 10: [HZ, HZ_DK], 12: [SAIL_W, SAIL_N] };
+/** The LOPAPEYSA's oatmeal wool and its yoke's pattern colours; the NECK PILLOW's grey-blue plush and its stripe. */
+const WOOL: RGB = [232, 222, 200], WOOL_DK: RGB = [196, 184, 158], YOKE: RGB = [92, 70, 58], YOKE2: RGB = [150, 60, 50], PIL: RGB = [120, 150, 190], PIL_DK: RGB = [86, 112, 150], PIL_HI: RGB = [170, 196, 226];
+const SLEEVES: Record<number, [RGB, RGB]> = { 13: [WOOL, WOOL_DK], 1: [K.COAT, K.COAT_SH], 4: [[80, 110, 210], [58, 79, 151]], 7: [[30, 28, 40], [236, 232, 220]], 8: [[236, 190, 60], [184, 136, 30]], 9: [[200, 40, 52], [150, 26, 38]], 10: [HZ, HZ_DK], 12: [SAIL_W, SAIL_N] };
 /** The ROCK STAR jacket's gold sequins and the twinkles on them (they catch the light as you move). */
 const SEQ: RGB = [236, 190, 60], SEQ_DK: RGB = [184, 136, 30], SEQ_HI: RGB = [255, 236, 150];
 function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void, x0: number, x1: number, y0: number, y1: number, P: Pose): void {
@@ -288,7 +301,7 @@ function sequins(R: (x: number, y: number, w: number, h: number, c: RGB) => void
   lit(() => { for (let k = 0; k < 5; k++) { const x = x0 + ((k * 7 + ph * 3) % Math.max(1, x1 - x0)), y = y0 + ((k * 5 + ph) % Math.max(1, y1 - y0)); R(x, y, 1, 1, k % 2 ? K.WHITE : SEQ_HI); } });
 }
 /** How far each prize hat (6..10) rises above its brim row. */
-const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16, 8, 14, 13];
+const HAT_TALL = [14, 10, 17, 13, 16, 16, 9, 15, 15, 16, 14, 16, 8, 14, 13, 14];
 type Rect = (x: number, y: number, w: number, h: number, c: RGB) => void;
 
 /** The claw machine hats (6..10), brim on row `b`. Returns where its glowing bit is, if any. */
@@ -376,6 +389,16 @@ function extraHat(R: Rect, hat: number, b: number, d: number, P: Pose, bulbCol: 
       const w = Math.max(1, Math.round(10 * (1 - j / 12))), x0 = -d * Math.round((j * j) / 26) - Math.floor(w / 2);
       R(x0, b - 2 - j, w, 1, g); R(d > 0 ? x0 + w - 1 : x0, b - 2 - j, 1, 1, gl); if (w > 3) R(d > 0 ? x0 : x0 + w - 1, b - 2 - j, 1, 1, gd);
     }
+    return null;
+  }
+  if (hat === 21) { // VIKING HELMET: a riveted steel dome with a brow band and a nose guard, and two ivory horns curving up and out.
+    // (Not what Vikings wore. The Puffin Shop says so.) `b` below -24 = Clawd (a wider dome)
+    const wide = b < -24, R2 = wide ? 14 : 12, cy = b + 2, ST: RGB = [168, 174, 186], SH: RGB = [210, 216, 226], SD: RGB = [116, 122, 136], HN: RGB = [240, 230, 204], HD: RGB = [196, 180, 146];
+    for (let y = cy - R2 + 4; y <= cy; y++) { const hw = Math.round(R2 * Math.sqrt(Math.max(0, 1 - ((y - cy) / (R2 - 2)) ** 2))); if (hw <= 0) continue; R(-hw, y, hw * 2, 1, ST); R(-hw, y, 2, 1, y < cy - 4 ? SH : ST); R(hw - 2, y, 2, 1, SD); }
+    R(-R2, cy, R2 * 2, 3, SD); R(-R2, cy, R2 * 2, 1, SH); for (let x = -R2 + 2; x < R2 - 1; x += 4) R(x, cy + 1, 1, 1, SH); // (the brow band and its rivets)
+    R(-1 + d, cy + 3, 2, 5, SD); R(-1 + d, cy + 3, 1, 5, SH); // (the nose guard)
+    R(-2, cy - R2 + 3, 4, R2 - 3, SD); R(-2, cy - R2 + 3, 1, R2 - 3, SH); // (the ridge over the top)
+    for (const side of [-1, 1]) for (let k = 0; k < 9; k++) { const hx = side * (R2 - 1 + Math.round(k * 0.7)), hy = cy - 2 - k + Math.round(k * k * 0.06), w = k < 3 ? 3 : k < 6 ? 2 : 1; R(side > 0 ? hx : hx - w + 1, hy, w, 2, k < 7 ? HN : HD); if (k < 6) R(side > 0 ? hx : hx - w + 1, hy + 1, 1, 1, HD); } // (the horns)
     return null;
   }
   if (hat === 20) { // DIVING HELMET: a round brass dome with a glass faceplate (the face shows through), a ring of bolts round it, a side port,
@@ -542,6 +565,12 @@ function composeClawd(look: Look, P: Pose, dim: number): Composed {
     } else if (look.fit === 12) { // SAILOR TOP
       R(-13, -15, 26, 11, SAIL_W); R(12, -15, 1, 11, SAIL_WD); for (let y = -12; y <= -6; y += 3) R(-13, y, 26, 1, SAIL_N); R(-13, -15, 26, 1, SAIL_N); R(-13, -5, 26, 1, SAIL_N);
       R(-2, -15, 4, 2, SAIL_R); R(-1, -13, 2, 2, SAIL_R); R(-2, -15, 1, 1, M(SAIL_R, K.WHITE, 0.35));
+    } else if (look.fit === 13) { // LOPAPEYSA
+      R(-13, -15, 26, 11, WOOL); R(12, -15, 1, 11, WOOL_DK); R(-13, -5, 26, 1, WOOL_DK);
+      for (let x = -13; x < 13; x++) { const k = ((x % 4) + 4) % 4; R(x, -15, 1, 1, YOKE); if (k === 1 || k === 2) R(x, -14, 1, 1, YOKE2); if (k === 0) R(x, -13, 1, 1, YOKE); if (k === 2) R(x, -12, 1, 1, YOKE); }
+      for (let x = -12; x < 12; x += 2) R(x, -6, 1, 2, WOOL_DK);
+    } else if (look.fit === 14) { // NECK PILLOW
+      R(-14, -17, 28, 4, PIL); R(-14, -17, 28, 1, PIL_HI); R(-14, -14, 28, 1, PIL_DK); R(-12, -16, 24, 1, M(PIL, K.WHITE, 0.25)); R(-3, -15, 6, 2, body); R(-14, -17, 2, 4, PIL_DK); R(12, -17, 2, 4, PIL_DK);
     }
     const sleeve = SLEEVES[look.fit] ?? null;
     const arm2 = (side: -1 | 1, raised: boolean, sway: number) => {

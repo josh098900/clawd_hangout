@@ -1,12 +1,13 @@
 // The QUESTS panel (the pill in the top bar): today's three quests with progress, when they
-// change, and your badges. Plus the badge chips shown on someone's player card.
+// change, and your badges (and, once you have one, the PASSPORT button). Plus the badge chips shown on someone's player card.
 
 import { BADGES, QUESTS, quests } from '../game/quests';
 import { button, openModal, row, font } from './modal';
 
 const hm = (sec: number) => { const m = Math.ceil(sec / 60); return Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
 
-export function openQuests(onClose: () => void): void {
+/** `passport`: opens your passport (its button shows once you've a stamp in it). */
+export function openQuests(onClose: () => void, passport?: () => void): void {
   const m = openModal('DAILY QUESTS', onClose);
   const list = document.createElement('div'); Object.assign(list.style, { display: 'flex', flexDirection: 'column', gap: '6px', width: 'min(460px, 84vw)' });
   if (!quests.today.length) { const e = document.createElement('div'); e.textContent = 'No quests yet (are you online?)'; Object.assign(e.style, font(20, '#9FEFFF')); list.appendChild(e); }
@@ -35,7 +36,7 @@ export function openQuests(onClose: () => void): void {
     const h = document.createElement('div'); h.textContent = b.hint; Object.assign(h.style, font(15, have ? '#E8D8C0' : '#6A6680'));
     c.append(n, h); grid.appendChild(c);
   }
-  m.body.append(list, foot, bh, grid, row(button('CLOSE', m.close, true)));
+  m.body.append(list, foot, bh, grid, row(...(passport ? [button('PASSPORT', passport)] : []), button('CLOSE', m.close, true)));
 }
 
 /** Badge chips for a player card (names only, gold). */

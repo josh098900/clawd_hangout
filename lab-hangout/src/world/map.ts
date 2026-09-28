@@ -9,7 +9,7 @@
 // their real timetables, the weather, the people). ui/map.ts puts it on the screen; features/map.ts
 // decides where a click takes you.
 
-import { K, DK, CK, NK, RK, PK, SK, MN, MP, RX, AQ, CONFETTI, type RGB } from '../engine/palette';
+import { K, DK, CK, NK, RK, PK, SK, MN, MP, RX, AQ, AP, CONFETTI, type RGB } from '../engine/palette';
 import { PX, r, line, disc, oval, txt, tw, lit, alpha, G, Gd, Gline, M, shade, bake, star4 } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
 import type { Rect, RoomId } from './room';
@@ -23,40 +23,37 @@ import { isHalloween, isWinter } from './season';
 import { EXPLORE } from '../game/places';
 import { gridOn, meltAgo } from './grid';
 import { dive, penSink, SUB_DOWN, SUB_UP } from '../game/sub';
+import { air, flying, PUSH_S, TAXI_S, ROLL_S, CLIMB_S, TOUCH_S, LEG_S } from '../game/air';
+import { MAP_W, MAP_H, R_, inR, drawMarks, type MapPage, type MapPlace, type MapLive } from './mapmarks';
+import { ICE_PLACES } from './icemap';
 
-export const MAP_W = 480, MAP_H = 300;
+export { MAP_W, MAP_H };
+export type { Zone, MapPlace, MapDot, MapLive } from './mapmarks';
 /** The horizon, where the Square's buildings stand, and the edges of the Square and the road. */
 const HOR = 100, BASE = 150, PLZ = 190, ROAD = 202;
 
-export type Zone = 'earth' | 'orbit' | 'moon';
-export interface MapPlace {
-  id: RoomId;
-  /** Its name on the card (the room's own title, mostly). */
-  name: string;
-  /** Where on the map it is (the first one is where its ? sticker and the people go). */
-  hits: Rect[];
-  /** Where people standing here are drawn. */
-  at: [number, number];
-  zone: Zone;
-  /** You can pick it to go there (the spacewalk is only reached through the station's airlock). */
-  pick: boolean;
-  /** Where its ? sticker goes (clear of its signs), if it's one the EXPLORER badge counts. */
-  tag?: [number, number];
-}
-const R_ = (x0: number, y0: number, x1: number, y1: number): Rect => ({ x0, y0, x1, y1 });
 /** The ORBIT and THE MOON boxes. */
 export const ORBIT = R_(104, 6, 194, 56), MOONBOX = R_(204, 6, 294, 56);
-/** The Subway's stations (in STATIONS order: SQUARE, PARK, DINER, KARTS) and the loop the line runs round. */
-const STN: [number, number][] = [[206, 212], [150, 226], [226, 240], [300, 226]];
-const LOOP: [number, number][] = [[206, 212], [150, 212], [150, 226], [150, 240], [226, 240], [300, 240], [300, 226], [300, 212], [206, 212]];
+/**
+ * The Subway's stations (in STATIONS order: SQUARE, PARK, DINER, KARTS, AIRPORT) and the way the train goes: round the loop, out along
+ * the branch past the Kart Track to the AIRPORT and back (the map draws the line as a diagram: the real line's one big loop).
+ */
+const STN: [number, number][] = [[206, 212], [150, 226], [226, 240], [300, 226], [492, 284]];
+const LOOP: [number, number][] = [[206, 212], [150, 212], [150, 226], [150, 240], [226, 240], [300, 240], [300, 226], [478, 226], [478, 284], [492, 284], [478, 284], [478, 226], [300, 226], [300, 212], [206, 212]];
 /** Stops on LOOP (the index of each station's point). */
-const LOOP_AT = [0, 2, 4, 6];
+const LOOP_AT = [0, 2, 4, 6, 9];
+/** The line as it's drawn (each stretch once), and where each roundel's letter goes. */
+const LINES: [number, number][][] = [LOOP.slice(0, 10), [[300, 226], [300, 212], [206, 212]]];
+const STN_L: [number, number][] = [[6, -2], [6, -2], [6, -2], [3, 6], [6, -2]];
+/** THE AIRPORT's layout: the runway's centre line and where it starts, the taxiway, the stand (the jet's wheels), where it touches down, the terminal, its sign, the tower. */
+const APT = { x0: 480, rwy: 222, rwy0: 488, tw: 498, stand: [526, 240] as [number, number], td: 504, term0: 488, term1: 546, sign: 504, tower: 552 };
 /** Checked in this order: the small things first (a station's roundel is on top of the Square's road). */
 export const PLACES: MapPlace[] = [
   { id: 'subway', name: 'SQUARE STATION', hits: [R_(194, 172, 222, 190), R_(199, 205, 213, 219)], at: [206, 186], zone: 'earth', pick: true, tag: [186, 175] },
   { id: 'parkstn', name: 'PARK STATION', hits: [R_(143, 219, 157, 233)], at: [150, 232], zone: 'earth', pick: true },
   { id: 'dinerstn', name: 'DINER STATION', hits: [R_(219, 233, 233, 247)], at: [226, 246], zone: 'earth', pick: true },
   { id: 'kartstn', name: 'KARTS STATION', hits: [R_(293, 219, 307, 233)], at: [300, 232], zone: 'earth', pick: true },
+  { id: 'airportstn', name: 'AIRPORT STATION', hits: [R_(485, 277, 499, 291)], at: [492, 290], zone: 'earth', pick: true },
   { id: 'arcade', name: 'THE ARCADE', hits: [R_(64, 162, 106, 190)], at: [76, 186], zone: 'earth', pick: true, tag: [104, 174] },
   { id: 'crypt', name: 'THE CRYPT', hits: [R_(286, 166, 328, 190)], at: [298, 186], zone: 'earth', pick: true, tag: [326, 173] },
   { id: 'spacewalk', name: 'SPACEWALK', hits: [R_(170, 30, 190, 44)], at: [180, 38], zone: 'orbit', pick: false, tag: [181, 42] },
@@ -77,14 +74,15 @@ export const PLACES: MapPlace[] = [
   { id: 'park', name: 'CITY PARK', hits: [R_(2, 204, 142, 298)], at: [72, 288], zone: 'earth', pick: true, tag: [6, 210] },
   { id: 'diner', name: 'THE GREASY BYTE', hits: [R_(166, 246, 292, 298)], at: [236, 292], zone: 'earth', pick: true, tag: [172, 249] },
   { id: 'karts', name: 'THE KART TRACK', hits: [R_(308, 206, 480, 298)], at: [392, 262], zone: 'earth', pick: true, tag: [312, 218] },
+  { id: 'airport', name: 'THE AIRPORT', hits: [R_(480, 216, 560, 300)], at: [517, 268], zone: 'earth', pick: true, tag: [484, 236] },
   { id: 'plaza', name: 'THE SQUARE', hits: [R_(60, 150, 388, 190)], at: [132, 168], zone: 'earth', pick: true, tag: [240, 181] },
 ];
-export const placeById = (id: RoomId): MapPlace | undefined => PLACES.find((p) => p.id === id);
-const inR = (q: Rect, x: number, y: number): boolean => x >= q.x0 && x < q.x1 && y >= q.y0 && y < q.y1;
+/** A place on either page. */
+export const placeById = (id: RoomId): MapPlace | undefined => PLACES.find((p) => p.id === id) ?? ICE_PLACES.find((p) => p.id === id);
 /** The place under map pixel (x, y). */
-export function placeAt(x: number, y: number): MapPlace | null { return PLACES.find((p) => p.hits.some((q) => inR(q, x, y))) ?? null; }
+export function placeAt(x: number, y: number, page: MapPage = 'city'): MapPlace | null { return (page === 'city' ? PLACES : ICE_PLACES).find((p) => p.hits.some((q) => inR(q, x, y))) ?? null; }
 /** Where the map's boards stand, for the "YOU ARE HERE" star: the Square's kiosk, a Subway platform's poster, the station's chart. */
-export const BOARDS: Partial<Record<RoomId, [number, number]>> = { plaza: [232, 172], subway: STN[0], parkstn: STN[1], dinerstn: STN[2], kartstn: STN[3], station: [149, 32] };
+export const BOARDS: Partial<Record<RoomId, [number, number]>> = { plaza: [232, 172], subway: STN[0], parkstn: STN[1], dinerstn: STN[2], kartstn: STN[3], airportstn: STN[4], airport: [496, 262], station: [149, 32] };
 
 /** The shoreline: sand to the left of it, sea to the right. */
 const shore = (y: number): number => Math.round(392 + (y - HOR) * 0.12 + 2 * Math.sin(y * 0.3));
@@ -122,7 +120,7 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
     const S0 = dn(K.SKY0, DK.SKY0), S1 = dn(K.SKY1, DK.SKY1), S2 = dn(K.SKY2, DK.SKY2);
     for (let y = 0; y < HOR + 4; y += 2) { const u = y / HOR; r(0, y, MAP_W, 2, u < 0.6 ? M(S0, S1, u / 0.6) : M(S1, S2, (u - 0.6) / 0.4)); }
     if (!day) for (let i = 0; i < 120; i++) { const x = Math.floor(h1(i * 3.7) * MAP_W), y = Math.floor(h1(i * 9.1) * 80); r(x, y, 1, 1, h1(i) > 0.8 ? [200, 210, 255] : [110, 120, 170]); }
-    else { disc(446, 22, 9, DK.SUN); disc(444, 20, 6, DK.SUN_HI); }
+    else { disc(526, 22, 9, DK.SUN); disc(524, 20, 6, DK.SUN_HI); }
     // far skyline, then the back streets behind the Square's frontage
     for (let x = 0, i = 0; x < 392; i++) {
       const w = 10 + Math.floor(h1(i * 1.7) * 16), top = 74 + Math.floor(h1(i * 2.9) * 20); r(x, top, w, HOR + 10 - top, dn(K.CITY0, DK.CITY0));
@@ -150,6 +148,10 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
     for (const y of [118, 130]) r(454, y, 9, 4, dn(shade(PK.LIGHT_RED, 0.8), PK.LIGHT_RED));
     r(452, 110, 13, 2, dn(K.BLACK, [60, 60, 70])); r(455, 104, 7, 6, dn([40, 44, 60], [160, 190, 210])); r(454, 101, 9, 3, dn(shade(PK.LIGHT_RED, 0.7), PK.LIGHT_RED)); r(458, 99, 1, 2, K.BLACK);
     r(457, 137, 3, 5, dn([30, 20, 20], [90, 60, 50])); // its door
+    // a container ship out on the horizon, past the Pier
+    { const sx = 500, sy = 102, BOX: [RGB, RGB][] = [[[90, 60, 50], [220, 120, 60]], [[50, 70, 100], [70, 130, 200]], [[100, 90, 50], [230, 190, 70]], [[60, 90, 70], [90, 170, 110]], [[90, 60, 80], [200, 90, 110]]];
+      r(sx, sy, 26, 2, dn([60, 44, 52], [150, 60, 60])); r(sx + 1, sy + 2, 24, 1, dn([26, 28, 40], [50, 56, 70])); r(sx - 1, sy - 1, 2, 1, dn([60, 44, 52], [150, 60, 60]));
+      BOX.forEach(([n, d], k) => r(sx + 2 + k * 3, sy - 2, 3, 2, dn(n, d))); r(sx + 19, sy - 5, 5, 5, dn([130, 132, 144], K.WHITE)); r(sx + 20, sy - 4, 3, 1, dn([40, 50, 70], DK.WIN)); r(sx + 21, sy - 7, 1, 2, dn([50, 50, 60], [80, 80, 90])); }
     // the pier: planks out over the sea on posts, a lamp at the end
     { const x0 = shore(166) - 2;
       for (let x = x0 + 3; x < 476; x += 7) { r(x, 170, 1, 7, dn(PK.WOOD_DK, PK.WOOD)); r(x, 176, 1, 1, dn(PK.FOAM, K.WHITE)); }
@@ -308,10 +310,10 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
     for (const x of [184, 197]) { for (let k = 0; k < 7; k++) r(x - 3 + k, 151 + (k === 0 || k === 6 ? 1 : 0), 1, 1, k % 2 ? dn([220, 210, 200], K.WHITE) : dn([180, 60, 70], [230, 90, 100])); r(x, 152, 1, 4, K.STEEL_POST); r(x - 2, 156, 5, 1, dn([150, 150, 160], [220, 220, 226])); r(x - 3, 157, 1, 1, dn(K.WOOD, K.WOOD_HI)); r(x + 3, 157, 1, 1, dn(K.WOOD, K.WOOD_HI)); }
 
     // ---- south of the road: the town, with the Park, the Diner and the Kart Track ----
-    r(0, ROAD, 390, MAP_H - ROAD, dn(MP.GROUND, MP.GROUND_D)); r(390, 216, 90, MAP_H - 216, dn(MP.GROUND, MP.GROUND_D));
+    r(0, ROAD, 390, MAP_H - ROAD, dn(MP.GROUND, MP.GROUND_D)); r(390, 216, MAP_W - 390, MAP_H - 216, dn(MP.GROUND, MP.GROUND_D));
     for (let i = 0; i < 260; i++) { const x = Math.floor(h1(i * 3.1 + 5) * MAP_W), y = ROAD + Math.floor(h1(i * 7.7 + 1) * (MAP_H - ROAD)); r(x, y, 2, 1, dn(MP.GROUND2, MP.GROUND2_D)); }
     // the sea's edge carries on below the pier as a sea wall
-    r(386, 214, 94, 2, dn([70, 74, 92], [150, 150, 160]));
+    r(386, 214, MAP_W - 386, 2, dn([70, 74, 92], [150, 150, 160]));
     // CITY PARK: a hedge round the edge, a sandy path, the pond, the trees, the sandbox, a bench
     { const g0 = dn(MP.GRASS, MP.GRASS_D), g1 = dn(MP.GRASS2, MP.GRASS2_D);
       r(2, 206, 140, 92, g0); for (let i = 0; i < 180; i++) r(2 + Math.floor(h1(i * 1.9) * 140), 206 + Math.floor(h1(i * 4.3) * 92), 1, 1, g1);
@@ -360,9 +362,51 @@ export function paintMap(ctx: CanvasRenderingContext2D, day: boolean): void {
       for (const [x, y] of LIGHTS) { r(x, y, 1, 14, K.STEEL_POST); r(x - 2, y - 2, 5, 2, [50, 54, 70]); }
       r(420, 218, 34, 7, [30, 24, 30]); r(420, 218, 34, 1, [200, 60, 60]); txt('KARTS', 427, 219, K.WHITE);
     }
+    // ---- THE AIRPORT, past the Kart Track on the shore: the runway along the sea wall, the apron and its stand, the terminal and its
+    // tower, the road and the car park (LAB AIR comes and goes on the live layer) ----
+    { const X0 = APT.x0, RY = APT.rwy, tar = dn(MP.ROAD, [96, 100, 110]), edge = dn([70, 74, 92], [214, 214, 220]), yel = dn([150, 126, 40], AP.LINE_Y);
+      r(X0, 216, MAP_W - X0, MAP_H - 216, dn(MP.GRASS, MP.GRASS_D)); for (let i = 0; i < 60; i++) r(X0 + Math.floor(h1(i * 3.7 + 11) * (MAP_W - X0)), 216 + Math.floor(h1(i * 5.3 + 4) * 84), 1, 1, dn(MP.GRASS2, MP.GRASS2_D));
+      for (let y = 217; y < MAP_H; y += 2) r(X0, y, 1, 1, dn([80, 86, 104], [160, 166, 178])); // the perimeter fence
+      // the runway (it runs on off the map: a long one), the threshold's piano keys, the centre line, the edge lights (lit at night, live)
+      r(APT.rwy0, RY - 3, MAP_W - APT.rwy0, 8, tar); r(APT.rwy0, RY - 3, MAP_W - APT.rwy0, 1, edge); r(APT.rwy0, RY + 4, MAP_W - APT.rwy0, 1, edge);
+      for (let y = RY - 2; y < RY + 4; y += 2) r(APT.rwy0 + 2, y, 4, 1, dn([150, 150, 160], K.WHITE));
+      for (let x = APT.rwy0 + 12; x < MAP_W; x += 7) r(x, RY, 4, 1, dn([120, 120, 130], K.WHITE));
+      for (let x = APT.rwy0; x < MAP_W; x += 6) { r(x, RY - 4, 1, 1, dn([60, 70, 100], [130, 140, 160])); r(x, RY + 5, 1, 1, dn([60, 70, 100], [130, 140, 160])); }
+      for (let k = 0; k < 4; k++) r(APT.rwy0 - 2 - k * 2, RY, 1, 1, dn([60, 60, 70], [120, 120, 130])); // the approach lights (they run in at night)
+      // the taxiway down to the apron
+      r(APT.tw - 2, RY + 5, 5, 8, tar); r(APT.tw, RY + 5, 1, 8, yel);
+      // the apron: concrete slabs, the taxi line along it, the stop bar at the stand
+      const con = dn([58, 62, 78], [186, 188, 192]); r(486, 232, 62, 13, con); for (let x = 486; x < 548; x += 8) r(x, 232, 1, 13, shade(con, 0.93)); r(486, 238, 62, 1, shade(con, 0.95));
+      r(APT.tw, 236, APT.stand[0] + 7 - APT.tw, 1, yel); r(APT.stand[0] + 7, 234, 1, 5, yel);
+      // THE TERMINAL: a long glass hall under a steel wing of a roof, AIRPORT on its sign band, the doors in the middle, the jet bridge out to the stand
+      { const x0 = APT.term0, x1 = APT.term1, rf = 245, face = 250, base = 265, gl = face + 7;
+        r(x0, rf, x1 - x0, face - rf, dn([84, 92, 110], AP.STEEL_HI)); r(x0, rf, x1 - x0, 1, dn([116, 124, 144], [236, 240, 244])); for (let x = x0 + 3; x < x1; x += 6) r(x, rf + 1, 1, face - rf - 1, dn([74, 82, 100], AP.STEEL));
+        r(x0 - 1, face - 1, x1 - x0 + 2, 1, dn(AP.TEAL_DK, AP.TEAL));
+        r(x0, face, x1 - x0, 7, AP.SIGN); r(x0, face, x1 - x0, 1, AP.SIGN_HI); txt('AIRPORT', APT.sign, face + 1, dn(shade(AP.SIGN_TXT, 0.55), AP.SIGN_TXT));
+        r(x0, gl, x1 - x0, base - gl, day ? AP.GLASS : [250, 214, 150]); if (day) r(x0, gl, x1 - x0, 2, AP.GLASS_HI); else WGLOW.push([x0, gl, x1 - x0, base - gl]);
+        for (let x = x0 + 2; x < x1; x += 5) r(x, gl, 1, base - gl, dn([70, 60, 50], AP.GLASS_DK));
+        r(512, gl + 1, 11, base - gl - 1, dn([60, 50, 40], [60, 90, 110])); r(513, gl + 2, 4, base - gl - 2, dn([255, 236, 190], AP.GLASS_HI)); r(518, gl + 2, 4, base - gl - 2, dn([255, 236, 190], AP.GLASS_HI)); // the doors
+        r(x1 - 2, rf, 2, base - rf, dn([40, 44, 56], AP.WALL_DK));
+        r(APT.stand[0] + 3, 240, 2, rf - 240, dn([90, 96, 110], AP.STEEL)); r(APT.stand[0] + 3, 240, 1, rf - 240, dn([120, 126, 140], AP.STEEL_HI)); // the jet bridge
+      }
+      // the control tower: a white shaft, the cab's green glass (lit at night), the mast (its beacon turns, live)
+      { const x = APT.tower, sh = dn([150, 156, 168], [238, 240, 242]);
+        r(x - 2, 232, 4, 33, sh); r(x + 1, 232, 1, 33, shade(sh, 0.8)); for (let y = 238; y < 264; y += 6) r(x - 2, y, 3, 1, shade(sh, 0.9));
+        r(x - 4, 225, 9, 7, dn([40, 46, 56], [96, 102, 112])); r(x - 3, 226, 7, 4, dn([90, 150, 130], [160, 214, 206])); r(x - 5, 224, 11, 1, dn([96, 102, 116], [210, 214, 220]));
+        r(x, 219, 1, 5, dn([90, 96, 110], [160, 166, 176])); if (!day) WGLOW.push([x - 3, 226, 7, 4]); }
+      r(484, 226, 1, 6, K.STEEL_POST); // the windsock's pole (the sock blows on the live layer)
+      // the road in front, a LAB AIR shuttle and a taxi at the kerb, the car park
+      r(X0 + 1, 265, MAP_W - X0 - 1, 1, dn(MP.KERB, MP.KERB_D)); r(X0 + 1, 266, MAP_W - X0 - 1, 6, dn(MP.ROAD, MP.ROAD_D)); r(X0 + 1, 272, MAP_W - X0 - 1, 1, dn(MP.KERB, MP.KERB_D));
+      for (let x = X0 + 4; x < MAP_W; x += 9) r(x, 269, 4, 1, dn(MP.ROAD_LN, MP.ROAD_LN_D));
+      { const bx = 526; r(bx, 265, 16, 4, dn(AP.TEAL_DK, AP.TEAL)); r(bx, 265, 16, 1, dn(AP.TEAL, AP.TEAL_HI)); for (let x = bx + 2; x < bx + 15; x += 3) r(x, 266, 2, 1, day ? DK.WIN : [255, 220, 150]); r(bx, 268, 16, 1, dn(AP.ORANGE_DK, AP.ORANGE)); r(bx + 2, 269, 2, 1, K.BLACK); r(bx + 12, 269, 2, 1, K.BLACK); }
+      car(501, 268, dn([150, 130, 40], K.YEL), day);
+      r(503, 275, MAP_W - 503, 23, dn(MP.ROAD, MP.ROAD_D)); for (const y of [276, 288]) for (let x = 504; x < MAP_W; x += 11) r(x, y, 1, 7, dn([90, 94, 110], K.WHITE));
+      const CARS: RGB[] = [[190, 60, 60], [60, 110, 190], [230, 230, 230], [60, 60, 70], [200, 170, 60], [90, 160, 110], [150, 150, 160], [170, 90, 150]];
+      for (let i = 0; i < 10; i++) { if (h1(i * 4.1 + 2) < 0.3) continue; const c = CARS[i % CARS.length]; car(505 + (i % 5) * 11, i < 5 ? 280 : 292, dn(shade(c, 0.55), c), day); }
+    }
     // the Subway underground: its line (dashed: it's down there somewhere) and the roundels at its stops
-    for (let i = 0; i < LOOP.length - 1; i++) { const [x0, y0] = LOOP[i], [x1, y1] = LOOP[i + 1], n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let k = 0; k <= n; k++) if ((k + i) % 4 < 2) r(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 2, 2, dn(MP.LINE, [40, 140, 100])); }
-    STN.forEach(([x, y], i) => { disc(x, y, 5, [30, 34, 40]); disc(x, y, 4, [40, 120, 90]); disc(x, y, 2, K.WHITE); r(x - 1, y, 3, 1, [30, 34, 40]); const L = STATIONS[i].name[0]; txt(L, x + 6, y - 2, dn([200, 240, 220], [20, 60, 46])); });
+    for (const pts of LINES) for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let k = 0; k <= n; k++) if ((k + i) % 4 < 2) r(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 2, 2, dn(MP.LINE, [40, 140, 100])); }
+    STN.forEach(([x, y], i) => { disc(x, y, 5, [30, 34, 40]); disc(x, y, 4, [40, 120, 90]); disc(x, y, 2, K.WHITE); r(x - 1, y, 3, 1, [30, 34, 40]); const L = STATIONS[i].name[0]; txt(L, x + STN_L[i][0], y + STN_L[i][1], dn([200, 240, 220], [20, 60, 46])); });
 
     // ---- ORBIT and THE MOON: two "not to scale" boxes up in the sky ----
     insetFrame(ORBIT); insetFrame(MOONBOX);
@@ -433,26 +477,6 @@ function clipTo(q: Rect, fn: () => void): void {
 // =====================================================================================
 // THE LIVE LAYER
 // =====================================================================================
-export interface MapDot { id: string; name: string; col: RGB; friend: boolean; room: RoomId }
-export interface MapLive {
-  /** Seconds (animation). */
-  a: number;
-  /** Everyone else online, where they are (empty during hide and seek). */
-  people: MapDot[];
-  /** You: your colour, and the room you're in. */
-  me: { col: RGB; room: RoomId };
-  /** Hide and seek is on: nobody is shown. */
-  hiding: boolean;
-  /** The place under the pointer, the one picked (its pin drops), and the places you've been. */
-  hover: RoomId | null;
-  pin: { id: RoomId; t0: number } | null;
-  seen: Set<string>;
-  /** The board this map was opened from (its YOU ARE HERE star). */
-  board: RoomId | null;
-  /** The Lofts: how many flats are in use, and whether a HOUSE PARTY is on. */
-  flats: number; party: boolean;
-}
-
 /** Quadratic curve point. */
 const qb = (p0: [number, number], c: [number, number], p1: [number, number], u: number): [number, number] => [(1 - u) * (1 - u) * p0[0] + 2 * (1 - u) * u * c[0] + u * u * p1[0], (1 - u) * (1 - u) * p0[1] + 2 * (1 - u) * u * c[1] + u * u * p1[1]];
 /** The rocket's route (the Rooftop pad to the station's left port) and the lander's (the station's right port to the Moon's pad). */
@@ -488,8 +512,9 @@ export function spotOf(id: RoomId): [number, number] | null {
   if (id === 'train') return trainAt();
   if (id === 'rocket') { const p = rocketAt(); return [p.x, p.y]; }
   if (id === 'lander') { const p = landerAt(); return [p.x, p.y]; }
+  if (id === 'plane') { const j = cityJet(); return j ? [Math.round(j.x), Math.round(j.y)] : flying(air()) ? CLIMB[2] : null; }
   const pl = placeById(id === 'flat' || id === 'flatbed' || id === 'flatkit' ? 'lofts' : id);
-  return pl ? pl.at : null;
+  return pl && !pl.page ? pl.at : null;
 }
 
 export function drawMapLive(L: MapLive): void {
@@ -497,7 +522,7 @@ export function drawMapLive(L: MapLive): void {
   // ---- the sky: twinkles, searchlights, clouds drifting by day ----
   if (night > 0.3) lit(() => { for (let i = 0; i < 18; i++) if ((a * 0.6 + h1(i + 7)) % 1 < 0.15) r(Math.floor(h1(i * 9.7) * MAP_W), Math.floor(h1(i * 3.9) * 76), 1, 1, [230, 235, 255]); });
   if (night > 0.3) for (const [bx, ph] of [[60, 0], [300, 2]] as [number, number][]) { const an = -Math.PI / 2 + 0.4 * Math.sin(a * 0.45 + ph); Gline(bx, BASE, bx + Math.cos(an) * 170, BASE + Math.sin(an) * 170, [150, 190, 255], 0.06 * night, 12); }
-  if (day > 0.2) alpha(day, () => { for (let i = 0; i < 5; i++) { const x = ((h1(i * 3.3) * 520 + a * (2 + i * 0.6) * (0.5 + wd.dx * 0.1)) % 540) - 40, y = 8 + Math.floor(h1(i * 7.1) * 50); r(x, y, 16, 3, DK.CLOUD); r(x + 3, y - 2, 8, 2, DK.CLOUD); r(x + 1, y + 3, 14, 1, DK.SKY1); } });
+  if (day > 0.2) alpha(day, () => { for (let i = 0; i < 5; i++) { const x = ((h1(i * 3.3) * (MAP_W + 40) + a * (2 + i * 0.6) * (0.5 + wd.dx * 0.1)) % (MAP_W + 60)) - 40, y = 8 + Math.floor(h1(i * 7.1) * 50); r(x, y, 16, 3, DK.CLOUD); r(x + 3, y - 2, 8, 2, DK.CLOUD); r(x + 1, y + 3, 14, 1, DK.SKY1); } });
   // ---- lit windows' soft light, and the lamps on the Square ----
   if (night > 0.05) for (const [x, y, ww, hh] of WGLOW) G(x - 1, y - 1, ww + 2, hh + 2, [255, 200, 120], 0.14 * night);
   for (const lx of LAMPS) { lit(() => r(lx - 1, 144, 3, 2, M([120, 110, 80], [255, 230, 170], night))); if (night > 0.1) { Gd(lx, 145, 5, [255, 220, 150], 0.5 * night); G(lx - 6, 156, 13, 3, [255, 220, 150], 0.12 * night); } }
@@ -546,7 +571,7 @@ export function drawMapLive(L: MapLive): void {
   lit(() => { for (let i = 0; i < 16; i++) { const y = HOR + 4 + Math.floor(h1(i * 2.2) * 108), x = shore(y) + 4 + Math.floor(h1(i * 5.5) * (MAP_W - shore(y) - 6)); if ((a * 0.7 + h1(i)) % 1 < 0.35) r(x, y, 2, 1, day > 0.5 ? MP.SEA_HI_D : [80, 120, 190]); } });
   for (let y = HOR + 60; y < 214; y += 7) { const x = shore(y) + 1 + Math.round(Math.sin(a * 1.4 + y) * 1.5); lit(() => r(x, y, 2, 1, PK.FOAM)); }
   { const f = Math.floor(a * 10) % 3; lit(() => { r(396, 202 - f, 3, 3 + f, PK.FIRE); r(397, 201 - f, 1, 2, PK.FIRE_HI); }); Gd(398, 202, 7 + f, PK.FIRE, 0.45); }
-  { const bx = 404 + ((a * 3) % 90), by = 128; if (bx < 474) { r(Math.round(bx), by, 7, 2, [240, 236, 220]); r(Math.round(bx) + 1, by + 2, 5, 1, K.BROWN); r(Math.round(bx) + 3, by - 7, 1, 7, [70, 60, 50]); r(Math.round(bx) + 4, by - 6, 3, 5, K.WHITE); } }
+  { const bx = 404 + ((a * 3) % (MAP_W - 390)), by = 128; if (bx < MAP_W - 8) { r(Math.round(bx), by, 7, 2, [240, 236, 220]); r(Math.round(bx) + 1, by + 2, 5, 1, K.BROWN); r(Math.round(bx) + 3, by - 7, 1, 7, [70, 60, 50]); r(Math.round(bx) + 4, by - 6, 3, 5, K.WHITE); } }
   { const cx = 390 + ((Math.sin(a * 0.4) + 1) * 6), cy = 210; r(Math.round(cx), cy, 3, 1, PK.CRAB); r(Math.round(cx) - 1, cy - 1, 1, 1, PK.CRAB); r(Math.round(cx) + 3, cy - 1, 1, 1, PK.CRAB); }
   lit(() => r(473, 155, 3, 2, M([120, 100, 60], [255, 230, 170], night))); if (night > 0.1) Gd(474, 156, 4, [255, 230, 170], 0.4 * night);
   { const by = 186 + Math.round(Math.sin(a * 1.6)); r(472, by, 3, 4, K.RED); r(472, by, 3, 1, [255, 120, 120]); r(473, by - 2, 1, 2, K.STEEL_POST); if ((a % 2) < 0.3) { lit(() => r(473, by - 3, 1, 1, [255, 90, 90])); Gd(473, by - 3, 4, [255, 90, 90], 0.5); } } // a buoy, bobbing and blinking
@@ -566,11 +591,13 @@ export function drawMapLive(L: MapLive): void {
   for (let k = 0; k < 2; k++) { const an = -a * (0.9 - k * 0.07) + k * 0.8, x = KT.cx + Math.cos(an) * (KT.rx - 3.5), y = KT.cy + Math.sin(an) * (KT.ry - 3.5); r(Math.round(x) - 1, Math.round(y) - 1, 3, 2, k ? [40, 140, 255] : K.RED); r(Math.round(x), Math.round(y) - 2, 1, 1, K.WHITE); }
   for (let j = 0; j < 4; j++) for (let i = 0; i < 6; i++) r(393 + i, 222 + j + Math.round(Math.sin(a * 6 + i * 0.8) * 0.8), 1, 1, (i + j) % 2 ? K.BLACK : K.WHITE);
   if (night > 0.2) for (const [x, y] of LIGHTS) { lit(() => r(x - 2, y - 2, 5, 1, [255, 250, 220])); Gd(x, y - 1, 5, [255, 250, 220], 0.45 * night); G(x - 10, y + 4, 21, 10, [255, 250, 220], 0.06 * night); }
+  // ---- THE AIRPORT: the runway's lights at night, the beacon, the sign, the windsock, the ship's lights, and LAB AIR on its timetable ----
+  airportLive(a, night, wd.dx);
   // ---- the Square: pigeons, a taxi going by ----
   { const u = (a * 0.05) % 1; if (u < 0.15) { const px = 60 + u / 0.15 * 330, py = 164 - Math.sin(u / 0.15 * Math.PI) * 30; r(Math.round(px), Math.round(py), 2, 1, K.PIGEON); r(Math.round(px) + ((Math.floor(a * 12) % 2) ? 1 : 0), Math.round(py) - 1, 1, 1, K.PIGEON_LT); } else { for (const [x, y] of [[140, 180], [143, 181], [270, 178]] as [number, number][]) { r(x, y, 2, 1, K.PIGEON); r(x + ((Math.floor(a * 2 + x) % 3) ? 1 : 0), y - 1, 1, 1, K.PIGEON_NECK); } } }
   { const u = (a * 0.04) % 1; if (u < 0.3) { const x = -12 + (u / 0.3) * 410; r(Math.round(x), 193, 9, 3, K.YEL); r(Math.round(x) + 2, 192, 5, 1, K.YEL_DK); r(Math.round(x) + 3, 193, 3, 1, [40, 50, 80]); lit(() => r(Math.round(x) + 9, 194, 1, 1, [255, 250, 210])); if (night > 0.2) G(Math.round(x) + 9, 193, 8, 3, [255, 250, 210], 0.2 * night); } }
   // ---- the seasons ----
-  if (isHalloween()) { for (const x of [70, 150, 250, 330, 120]) { r(x, 186, 3, 2, [255, 140, 30]); lit(() => r(x + 1, 186, 1, 1, [255, 220, 90])); } for (let k = 0; k < 3; k++) { const x = ((a * 8 + k * 150) % 520) - 20, y = 40 + k * 14 + Math.sin(a * 3 + k) * 3, wf = Math.floor(a * 8 + k) % 2; r(Math.round(x), Math.round(y), 2, 1, [20, 14, 26]); r(Math.round(x) - 2, Math.round(y) - wf, 2, 1, [20, 14, 26]); r(Math.round(x) + 2, Math.round(y) - wf, 2, 1, [20, 14, 26]); } G(286, 176, 22, 14, [124, 242, 208], 0.12); }
+  if (isHalloween()) { for (const x of [70, 150, 250, 330, 120]) { r(x, 186, 3, 2, [255, 140, 30]); lit(() => r(x + 1, 186, 1, 1, [255, 220, 90])); } for (let k = 0; k < 3; k++) { const x = ((a * 8 + k * 150) % (MAP_W + 40)) - 20, y = 40 + k * 14 + Math.sin(a * 3 + k) * 3, wf = Math.floor(a * 8 + k) % 2; r(Math.round(x), Math.round(y), 2, 1, [20, 14, 26]); r(Math.round(x) - 2, Math.round(y) - wf, 2, 1, [20, 14, 26]); r(Math.round(x) + 2, Math.round(y) - wf, 2, 1, [20, 14, 26]); } G(286, 176, 22, 14, [124, 242, 208], 0.12); }
   if (isWinter()) {
     for (const [x0, x1, y] of SNOWCAPS) r(x0, y, x1 - x0, 1, K.WHITE);
     { const x = 322, y = 150; for (let k = 0; k < 7; k++) r(x - k, y - 14 + k * 2, 1 + k * 2, 2, [30, 110, 70]); r(x, y - 1, 1, 2, K.BROWN); lit(() => { star4(x, y - 15, 1, K.GOLD); for (let k = 0; k < 6; k++) if ((a * 2 + k) % 2 < 1.4) r(x - 4 + Math.floor(h1(k * 3.3) * 9), y - 11 + Math.floor(h1(k * 1.7) * 10), 1, 1, CONFETTI[k]); }); Gd(x, y - 7, 8, [255, 214, 120], 0.25); }
@@ -584,53 +611,75 @@ export function drawMapLive(L: MapLive): void {
     if (w.kind === 'storm') { const lt = lightning(); if (lt.f > 0) alpha(lt.f * 0.5, () => r(0, 0, MAP_W, MAP_H, [230, 236, 255])); }
     c.restore();
   }
-  // ---- people ----
-  if (!L.hiding) {
-    const groups = new Map<string, MapDot[]>();
-    for (const p of L.people) { const s = spotOf(p.room); if (!s) continue; const k = s[0] + ',' + s[1]; groups.set(k, [...(groups.get(k) ?? []), p]); }
-    for (const [k, ps] of groups) {
-      const [x, y] = k.split(',').map(Number), shown = ps.slice(0, 5);
-      shown.forEach((p, i) => { const dx = Math.round(x - (shown.length - 1) * 2 + i * 4), dy = Math.round(y - 2 + Math.sin(a * 2 + i) * 0.5); r(dx - 1, dy - 1, 3, 3, K.OUTLINE); lit(() => r(dx, dy, 1, 1, shade(p.col, 1.2))); r(dx - 1, dy, 1, 1, p.col); r(dx + 1, dy, 1, 1, p.col); r(dx, dy - 1, 1, 1, p.col); });
-      if (ps.length > 5) { const s = '+' + (ps.length - 5); lit(() => { r(x + 9, y - 5, tw(s) + 2, 7, K.OUTLINE); txt(s, x + 10, y - 4, K.WHITE); }); }
-    }
-    // starred friends: a little head and their name, on top
-    const tagged: [number, number][] = [];
-    for (const p of L.people) { if (!p.friend) continue; const s = spotOf(p.room); if (!s) continue; let [x, y] = s; while (tagged.some(([tx, ty]) => Math.abs(tx - x) < 20 && Math.abs(ty - y) < 8)) y -= 8; tagged.push([x, y]); friendTag(x, y - 6, p.name, p.col); }
-  }
-  // ---- you ----
-  { const s = spotOf(L.me.room); if (s) { const [x, y] = s, pulse = 3 + Math.round((Math.sin(a * 5) + 1) * 1.2); lit(() => { for (let k = 0; k < 16; k++) { const an = k / 16 * Math.PI * 2; r(Math.round(x + Math.cos(an) * pulse), Math.round(y - 2 + Math.sin(an) * pulse * 0.7), 1, 1, K.GOLD); } r(x - 1, y - 3, 3, 3, K.OUTLINE); r(x, y - 2, 1, 1, L.me.col); }); Gd(x, y - 2, 7, K.GOLD, 0.35); lit(() => { r(x - 7, y + 3, 15, 7, K.OUTLINE); txt('YOU', x - 5, y + 4, K.GOLD); }); } }
-  // ---- the YOU ARE HERE star (the board you opened this from) ----
-  if (L.board) { const s = BOARDS[L.board]; if (s) { const [x, y] = s, big = (a % 1) < 0.5 ? 2 : 1; lit(() => star4(x, y - 9, big, MP.PIN)); Gd(x, y - 9, 5, MP.PIN, 0.4); } }
-  // ---- ? stickers where you've never been ----
-  for (const p of PLACES) if (p.tag && EXPLORE_SET.has(p.id) && !L.seen.has(p.id)) sticker(p.tag[0], p.tag[1], a, p.id);
-  // ---- the place under the pointer: gold corner brackets and a warm lift; the pin that drops when you pick it ----
-  if (L.hover) { const pl = placeById(L.hover); if (pl) for (const q of pl.hits) { brackets(q, a, pl.pick); G(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0, pl.pick ? [255, 214, 90] : [160, 170, 200], 0.1); } }
-  if (L.pin) { const pl = placeById(L.pin.id); if (pl) { const u = clamp((a - L.pin.t0) / 0.25, 0, 1), [x, y] = pl.at, drop = Math.round((1 - u * u) * -24), bounce = u >= 1 ? Math.round(-Math.abs(Math.sin((a - L.pin.t0 - 0.25) * 14)) * 3 * Math.max(0, 1 - (a - L.pin.t0 - 0.25) * 3)) : 0; pin(x, y - 4 + drop + bounce); } }
+  drawMarks(L, { places: PLACES, spot: spotOf, boards: BOARDS, sticker: (p) => EXPLORE_SET.has(p.id) && !L.seen.has(p.id) });
 }
 const XGHOST: RGB = [232, 240, 255];
 /** Snow along the roofs' top edges in winter: [x0, x1, y]. */
-const SNOWCAPS: [number, number, number][] = [[8, 60, 88], [94, 144, 113], [148, 172, 61], [176, 210, 101], [212, 250, 111], [254, 290, 105], [292, 334, 93], [333, 389, 56], [184, 264, 254], [152, 298, 211]];
+const SNOWCAPS: [number, number, number][] = [[8, 60, 88], [94, 144, 113], [148, 172, 61], [176, 210, 101], [212, 250, 111], [254, 290, 105], [292, 334, 93], [333, 389, 56], [184, 264, 254], [152, 298, 211], [488, 546, 245], [547, 558, 224]];
 const EXPLORE_SET = new Set<string>(EXPLORE);
 
-function brackets(q: Rect, a: number, pick: boolean): void {
-  const c: RGB = pick ? K.GOLD : [170, 180, 210], o = (a * 4) % 2 < 1 ? 0 : 1, L = 4;
-  lit(() => {
-    const x0 = q.x0 - 1 - o, y0 = q.y0 - 1 - o, x1 = q.x1 + o, y1 = q.y1 + o;
-    r(x0, y0, L, 1, c); r(x0, y0, 1, L, c); r(x1 - L + 1, y0, L, 1, c); r(x1, y0, 1, L, c);
-    r(x0, y1, L, 1, c); r(x0, y1 - L + 1, 1, L, c); r(x1 - L + 1, y1, L, 1, c); r(x1, y1 - L + 1, 1, L, c);
-  });
+/** LAB AIR's ways in and out of the city's page: the climb away over the sea to the horizon (Iceland's that way), and the approach back in. */
+const CLIMB: [[number, number], [number, number], [number, number]] = [[APT.tw + 34, APT.rwy], [566, 206], [540, 101]];
+const APPROACH: [[number, number], [number, number], [number, number]] = [[432, 101], [444, 212], [APT.td, APT.rwy]];
+/** Where LAB AIR is on the city's page (null: at Keflavík, or out over the sea), which way it faces, how big (smaller as it goes off towards the horizon). */
+function cityJet(): { x: number; y: number; dir: 1 | -1; s: number; gear: boolean; air: boolean } | null {
+  const A = air(), k = A.k, [sx, sy] = APT.stand, sm = (u: number) => u * u * (3 - 2 * u);
+  const J = (x: number, y: number, dir: 1 | -1, gear = true, up = false) => ({ x, y, dir, s: clamp((y - 104) / 100, 0.15, 1), gear, air: up });
+  if (A.from === 'city') {
+    if (k < PUSH_S) return J(sx, sy, 1);
+    if (k < TAXI_S) return J(sx - sm((k - PUSH_S) / (TAXI_S - PUSH_S)) * 6, sy, 1);
+    if (k < ROLL_S) { // out along the apron to the taxiway, up it onto the runway, and round to face the take-off
+      const u = sm((k - TAXI_S) / (ROLL_S - TAXI_S)), a0 = sx - 6 - APT.tw, a1 = sy - APT.rwy, d = u * (a0 + a1);
+      return d < a0 ? J(sx - 6 - d, sy, -1) : J(APT.tw, sy - (d - a0), u > 0.97 ? 1 : -1);
+    }
+    if (k < CLIMB_S) { const u = (k - ROLL_S) / (CLIMB_S - ROLL_S); return J(APT.tw + u * u * 34, APT.rwy, 1); }
+    const u = (k - CLIMB_S) / 30; if (u >= 1) return null;
+    const [x, y] = qb(CLIMB[0], CLIMB[1], CLIMB[2], sm(u)); return J(x, y, 1, u < 0.12, true);
+  }
+  if (k >= TOUCH_S - 24 && k < TOUCH_S) { const [x, y] = qb(APPROACH[0], APPROACH[1], APPROACH[2], sm((k - (TOUCH_S - 24)) / 24)); return J(x, y, 1, k > TOUCH_S - 12, true); }
+  if (k >= TOUCH_S) { const u = (k - TOUCH_S) / (LEG_S - TOUCH_S); if (u < 0.5) { const e = 1 - (1 - u * 2) * (1 - u * 2); return J(APT.td + e * 26, APT.rwy, 1); } const e = sm((u - 0.5) * 2); return J(APT.td + 26 + e * (sx - APT.td - 26), APT.rwy + e * (sy - APT.rwy), 1); }
+  return null;
 }
-function sticker(x: number, y: number, a: number, id: string): void {
-  const wob = Math.round(Math.sin(a * 2 + id.length) * 0.6);
-  r(x - 1, y + wob, 7, 7, MP.STICKER_DK); r(x, y - 1 + wob, 5, 9, MP.STICKER_DK); lit(() => { r(x, y + wob, 5, 7, MP.STICKER); r(x - 1 + 1, y + wob, 5, 1, K.YEL_HI); txt('?', x + 1, y + 1 + wob, K.OUTLINE); });
+function airportLive(a: number, night: number, wdx: number): void {
+  const RY = APT.rwy;
+  // the windsock, blowing with the wind (limp when it's calm)
+  { const k = clamp(Math.abs(wdx), 0.15, 1), d = wdx >= 0 ? 1 : -1, n = 2 + Math.round(k * 3); for (let i = 0; i < n; i++) r(484 + d * (i + 1), 226 + (k < 0.35 ? Math.floor(i / 2) : Math.round(Math.sin(a * 6 + i) * 0.4)), 1, 1, i % 2 ? K.WHITE : AP.ORANGE); }
+  if (night > 0.1) {
+    // the runway's edge lights, the taxiway's blue ones, and the approach lights running in towards the threshold
+    lit(() => { for (let x = APT.rwy0; x < MAP_W; x += 6) { r(x, RY - 4, 1, 1, [230, 240, 255]); r(x, RY + 5, 1, 1, [230, 240, 255]); } for (let y = RY + 6; y < 232; y += 3) { r(APT.tw - 3, y, 1, 1, [90, 150, 255]); r(APT.tw + 3, y, 1, 1, [90, 150, 255]); } });
+    G(APT.rwy0, RY - 5, MAP_W - APT.rwy0, 11, [170, 200, 255], 0.1 * night);
+    const run = Math.floor(a * 6) % 6; if (run < 4) { const x = APT.rwy0 - 2 - (3 - run) * 2; lit(() => r(x, RY, 1, 1, K.WHITE)); Gd(x, RY, 3, [255, 255, 230], 0.6 * night); }
+    // the terminal's sign, the tower's cab, the ship's lights
+    lit(() => txt('AIRPORT', APT.sign, 251, AP.SIGN_TXT)); G(APT.sign - 3, 250, 33, 7, [255, 210, 80], 0.3 * night);
+    Gd(APT.tower, 228, 6, [150, 255, 210], 0.35 * night);
+    lit(() => { r(521, 95, 1, 1, K.WHITE); r(500, 101, 1, 1, [255, 80, 80]); }); Gd(521, 95, 3, [255, 250, 220], 0.4 * night);
+  }
+  // the tower's beacon: white and green by turns
+  if ((a * 1.2) % 1 < 0.35) { const c: RGB = Math.floor(a * 1.2) % 2 ? [120, 255, 150] : K.WHITE; lit(() => r(APT.tower, 218, 1, 1, c)); Gd(APT.tower, 218, 4, c, 0.3 + 0.4 * night); }
+  // LAB AIR's routes (faint), its baggage train at the stand, the jet itself
+  for (const [R, sp] of [[CLIMB, 0.7], [APPROACH, 0.5]] as [typeof CLIMB, number][]) for (let k = 0; k < 12; k++) { const u = (k + (a * sp) % 1) / 12; const [x, y] = qb(R[0], R[1], R[2], u); alpha(0.35, () => r(Math.round(x), Math.round(y), 1, 1, [220, 226, 240])); }
+  const A = air(), j = cityJet(), n = 0.5 * night;
+  if (j) {
+    if (j.air && night > 0.2) Gd(j.x + j.dir * 6 * j.s, j.y - 1, 4, [255, 250, 220], 0.5 * night); // its landing lights
+    miniJet(j.x, j.y, j.dir, j.s, j.gear, a, n);
+  }
+  if (A.from === 'city' && A.k < PUSH_S - 6) { const u = (A.k / 20) % 2, e = u < 1 ? u : 2 - u, bx = Math.round(492 + e * 24); r(bx, 242, 3, 2, [230, 196, 60]); r(bx, 242, 3, 1, [255, 230, 120]); for (const d of [4, 8]) { r(bx - d, 242, 3, 2, [140, 144, 156]); r(bx - d, 244, 1, 1, K.BLACK); } }
 }
-function pin(x: number, y: number): void {
-  lit(() => { r(x, y - 1, 1, 4, [200, 200, 210]); disc(x, y - 4, 2, MP.PIN); r(x - 1, y - 5, 1, 1, MP.PIN_HI); });
-  alpha(0.4, () => oval(x, y + 3, 2, 1, [0, 0, 0])); Gd(x, y - 4, 5, MP.PIN, 0.4);
-}
-function friendTag(x: number, y: number, name: string, col: RGB): void {
-  const s = name.slice(0, 10).toUpperCase(), w = tw(s) + 9;
-  lit(() => { r(x - 3, y - 4, w, 7, K.OUTLINE); r(x - 2, y - 3, 5, 5, col); r(x - 1, y - 2, 1, 1, K.EYE); r(x + 1, y - 2, 1, 1, K.EYE); r(x - 2, y - 3, 5, 1, shade(col, 1.25)); txt(s, x + 4, y - 3, K.WHITE); r(x - 3 + w, y - 4, 1, 7, K.GOLD); });
+/** LAB AIR, side on: 13 px at the airport, smaller as it flies off towards the horizon (s); the beacon on its back blinks. */
+function miniJet(x: number, y: number, dir: 1 | -1, s: number, gear: boolean, a: number, dusk: number): void {
+  x = Math.round(x); y = Math.round(y);
+  const px = (dx: number, dy: number, w: number, h: number, c: RGB) => r(dir > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, c);
+  const body: RGB = M(K.WHITE, [150, 160, 190], dusk), belly: RGB = M([210, 214, 222], [110, 120, 150], dusk);
+  let top = -3;
+  if (s >= 0.8) {
+    px(-6, -5, 1, 1, AP.TEAL); px(-6, -4, 2, 1, AP.TEAL); px(-6, -3, 3, 1, AP.TEAL); // the fin
+    px(-6, -2, 12, 1, body); px(4, -2, 1, 1, [40, 60, 90]); // the fuselage's top, the cockpit window
+    px(-6, -1, 13, 1, belly); px(-4, -1, 8, 1, AP.ORANGE); // underneath, the orange cheatline
+    px(-2, 0, 4, 1, AP.STEEL_DK); // the wing and its engine
+    if (gear) { px(-3, 0, 1, 1, K.BLACK); px(3, 0, 1, 1, K.BLACK); }
+  } else if (s >= 0.45) { px(-4, -3, 1, 1, AP.TEAL); px(-4, -2, 2, 1, AP.TEAL); px(-4, -1, 9, 1, body); px(-1, 0, 3, 1, AP.STEEL_DK); top = -2; }
+  else { px(-2, -1, 4, 1, body); top = -2; }
+  if ((a * 1.4) % 1 < 0.3) { lit(() => r(x, y + top, 1, 1, [255, 70, 60])); Gd(x, y + top, 3, [255, 70, 60], 0.4); }
 }
 function miniRocket(x: number, y: number, dir: 'up' | 'side', shake: number): void {
   x = Math.round(x + shake * 0.6); y = Math.round(y);

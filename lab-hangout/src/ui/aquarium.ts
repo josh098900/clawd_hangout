@@ -4,7 +4,7 @@
 
 import { FISH } from '../game/fish';
 import { GALLERY, THANKS } from '../game/aquarium';
-import { GIFTS, basePose, itemName, stampCritter, type Look } from '../entities/critter';
+import { GIFTS, GIFT_SHOP, basePose, itemName, stampCritter, type Look, type Shop } from '../entities/critter';
 import { FURNITURE, type Furn } from '../world/furniture';
 import { bake, mk } from '../engine/pixel';
 import { withItem } from './claw';
@@ -68,6 +68,8 @@ export interface ShopHooks {
   buyFurn(id: string): Promise<number>;
   /** Put on a piece of clothing you own. */
   wear(item: string): void;
+  /** Which shop (default: the aquarium's). */
+  shop?: Shop;
 }
 /** A little picture of you wearing `item`. */
 function wearing(look: Look, item: string): HTMLCanvasElement {
@@ -81,11 +83,13 @@ function piece(f: Furn): HTMLCanvasElement {
   bake(c, () => f.draw(Math.round(c.width / 2), c.height - (f.layer === 'wall' ? 2 : 4), false, { a: 1, night: 0, party: false, fish: [], badges: [], owner: '', photo: null }));
   c.style.height = '44px'; c.style.imageRendering = 'pixelated'; return c;
 }
-/** THE GIFT SHOP: four clothes (once each) and four pieces of furniture for your flat. */
+/** A shop: its clothes (once each) and its furniture for your flat: THE GIFT SHOP (the aquarium), DUTY FREE (the airport), THE PUFFIN SHOP (Reykjavík). */
+const SHOP_TITLE: Record<Shop, string> = { aquarium: 'THE GIFT SHOP', duty: 'DUTY FREE', puffin: 'THE PUFFIN SHOP' };
+const SHOP_SUB: Record<Shop, string> = { aquarium: 'Everything here is only sold at the City Aquarium.', duty: 'Tax free! (There was never any tax.) For the flight.', puffin: 'Takk fyrir! Wool, horns and puffins: only in Reykjavik.' };
 export function openShop(h: ShopHooks, onClose: () => void): void {
-  const m = openModal('THE GIFT SHOP', onClose);
+  const shop: Shop = h.shop ?? 'aquarium', m = openModal(SHOP_TITLE[shop], onClose);
   const head = document.createElement('div'); Object.assign(head.style, HEAD);
-  const sub = document.createElement('div'); Object.assign(sub.style, { ...font(18, '#9FEFFF'), textAlign: 'center' }); sub.textContent = 'Everything here is only sold at the City Aquarium.';
+  const sub = document.createElement('div'); Object.assign(sub.style, { ...font(18, '#9FEFFF'), textAlign: 'center' }); sub.textContent = SHOP_SUB[shop];
   const list = document.createElement('div'); Object.assign(list.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '6px', width: 'min(620px, 86vw)', maxHeight: '54vh', overflowY: 'auto' });
   const bought = new Map<string, number>();
   let busy = false;
@@ -100,11 +104,11 @@ export function openShop(h: ShopHooks, onClose: () => void): void {
   const go = (act: () => Promise<unknown>) => { if (busy) return; busy = true; void act().finally(() => { busy = false; redraw(); }); };
   const redraw = () => {
     head.textContent = 'YOUR TOKENS: ' + h.tokens();
-    const clothes = GIFTS.map(([item, price]) => {
+    const clothes = GIFTS.filter(([item]) => (GIFT_SHOP[item] ?? 'aquarium') === shop).map(([item, price]) => {
       const own = h.owns(item);
       return tile(wearing(h.look(), item), itemName(item), own ? 'YOURS' : price + ' TOKENS', own ? button('WEAR', () => { h.wear(item); m.close(); }, true) : button('BUY', () => go(() => h.buy(item))));
     });
-    const furn = FURNITURE.filter((f) => f.shop === 'aquarium').map((f) => {
+    const furn = FURNITURE.filter((f) => f.shop === shop).map((f) => {
       const n = bought.get(f.id);
       return tile(piece(f), f.name, f.price + ' TOKENS · FOR YOUR FLAT' + (n ? ' · YOU HAVE ' + n : ''), button('BUY', () => go(() => h.buyFurn(f.id).then((k) => { bought.set(f.id, k); }))));
     });
