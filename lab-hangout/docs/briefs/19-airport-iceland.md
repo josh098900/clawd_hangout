@@ -665,3 +665,64 @@ and nothing is sent.
   - the phone's rooms and map
   - CPU ×4 with 4 bots: 2.4-6.1 ms of work a frame (Keflavík's window with the aurora is the heaviest)
   - no NPC waits where E would offer TALK instead of a spot
+
+---
+
+## 16. Push 1b: REYKJAVÍK, made beautiful (for Josh to check before it's built)
+
+Josh (28 Sep), after the live check: *"the cities should have the utmost beauty and detail ever seen in this world"*,
+with two photos: **Skólavörðustígur** (the rainbow street running uphill to the church) and **Hallgrímskirkja** at dusk.
+Push 1's Reykjavík is a flat row of houses with a small church behind them. This pass makes its middle a real street
+scene, and brings everything else up to the same finish.
+
+### The centrepiece: the rainbow street up to the church
+
+```
+            ┌──────────── the view up SKÓLAVÖRÐUSTÍGUR (painted into the backdrop, in perspective) ────────────┐
+ houses …   │  shop fronts on the left,        HALLGRÍMSKIRKJA at the top,          shop fronts on the right, │  … houses
+            │  getting smaller up the hill     its wings stepping down either side  getting smaller up the hill│
+            │  lamps, bare trees, benches      the maze-patterned plaza in front    signs, planters, a mural   │
+            └───────────── the rainbow road narrows uphill and runs out onto the street where you walk ─────────┘
+```
+
+- **Where:** the gap between the houses where the church stands now (about x 390-620, a little wider than today). The
+  room stays 1900 wide, and every spot, door and talker stays where it is.
+- **The street, in perspective:** two rows of façades angling in towards the church, each smaller and hazier up the
+  hill. Their detail comes from the photo:
+  - painted corrugated iron and concrete walls, white window frames, a hanging shop sign on each, lit shop windows
+  - green street lamps, bare birch trees along the pavements, benches with orange slats, round concrete planters with
+    grasses, a bike rack, a sandwich board
+  - a graffiti mural on one concrete wall, like the photo's
+  - people in winter coats walking up and down, shrinking as they go uphill (ambient, no network)
+- **The rainbow road:** six bands (red, orange, yellow, green, blue, violet), with kerbs and grey pavements, narrowing
+  to the church and running out across the floor where you walk (as now, but crisper and in perspective).
+- **HALLGRÍMSKIRKJA, as in the photo:**
+  - the tall central tower of pale grey concrete: narrow vertical windows up it, the clock, the belfry openings, the
+    pointed top and its cross
+  - the wings of tall basalt-like columns stepping down either side in a smooth curve
+  - the tall arched doorway with its stained-glass window above
+  - the plaza in front, black with the white maze pattern
+  - after dark, warm uplights between the columns at its base (the photo's orange glow), and the belfry lit
+  - it's tall: on a laptop its top reaches above the screen, so there's **a bench at the foot of the street: sit and
+    the camera looks up to frame the whole church** (like the aurora bench). A phone sees it all anyway.
+
+### Everything else, to the same finish
+- **The houses along the street you walk on:** corrugated cladding that catches the light, dormers and chimneys, tin
+  roofs in red, green, black and grey, window boxes, lit windows at night, shop signs and awnings. Snow on the roofs
+  and sills.
+- **The light:** golden-hour warmth on the façades at dawn and dusk, the purple dusk from the photo (the sky already
+  fades to violet and gold), the church floodlit at night, lamps and shop windows glowing.
+- **Winter:** the photo's giant bell ornaments on wires across the rainbow street, strings of lights zigzagging
+  between the façades, and fairy lights in the bare trees (the YULE CAT stays).
+- **The seafront:** Esja across the bay with its snow streaks, the SUN VOYAGER drawn to its real shape (a steel boat's
+  skeleton), boats in the harbour. HARPA keeps its new angular roof, with more facets in its glass.
+- **Life:** gulls, steam from the vents, the cat, a dog walker, tourists taking photos of the church.
+
+### How it's built and checked
+- In order: the street and the church, then the houses and furniture, then the light and life, then the seafront.
+  Close-up screenshots at each step, and a polish pass at the end.
+- Still parts are baked into the backdrop, so the extra detail costs little per frame. The walkers are a handful of
+  tiny sprites.
+- Checks: every spot's reach, and no NPC in the way (the scan from 717aaaa); golden (only Reykjavík changes); the phone;
+  CPU ×4 with bots; a two-player look round.
+- **No SQL.**
