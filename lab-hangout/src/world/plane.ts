@@ -200,7 +200,7 @@ const seatRow = (rx: number): Prop[] => (['A', 'C'] as const).map((L) => { const
 
 export const PLSPOT = { SEAT0: 0, LAV: 12, DRINKS: 13 };
 export const PLANE_SPOTS: Spot[] = [
-  ...PLR.rows.flatMap((rx): Spot[] => (['A', 'C'] as const).map((L): Spot => ({ kind: 'sit', x: rx + (L === 'C' ? 8 : 2), y: SEAT_Y[L] - 4, sx: rx + 26, sy: 548, lift: 10, label: 'SIT ' + (PLR.rows.indexOf(rx) + 1) + L, area: { x0: rx - 22, y0: SEAT_Y[L] - 46, x1: rx + 22, y1: SEAT_Y[L] } }))),
+  ...PLR.rows.flatMap((rx): Spot[] => (['A', 'C'] as const).map((L): Spot => ({ kind: 'sit', x: rx + (L === 'C' ? 8 : 2), y: SEAT_Y[L] - 4, sx: rx + (L === 'A' ? 12 : 40), sy: 548, lift: 10, label: 'SIT ' + (PLR.rows.indexOf(rx) + 1) + L, area: { x0: rx - 22, y0: SEAT_Y[L] - 46, x1: rx + 22, y1: SEAT_Y[L] } }))),
   { kind: 'lav', x: PLR.lav, y: 500, sx: PLR.lav + 10, sy: 520, lift: 0, label: 'LAVATORY', area: { x0: 4, y0: 380, x1: 66, y1: 470 } },
   { kind: 'drinks', x: PLR.galley + 40, y: 500, sx: PLR.galley + 40, sy: 520, lift: 0, label: 'A DRINK', area: { x0: 70, y0: 360, x1: 190, y1: 470 } },
 ];

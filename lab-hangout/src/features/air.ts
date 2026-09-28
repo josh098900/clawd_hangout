@@ -95,7 +95,7 @@ function planeStep(): void {
   const p = game.npcs.inRoom('plane').find((q) => q.def.id === PENNY);
   PLANEW.penny = p ? { x: p.av.x, y: p.av.y } : null;
   const sp = game.room.spots[PLSPOT.DRINKS], round = PLANEW.penny && a.k >= TROLLEY_S - 2 && a.k < TROLLEY_E + 4 && PLANEW.penny.x > 190;
-  if (sp) { const x = round ? Math.round(PLANEW.penny!.x + 26) : PLR.galley + 40; sp.x = sp.sx = x; sp.area = round ? { x0: x - 16, y0: 510, x1: x + 16, y1: 568 } : { x0: 70, y0: 360, x1: 190, y1: 470 }; sp.label = round ? 'A DRINK FROM THE TROLLEY' : 'A DRINK'; }
+  if (sp) { const x = round ? Math.round(PLANEW.penny!.x + 26) : PLR.galley + 40; sp.x = sp.sx = x; sp.sy = round ? 548 : 520; sp.area = round ? { x0: x - 16, y0: 510, x1: x + 16, y1: 568 } : { x0: 70, y0: 360, x1: 190, y1: 470 }; sp.label = round ? 'A DRINK FROM THE TROLLEY' : 'A DRINK'; }
 }
 
 // ---------------------------------------------------------------- Keflavík ----------------------------------------------------------------

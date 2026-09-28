@@ -992,9 +992,10 @@ function nearestNpc(maxD: number): Npc | null {
   for (const n of npcs.inRoom(room.id)) { const d = Math.hypot(n.av.x - me.x, (n.av.y - me.y) * 1.5); if (d < bd) { bd = d; best = n; } }
   return best;
 }
+/** The spot E reaches from here: its stand point within maxD, counting depth (y) at 0.6 (you can be a step nearer or further than it). */
 function nearestSpot(maxD: number): number {
   let best = -1, bd = maxD;
-  room.spots.forEach((s, i) => { if (busy.has(i)) return; const d = Math.hypot(s.sx - me.x, s.sy - me.y); if (d < bd) { bd = d; best = i; } });
+  room.spots.forEach((s, i) => { if (busy.has(i)) return; const d = Math.hypot(s.sx - me.x, (s.sy - me.y) * 0.6); if (d < bd) { bd = d; best = i; } });
   return best;
 }
 
@@ -1021,7 +1022,7 @@ function currentAction(): Action | null {
   if (n) return { label: 'TALK', run: () => talkTo(n), at: [n.av.x, n.av.y - liftOf(n.av) - 48] };
   const tk = nearestTalker(26);
   if (tk) return { label: tk.verb ?? 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
-  const i = nearestSpot(20);
+  const i = nearestSpot(22);
   if (i >= 0) { const s = room.spots[i], sl = room.id === 'sub' ? subLabel(s.kind, s.n ?? 0) : airLabel(s.kind); return { label: sl ? sl : s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
   if (isWinter() && !me.hold && onSnow(room, me.x, me.y) && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };

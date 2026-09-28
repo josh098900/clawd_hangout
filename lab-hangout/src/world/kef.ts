@@ -182,7 +182,7 @@ export const KEF_SPOTS: Spot[] = [
 const TALK: Talker[] = [
   { id: 'car-hire', name: 'THE CAR HIRE DESK', x: 1108, y: 530, sx: 1108, sy: 568, lines: ['SUPER JEEPS: ALL BOOKED. A note underneath: "try the tour bus. coming soon."', 'Monster tyres in the photo. Taller than a critter.'], verb: 'READ' },
   { id: 'photo-glacier', name: 'THE PHOTOS', x: 614, y: 430, sx: 614, sy: 510, lines: ['A glacier, a waterfall, the northern lights. Iceland, showing off.', 'The waterfall one has a rainbow in the spray. Of course it does.'], verb: 'LOOK' },
-  { id: 'shop-kef', name: 'THE SHOP', x: KFR.skyr, y: 420, sx: KFR.skyr, sy: 512, lines: ['Liquorice, woolly socks, and puffin magnets. So many puffin magnets.', 'A tin of "ICELANDIC AIR". It\'s empty. It costs 9 tokens.'], verb: 'LOOK' },
+  { id: 'shop-kef', name: 'THE SHOP', x: KFR.skyr + 30, y: 420, sx: KFR.skyr + 30, sy: 534, lines: ['Liquorice, woolly socks, and puffin magnets. So many puffin magnets.', 'A tin of "ICELANDIC AIR". It\'s empty. It costs 9 tokens.'], verb: 'LOOK' },
 ];
 export function makeKef(): Room {
   const room: Room = {

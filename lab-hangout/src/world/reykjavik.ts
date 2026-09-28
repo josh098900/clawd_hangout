@@ -140,8 +140,9 @@ function towns(): void { if (townNight) return; townNight = mk(W, H); townDay = 
 function drawBack(a: number): void {
   towns();
   const day = iceDay(), night = 1 - day, gold = iceGold(), w = iceWeather(), au = auroraNow(), vx0 = Math.max(0, REYKW.view.x0 - 10), vx1 = Math.min(W, REYKW.view.x1 + 10), g = PX.ctx;
-  // the low sun (and its glow on the sky) at dawn and dusk; a golden band along the horizon
-  if (gold > 0.01) alpha(gold * 0.5, () => { for (let y = 300; y < HORIZON; y += 3) r(vx0, y, vx1 - vx0, 3, M([255, 170, 90], [255, 214, 150], (y - 300) / 124)); });
+  // the low sun (and its glow on the sky) at dawn and dusk: the sky warms towards the horizon, violet-pink up high and gold
+  // down low, fading in smoothly (no edge where it starts)
+  if (gold > 0.01) for (let y = 150; y < HORIZON; y += 2) { const u = (y - 150) / (HORIZON - 150), k = gold * 0.62 * u * u * (3 - 2 * u); if (k > 0.01) alpha(k, () => r(vx0, y, vx1 - vx0, 2, u < 0.55 ? M([186, 128, 196], [240, 150, 150], u / 0.55) : M([240, 150, 150], [255, 200, 120], (u - 0.55) / 0.45))); }
   { const s = iceSun(); if (s > -0.08 && w.kind !== 'cloudy' && w.kind !== 'snow' && w.kind !== 'drizzle') { const sx = 1700 - Math.round((s + 0.05) * 400), sy = Math.round(HORIZON - 6 - s * 160); if (seen(sx - 20, sx + 20)) { alpha(0.3, () => disc(sx, sy, 12, [255, 220, 150])); disc(sx, sy, 6, M([255, 250, 220], [255, 160, 80], gold)); } } }
   // clouds: a lid of them when it's grey, a few drifting by when it's fine
   { const lid = w.kind === 'cloudy' || w.kind === 'snow' || w.kind === 'drizzle', n = lid ? 22 : 7, cc = M(M([40, 46, 66], [236, 240, 246], day), [150, 156, 166], lid ? 0.4 : 0);
@@ -241,7 +242,7 @@ export const REYKJAVIK_SPOTS: Spot[] = [
 ];
 const TALK: Talker[] = [
   { id: 'statue', name: 'THE EXPLORER', x: RKR.church + 40, y: 420, sx: RKR.church + 40, sy: 520, lines: ['A statue of an explorer who sailed on to find a whole new land. He looks like he\'s still deciding where next.', 'He\'s been pointing that way for years.'], verb: 'LOOK' },
-  { id: 'mural', name: 'THE MURAL', x: 1124, y: 436, sx: 1124, sy: 500, lines: ['A humpback whale, painted three storeys tall. It looks happy about it.'], verb: 'LOOK' },
+  { id: 'mural', name: 'THE MURAL', x: 1108, y: 436, sx: 1100, sy: 506, lines: ['A humpback whale, painted three storeys tall. It looks happy about it.'], verb: 'LOOK' },
   { id: 'hall-of-fame', name: 'THE HALL OF FAME', x: 1284, y: 440, sx: 1284, sy: 520, lines: ['Photos of happy customers holding hot dogs. Every single one looks delighted.', 'A signed photo: "BEST HOT DOG OF MY LIFE." Someone\'s drawn a crown on it.'], verb: 'LOOK' },
   { id: 'harpa', name: 'HARPA', x: 1580, y: 430, sx: 1580, sy: 500, lines: ['HARPA, the concert hall: hundreds of glass panes, like a honeycomb. At night they light up.', 'Music drifts out when the doors open. Something with a lot of cellos.'], verb: 'LOOK' },
   { id: 'whale-boat', name: 'THE WHALE BOAT', x: 1860, y: 440, sx: 1860, sy: 500, lines: ['WHALE WATCHING: COMING SOON. The boat bobs, ready. The whales are ready too, probably.'], verb: 'READ' },

@@ -63,7 +63,7 @@ const DEFS: NpcDef[] = [
       { x: 1000, y: 540, wait: 86, say: ['welcome aboard!', 'any seat, dear. well. your seat'] },
       { x: 700, y: 546, wait: 22 },
       { x: 110, y: 530, wait: 30, say: ['kettle\'s on'] },
-      { x: 226, y: 546, wait: 5 }, { x: 346, y: 546, wait: 10 }, { x: 466, y: 546, wait: 10 }, { x: 586, y: 546, wait: 10 }, { x: 706, y: 546, wait: 10 }, { x: 826, y: 546, wait: 10 }, { x: 930, y: 546, wait: 10 },
+      { x: 226, y: 546, wait: 5 }, { x: 346, y: 546, wait: 10 }, { x: 466, y: 546, wait: 10 }, { x: 586, y: 546, wait: 10 }, { x: 706, y: 546, wait: 10 }, { x: 826, y: 546, wait: 10 }, { x: 944, y: 546, wait: 10 },
       { x: 980, y: 540, wait: 1 },
     ],
     chat: ['press the call button and i\'ll come. eventually', 'juice, coffee, or juice?', 'the lavatory\'s at the back. mind the door, it sticks', 'your nearest exit may be behind you. i mean it'],

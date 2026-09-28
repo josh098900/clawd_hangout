@@ -354,6 +354,8 @@ function drawBack(a: number): void {
 
 export const APSPOT = { CHECKIN0: 0, XRAY: 3, CAFE: 4, DUTY: 5, TV: 6, MAP: 7, SEAT0: 8 };
 const SEAT_XS = [1500, 1560, 1620, 1680, 1740, 1800];
+/** The gate's two rows of seats (their front edges): room to walk between them, and in front of the front row. */
+const SEAT_ROWS = [518, 552];
 export const AIRPORT_SPOTS: Spot[] = [
   ...APR.desk.map((dx, n): Spot => ({ kind: 'checkin', n, x: dx, y: 510, sx: dx, sy: 510, lift: 0, label: 'CHECK IN', area: { x0: dx - 40, y0: 436, x1: dx + 40, y1: 494 } })),
   { kind: 'xray', x: APR.xray, y: 512, sx: APR.xray, sy: 512, lift: 0, label: 'X-RAY', area: { x0: 586, y0: 430, x1: 800, y1: 500 } },
@@ -361,14 +363,14 @@ export const AIRPORT_SPOTS: Spot[] = [
   { kind: 'giftshop', n: 1, x: APR.duty, y: 514, sx: APR.duty, sy: 514, lift: 0, label: 'SHOP', area: { x0: APR.duty - 44, y0: 386, x1: APR.duty + 44, y1: 502 } },
   { kind: 'forecast', x: APR.tv, y: 504, sx: APR.tv, sy: 504, lift: 0, label: 'FORECAST', area: { x0: APR.tv - 34, y0: 392, x1: APR.tv + 34, y1: 444 } },
   { kind: 'map', x: APR.pillar, y: 500, sx: APR.pillar, sy: 500, lift: 0, label: 'MAP', area: { x0: APR.pillar - 14, y0: 386, x1: APR.pillar + 14, y1: 466 } },
-  ...[522, 560].flatMap((ry) => SEAT_XS.map((x): Spot => ({ kind: 'sit', x, y: ry - 12, sx: x, sy: ry + 8, lift: 12, label: 'SIT', area: { x0: x - 26, y0: ry - 30, x1: x + 26, y1: ry } }))),
+  ...SEAT_ROWS.flatMap((ry) => SEAT_XS.map((x): Spot => ({ kind: 'sit', x, y: ry - 12, sx: x, sy: ry + 8, lift: 12, label: 'SIT', area: { x0: x - 26, y0: ry - 30, x1: x + 26, y1: ry } }))),
 ];
 const TALK: Talker[] = [
   { id: 'poster-lab-air', name: 'THE POSTER', x: 575, y: 396, sx: 575, sy: 500, lines: ["FLY LAB AIR: WE'VE TESTED FLYING. Several times.", 'The small print: "Flask not included."'], verb: 'READ' },
   { id: 'poster-aurora', name: 'THE POSTER', x: 1353, y: 396, sx: 1353, sy: 500, lines: ['SEE THE NORTHERN LIGHTS. LA101 to Keflavik, every 10 minutes.', 'A photo of green lights over a snowy mountain. It looks unreal.'], verb: 'READ' },
   { id: 'cleaner-cart', name: 'THE CART', x: 1054, y: 530, sx: 1054, sy: 568, lines: ["Someone's left their mop. Mid-mop.", 'A sign on the bucket: DO NOT DRINK. Good tip.'], verb: 'LOOK' },
   { id: 'lost-trolley', name: 'THE TROLLEY', x: 498, y: 528, sx: 498, sy: 566, lines: ["A red suitcase on a trolley. Nobody's. The tag says: IF FOUND, KEEP.", 'It rattles a bit. Better not.'], verb: 'LOOK' },
-  { id: 'duty-teddy', name: 'THE GIANT TEDDY', x: APR.duty + 30, y: 446, sx: APR.duty + 26, sy: 516, lines: ['A teddy the size of a critter. 400 TOKENS. Nobody has ever bought it.', 'It stares. Kindly.'], verb: 'LOOK' },
+  { id: 'duty-teddy', name: 'THE GIANT TEDDY', x: APR.duty + 30, y: 446, sx: APR.duty + 42, sy: 522, lines: ['A teddy the size of a critter. 400 TOKENS. Nobody has ever bought it.', 'It stares. Kindly.'], verb: 'LOOK' },
 ];
 export function makeAirport(): Room {
   const room: Room = {
@@ -382,7 +384,7 @@ export function makeAirport(): Room {
       ...glassBlocks(FL0, LANE.y0 - 4), ...glassBlocks(LANE.y1 + 4, FL1 + 4), // the glass barrier, as it slants (the arch's lane is open)
       { x0: APR.duty - 28, y0: 494, x1: APR.duty + 28, y1: 506 }, { x0: APR.cafe - 38, y0: 494, x1: APR.cafe + 38, y1: 506 },
       { x0: APR.gateDesk - 30, y0: 494, x1: APR.gateDesk + 30, y1: 506 },
-      { x0: 1476, y0: 510, x1: 1832, y1: 524 }, { x0: 1476, y0: 548, x1: 1832, y1: 562 }, // the seat rows
+      ...SEAT_ROWS.map((ry) => ({ x0: 1476, y0: ry - 12, x1: 1832, y1: ry + 2 })), // the seat rows
       { x0: 1034, y0: 556, x1: 1074, y1: 568 }, { x0: 474, y0: 548, x1: 520, y1: 562 }, // the cart, the trolley
     ],
     doors: [
@@ -397,7 +399,7 @@ export function makeAirport(): Room {
     bg: mk(W, H),
     build: () => build.call(room),
     drawBack,
-    props: [checkin, queueBelts, xrayMachine, archBack, archFront, dutyTill, cafeCounter, gateDesk, seatRow(522), seatRow(560), plant(1336, 504), plant(876, 504), charger, cleanerCart, lostTrolley],
+    props: [checkin, queueBelts, xrayMachine, archBack, archFront, dutyTill, cafeCounter, gateDesk, ...SEAT_ROWS.map(seatRow), plant(1336, 504), plant(876, 504), charger, cleanerCart, lostTrolley],
     talkers: TALK,
   };
   return room;
