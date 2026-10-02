@@ -60,24 +60,24 @@ const vgy = (z: number): number => VST.vy + (WALL - VST.vy) * vs(z);
 const vzAt = (y: number): number => ((WALL - VST.vy) / Math.max(0.5, y - VST.vy) - 1) / 3;
 /** Where the street meets the church's plaza, and where the church stands. */
 const PLAZA_Z = 0.75, CH = { cx: 500, base: 412 };
-type Facade = { z0: number; z1: number; h: number; c: RGB; roof: RGB; shop?: boolean; sign?: RGB; mural?: boolean; wood?: boolean };
+type Facade = { z0: number; z1: number; h: number; c: RGB; roof: RGB; shop?: boolean; sign?: RGB; mural?: boolean; wood?: boolean; gable?: boolean };
 /** The street's buildings, each side from the mouth up to the plaza: height (at the mouth's scale), walls, roof, a shop at street level, a hanging sign. */
 const STREET: Record<-1 | 1, Facade[]> = {
   [-1]: [
-    { z0: 0, z1: 0.1, h: 92, c: [206, 200, 188], roof: IS.ROOF_GREY, shop: true, sign: [40, 120, 80] },
-    { z0: 0.1, z1: 0.22, h: 78, c: IS.RED, roof: IS.ROOF_BLACK, shop: true, sign: [240, 200, 60], wood: true },
-    { z0: 0.22, z1: 0.36, h: 98, c: [226, 224, 218], roof: IS.ROOF_GREY, mural: true },
-    { z0: 0.36, z1: 0.49, h: 74, c: IS.MUSTARD, roof: IS.ROOF_RED, shop: true, sign: [180, 50, 50], wood: true },
-    { z0: 0.49, z1: 0.62, h: 86, c: [96, 118, 146], roof: IS.ROOF_GREY, shop: true, wood: true },
-    { z0: 0.62, z1: PLAZA_Z, h: 70, c: [236, 232, 222], roof: IS.ROOF_RED, shop: true },
+    { z0: 0, z1: 0.1, h: 88, c: [234, 228, 214], roof: IS.ROOF_GREY, shop: true, sign: [40, 120, 80], gable: true },
+    { z0: 0.1, z1: 0.22, h: 78, c: [196, 58, 52], roof: IS.ROOF_BLACK, shop: true, sign: [240, 200, 60], wood: true },
+    { z0: 0.22, z1: 0.36, h: 98, c: [176, 196, 210], roof: IS.ROOF_GREY, mural: true },
+    { z0: 0.36, z1: 0.49, h: 74, c: IS.MUSTARD, roof: IS.ROOF_RED, shop: true, sign: [180, 50, 50], wood: true, gable: true },
+    { z0: 0.49, z1: 0.62, h: 86, c: [56, 60, 68], roof: IS.ROOF_GREY, shop: true, wood: true },
+    { z0: 0.62, z1: PLAZA_Z, h: 70, c: [226, 150, 128], roof: IS.ROOF_RED, shop: true, gable: true },
   ],
   [1]: [
-    { z0: 0, z1: 0.12, h: 84, c: [120, 84, 60], roof: IS.ROOF_BLACK, shop: true, sign: [230, 230, 236], wood: true },
-    { z0: 0.12, z1: 0.24, h: 96, c: [232, 230, 224], roof: IS.ROOF_GREY, shop: true, sign: [40, 70, 140], mural: true },
-    { z0: 0.24, z1: 0.37, h: 80, c: IS.TEAL, roof: IS.ROOF_BLACK, shop: true, sign: [250, 160, 60], wood: true },
-    { z0: 0.37, z1: 0.5, h: 90, c: [168, 72, 62], roof: IS.ROOF_GREY, shop: true },
-    { z0: 0.5, z1: 0.63, h: 72, c: IS.WHITE, roof: IS.ROOF_GREEN, shop: true, sign: [60, 140, 90], wood: true },
-    { z0: 0.63, z1: PLAZA_Z, h: 82, c: [120, 128, 140], roof: IS.ROOF_GREY },
+    { z0: 0, z1: 0.12, h: 84, c: [48, 92, 128], roof: IS.ROOF_BLACK, shop: true, sign: [230, 230, 236], wood: true, gable: true },
+    { z0: 0.12, z1: 0.24, h: 96, c: [236, 234, 226], roof: IS.ROOF_GREY, shop: true, sign: [40, 70, 140], mural: true },
+    { z0: 0.24, z1: 0.37, h: 80, c: IS.TEAL, roof: IS.ROOF_BLACK, shop: true, sign: [250, 160, 60], wood: true, gable: true },
+    { z0: 0.37, z1: 0.5, h: 90, c: [176, 52, 48], roof: IS.ROOF_GREY, shop: true, wood: true },
+    { z0: 0.5, z1: 0.63, h: 72, c: IS.WHITE, roof: IS.ROOF_GREEN, shop: true, sign: [60, 140, 90], wood: true, gable: true },
+    { z0: 0.63, z1: PLAZA_Z, h: 82, c: [214, 170, 60], roof: IS.ROOF_GREY, wood: true },
   ],
 };
 /** The street's lamps (green, as in the photo), its bare birches, benches and planters: [z, side]. */
@@ -106,7 +106,8 @@ function vista(day: boolean, dk: (c: RGB) => RGB): void {
     r(cx - 4, base - 12, 8, 12, lc([84, 60, 46])); r(cx, base - 12, 1, 12, lc([54, 38, 30]));
     // the plaza in front: black, with its white maze pattern, running down to the top of the street
     for (let y = base; y <= Math.ceil(vgy(PLAZA_Z)); y++) { const z = vzAt(y), sc = vs(z), half = Math.round((VST.walk + 30) * sc);
-      for (let x = cx - half; x < cx + half; x++) { const u = (x - cx) / (16 * sc), row = Math.floor(z * 5), cell = Math.floor(u), along = (z * 5) % 1 < 0.16 && h1(cell * 3.1 + row * 7.7) > 0.35, down = u - cell < 0.07 && h1(cell * 5.3 + row * 1.9) > 0.45; r(x, y, 1, 1, along || down ? dk([206, 206, 200]) : dk([38, 38, 42])); } }
+      for (let x = cx - half; x < cx + half; x++) { const u = (x - cx) / (16 * sc), row = Math.floor(z * 5), cell = Math.floor(u), along = (z * 5) % 1 < 0.16 && h1(cell * 3.1 + row * 7.7) > 0.35, down = u - cell < 0.07 && h1(cell * 5.3 + row * 1.9) > 0.45; r(x, y, 1, 1, along || down ? dk([176, 176, 172]) : dk([96, 98, 104])); } }
+    for (let k = 0; k < 3; k++) { const y = Math.ceil(vgy(PLAZA_Z)) - k * 2, half = Math.round((VST.walk + 30) * vs(PLAZA_Z)); r(CH.cx - half, y, half * 2, 1, dk([150, 150, 148])); } // (the steps up from the street)
     // the explorer on his plinth, before the door
     r(cx + 22, base - 4, 4, 5, haze([120, 116, 110], 0.25)); r(cx + 23, base - 9, 2, 5, haze([90, 110, 100], 0.25)); r(cx + 23, base - 10, 2, 1, haze([90, 110, 100], 0.25));
   }
@@ -124,22 +125,34 @@ function vista(day: boolean, dk: (c: RGB) => RGB): void {
   const P = (side: number, off: number, z: number, up: number): [number, number] => [VST.cx + side * off * vs(z), vgy(z) - up * vs(z)];
   for (const side of [-1, 1] as const) for (const f of [...STREET[side]].reverse()) {
     const wall = (sc: number) => haze(f.c, sc), endWall = (sc: number) => haze(M(f.c, [0, 0, 0], 0.22), sc), roofC = (sc: number) => haze(M(f.roof, [255, 255, 255], 0.06), sc), ridge = f.h + 24, back = VST.walk + 34, far = VST.walk + 68;
+    const GH = 24, gableUp = (u: number): number => (f.gable ? GH * (1 - Math.abs(2 * u - 1)) : 0);
+    if (f.gable) {
+      // a gable facing the street: its near roof slope runs back from the gable's edge (the far slope's hidden), snow along both
+      const zm = (f.z0 + f.z1) / 2, sm = vs(zm), [a0x, a0y] = P(side, VST.walk, f.z0, f.h), [mx, my] = P(side, VST.walk, zm, f.h + GH), [m2x, m2y] = P(side, far, zm, f.h + GH), [b0x, b0y] = P(side, far, f.z0, f.h);
+      fillPoly([[a0x, a0y], [mx, my], [m2x, m2y], [b0x, b0y]], roofC(sm));
+      for (let q = 1; q < 5; q++) { const zq = f.z0 + ((zm - f.z0) * q) / 5, [ax, ay] = P(side, VST.walk, zq, f.h + (GH * q) / 5), [bx2, by2] = P(side, far, zq, f.h + (GH * q) / 5); line(Math.round(ax), Math.round(ay), Math.round(bx2), Math.round(by2), haze(M(f.roof, [0, 0, 0], 0.25), vs(zq))); }
+      line(Math.round(mx), Math.round(my), Math.round(m2x), Math.round(m2y), dk(IS.SNOW));
+      const [e1x, e1y] = P(side, VST.walk, f.z1, f.h); line(Math.round(a0x), Math.round(a0y) - 1, Math.round(mx), Math.round(my) - 1, dk(IS.SNOW)); line(Math.round(mx), Math.round(my) - 1, Math.round(e1x), Math.round(e1y) - 1, dk(IS.SNOW));
+      if (h1(f.z0 * 13 + side) > 0.3) { const zc = f.z0 + (f.z1 - f.z0) * 0.3, sc = vs(zc), [cx2, cy2] = P(side, VST.walk + 20, zc, f.h + GH * 0.6); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), Math.max(3, Math.round(12 * sc)), haze([150, 70, 60], sc)); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), 1, dk(IS.SNOW)); }
+    } else {
     // the gable end facing us at the building's near end, and its end wall
-    { const s0 = vs(f.z0), [ex, ey] = P(side, VST.walk, f.z0, f.h), [rx, ry] = P(side, back, f.z0, ridge), [gx, gy] = P(side, far, f.z0, f.h), [bx, by] = P(side, far, f.z0, 0);
+      { const s0 = vs(f.z0), [ex, ey] = P(side, VST.walk, f.z0, f.h), [rx, ry] = P(side, back, f.z0, ridge), [gx, gy] = P(side, far, f.z0, f.h), [bx, by] = P(side, far, f.z0, 0);
       fillPoly([[ex, ey], [gx, gy], [bx, by], [ex, vgy(f.z0)]], endWall(s0)); fillPoly([[ex, ey], [rx, ry], [gx, gy]], endWall(s0)); fillPoly([[ex, ey - 1], [rx, ry - 1], [rx, ry + 1], [ex, ey + 1]], dk(IS.SNOW)); fillPoly([[rx, ry - 1], [gx, gy - 1], [gx, gy + 1], [rx, ry + 1]], dk(IS.SNOW));
       if (s0 > 0.4 && Math.abs(gx - ex) > 8) { const wx = (ex + rx) / 2 + side * 3 * s0, wy = ry + (ey - ry) * 0.75; r(Math.round(wx - 2 * s0), Math.round(wy), Math.max(2, Math.round(4 * s0)), Math.max(2, Math.round(4 * s0)), day ? haze([110, 146, 176], s0) : [255, 206, 130]); } }
     // the roof slope facing the street: from the eave up to the ridge, seams running up it, snow along the ridge and the eave
-    { const [e0x, e0y] = P(side, VST.walk, f.z0, f.h), [e1x, e1y] = P(side, VST.walk, f.z1, f.h), [r0x, r0y] = P(side, back, f.z0, ridge), [r1x, r1y] = P(side, back, f.z1, ridge), sm = vs((f.z0 + f.z1) / 2);
+      { const [e0x, e0y] = P(side, VST.walk, f.z0, f.h), [e1x, e1y] = P(side, VST.walk, f.z1, f.h), [r0x, r0y] = P(side, back, f.z0, ridge), [r1x, r1y] = P(side, back, f.z1, ridge), sm = vs((f.z0 + f.z1) / 2);
       fillPoly([[e0x, e0y], [e1x, e1y], [r1x, r1y], [r0x, r0y]], roofC(sm));
       for (let q = 1; q < 6; q++) { const zq = f.z0 + ((f.z1 - f.z0) * q) / 6, [ax, ay] = P(side, VST.walk, zq, f.h), [bx2, by2] = P(side, back, zq, ridge); line(Math.round(ax), Math.round(ay), Math.round(bx2), Math.round(by2), haze(M(f.roof, [0, 0, 0], 0.25), vs(zq))); }
       line(Math.round(r0x), Math.round(r0y), Math.round(r1x), Math.round(r1y), dk(IS.SNOW)); line(Math.round(e0x), Math.round(e0y) - 1, Math.round(e1x), Math.round(e1y) - 1, dk(IS.SNOW));
       if (h1(f.z0 * 13 + side) > 0.4) { const zc = f.z0 + (f.z1 - f.z0) * 0.6, sc = vs(zc), [cx2, cy2] = P(side, (VST.walk + back) / 2 + 4, zc, (f.h + ridge) / 2 + 4); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), Math.max(3, Math.round(12 * sc)), haze([150, 70, 60], sc)); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), 1, dk(IS.SNOW)); } }
+    }
     // the front, column by column
     const xa = VST.cx + side * VST.walk * vs(f.z0), xb = VST.cx + side * VST.walk * vs(f.z1);
     for (let x = Math.round(Math.min(xa, xb)); x <= Math.round(Math.max(xa, xb)); x++) {
       const sc = Math.abs(x - VST.cx) / VST.walk; if (sc <= 0.05) continue;
-      const z = clamp((1 / sc - 1) / 3, f.z0, f.z1), u = (z - f.z0) / (f.z1 - f.z0), bot = vgy(z), top = Math.round(bot - f.h * sc), hh = bot - top, yAt = (k: number) => Math.round(bot - f.h * sc * k);
-      r(x, top, 1, Math.ceil(hh), wall(sc)); if (f.wood && Math.floor(z * 300) % 3 === 0) r(x, top, 1, Math.ceil(hh), haze(M(f.c, [0, 0, 0], 0.16), sc));
+      const z = clamp((1 / sc - 1) / 3, f.z0, f.z1), u = (z - f.z0) / (f.z1 - f.z0), bot = vgy(z), top = Math.round(bot - (f.h + gableUp(u)) * sc), hh = bot - top, yAt = (k: number) => Math.round(bot - f.h * sc * k);
+      r(x, top, 1, Math.ceil(hh), wall(sc)); if (f.wood) { const rib = Math.floor(z * 400) % 3; if (rib === 0) r(x, top, 1, Math.ceil(hh), haze(M(f.c, [0, 0, 0], 0.18), sc)); else if (rib === 1 && sc > 0.4) r(x, top, 1, Math.ceil(hh), haze(M(f.c, K.WHITE, 0.12), sc)); } // (corrugated iron's ribs)
+      if (f.gable && Math.abs(u - 0.5) < 0.07) { const ay = Math.round(bot - (f.h + GH * 0.45) * sc); r(x, ay, 1, Math.max(2, Math.round(7 * sc)), Math.abs(u - 0.5) > 0.05 && sc > 0.35 ? haze(K.WHITE, sc) : day ? haze([110, 146, 176], sc) : h1(f.z0 * 9 + side) > 0.4 ? [255, 206, 130] : [40, 40, 54]); } // (the attic window in the gable)
       r(x, top, 1, Math.max(1, Math.round(2 * sc)), haze(K.WHITE, sc)); // (the white trim under the eave)
       r(x, yAt(0.07), 1, Math.max(1, Math.round(f.h * sc * 0.07)), haze(M(f.c, [60, 60, 66], 0.5), sc)); // (the footing)
       for (const k of [0.48, 0.76]) r(x, yAt(k), 1, 1, haze(M(f.c, [0, 0, 0], 0.2), sc)); // (the floors' trims)
@@ -151,7 +164,13 @@ function vista(day: boolean, dk: (c: RGB) => RGB): void {
         const lit2 = h1(wi * 7.7 + a * 3 + f.z0 * 13 + side) > 0.35, glass: RGB = day ? haze([110, 146, 176], sc) : lit2 ? [255, 206, 130] : [40, 40, 54];
         r(x, y0, 1, Math.max(1, y1 - y0), edge && sc > 0.35 ? haze(K.WHITE, sc) : glass); if (sc > 0.35) { r(x, y0, 1, 1, haze(K.WHITE, sc)); r(x, y1, 1, 1, haze(K.WHITE, sc)); }
       }
-      if (f.shop && u > 0.1 && u < 0.9) { const y0 = yAt(0.4), y1 = yAt(0.1), edge = u < 0.13 || u > 0.87; r(x, y0, 1, Math.max(1, y1 - y0), edge ? haze([60, 50, 46], sc) : day ? haze([170, 196, 210], sc) : M([255, 214, 150], [40, 40, 50], (1 - sc) * 0.5)); r(x, y0 - Math.max(1, Math.round(2 * sc)), 1, Math.max(1, Math.round(2 * sc)), haze(f.sign ?? [60, 60, 66], sc)); }
+      if (f.shop && u > 0.08 && u < 0.92) { // the shop: a dark frame, glass split by mullions (goods on shelves behind, a sky reflection by day, warm light at night), its door, the fascia in the sign's colour
+        const y0 = yAt(0.42), y1 = yAt(0.06), frame = haze([44, 40, 40], sc), door = u > 0.72 && u < 0.84, mull = (u * 5) % 1 < 0.08 || u < 0.11 || u > 0.89;
+        if (door) { r(x, y0, 1, Math.max(1, y1 - y0), haze([70, 48, 36], sc)); if (u > 0.75 && u < 0.81) r(x, y0 + Math.round((y1 - y0) * 0.15), 1, Math.max(1, Math.round((y1 - y0) * 0.4)), day ? haze([150, 180, 196], sc) : [255, 214, 150]); }
+        else if (mull) r(x, y0, 1, Math.max(1, y1 - y0), frame);
+        else { const n = h1(Math.floor(u * 24) * 1.3 + f.z0 * 17 + side), goods: RGB = ([[200, 60, 60], [240, 200, 80], [70, 120, 190], [236, 232, 220], [90, 150, 100]] as RGB[])[Math.floor(n * 5)];
+          for (let y = y0; y < y1; y++) { const t = (y - y0) / Math.max(1, y1 - y0), shelf = t > 0.55 && n > 0.25 && (t < 0.7 || t > 0.82); r(x, y, 1, 1, shelf ? (day ? haze(goods, sc) : M(goods, [255, 214, 150], 0.35)) : day ? haze(M([150, 182, 204], [222, 236, 244], ((x * 0.5 + y) % 9) < 2 ? 0.7 : t * 0.3), sc) : M([255, 214, 150], [40, 40, 50], (1 - sc) * 0.5 + t * 0.2)); } }
+        r(x, y0 - Math.max(2, Math.round(4 * sc)), 1, Math.max(2, Math.round(4 * sc)), haze(f.sign ?? M(f.c, [0, 0, 0], 0.5), sc)); r(x, y1, 1, Math.max(1, Math.round(2 * sc)), frame); }
       if (f.mural && u > 0.1 && u < 0.9) { const k = Math.floor(u * 7), mc = ([[230, 80, 120], [60, 170, 220], [250, 200, 60], [120, 200, 120], [160, 90, 200]] as RGB[])[(k + side + 5) % 5]; r(x, Math.round(bot - f.h * sc * (0.5 + 0.2 * Math.sin(u * 9))), 1, Math.max(1, Math.round(f.h * sc * 0.16)), haze(mc, sc)); } // (graffiti)
     }
     // a hanging sign on its iron bracket, sticking out over the pavement

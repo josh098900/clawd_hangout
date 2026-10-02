@@ -1361,6 +1361,7 @@ function render(a: number, t: number): void {
   R.begin();
   PX.dim = 0;
   PX.gmul = room.glowMul?.() ?? 1;
+  { const v = R.viewRect(room.w, room.h); R.wctx.clearRect(v.sx0, v.sy0, v.sx1 - v.sx0, v.sy1 - v.sy0); } // (so a gap in a backdrop shows the room's floor colour, never the last room's pixels)
   R.blitView(room.bg, room.w, room.h); // (only the part in view: the rest is never shown)
   const alt = room.bgAlt ? room.altAlpha?.() ?? 0 : 0;
   if (alt > 0.004) { R.wctx.globalAlpha = alt; R.blitView(room.bgAlt!, room.w, room.h); R.wctx.globalAlpha = 1; }

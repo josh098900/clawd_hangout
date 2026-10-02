@@ -42,6 +42,7 @@ function build(this: Room): void {
   bake(this.bg.getContext('2d')!, () => {
     // ---- the ceiling and the overhead bins (a long row of rounded doors with their latches) ----
     r(0, 0, W, 330, PL.WALL2); for (let y = 250; y < 330; y += 3) r(0, y, W, 3, M(PL.WALL2, PL.BIN, (y - 250) / 80));
+    for (const [x0, x1] of [[0, 200], [960, W]]) { r(x0, 330, x1 - x0, 54, PL.WALL2); r(x0, 330, x1 - x0, 2, PL.WALL_DK); r(x0, 352, x1 - x0, 1, PL.WALL_DK); } // (the bulkheads over the galleys, where there are no bins)
     r(200, 330, 760, 50, PL.BIN); r(200, 330, 760, 3, K.WHITE); r(200, 376, 760, 4, PL.BIN_DK); r(200, 380, 760, 2, PL.BIN_EDGE);
     for (let x = 200; x < 960; x += 95) { r(x, 330, 1, 50, PL.BIN_EDGE); r(x + 40, 366, 14, 4, PL.BIN_DK); r(x + 42, 367, 10, 2, PL.FRAME_DK); }
     // the LED strip under the bins, the reading lights and call buttons over each row

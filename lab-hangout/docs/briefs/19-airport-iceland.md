@@ -1120,3 +1120,16 @@ NPCs stand clear of every spot, and the golden test checks it.
    always hop back by map once you've visited. Two buses, half a lap apart, halve the wait but mean two bus rooms.
 3. **The guide.** §14 had HEKLA on the mic, but she runs Reykjavík's info kiosk. **(Recommended)** a new guide, KATLA,
    so HEKLA stays at her kiosk.
+
+## As built: fixes from Josh's second look (2 Oct)
+
+- **The airport's signs in the plane** ("< TRAINS", "GATE A1 >", and the door labels smeared into each other) came from a
+  strip of the plane's backdrop that was never painted, over both galleys (y 330-384 outside the bins). The last room's
+  pixels showed through it. The strip is now painted as bulkheads. Every frame now also clears the view before the
+  backdrop goes down, so a gap in any room's backdrop shows its floor colour, never another room.
+- **The street up to the church:**
+  - Half the buildings now have a gable facing the street (with an attic window), as many of Reykjavík's do. The others
+    keep the roof running along the street.
+  - Brighter colours (red, mustard, salmon, charcoal, deep blue, teal), with corrugated ribs that catch the light.
+  - Shop windows have a dark frame, mullions, a door, goods on the shelves, a sky reflection by day and a warm glow at night.
+  - The plaza is grey paving with steps up from the street (it read as a black wall before).
