@@ -6,7 +6,7 @@
 // textContent / the pixel font (never innerHTML).
 
 import { sanitizeLook, type Look } from '../entities/critter';
-import { isEmote, type EmoteKind } from '../entities/avatar';
+import { HOLDS, isEmote, type EmoteKind } from '../entities/avatar';
 import { ROOM_IDS, type RoomId } from '../world/room';
 import { scrub } from './filter';
 import { COOKS_MAX, type DinerState } from '../game/diner';
@@ -24,7 +24,8 @@ export interface PeerState { id: string; name: string; look: Look; x: number; y:
  * 3 ghost, 4 rowing, 5 floating up high (weightless, pushed off the floor; on the Moon: a big slow jump), 6 driving a moon buggy.
  */
 export interface MoveMsg { x: number; y: number; dir: 1 | -1; moving: boolean; use: number; hold: number; pose: number }
-export const SPOTS_MAX = 40, HOLD_MAX = 24, POSE_MAX = 6;
+/** HOLD_MAX is the highest hold there is (worked out from HOLDS, so a new one is never dropped on its way to everyone else). */
+export const SPOTS_MAX = 40, HOLD_MAX = Math.max(...Object.keys(HOLDS).map(Number)), POSE_MAX = 6;
 
 /** The Dev Den's build: passing?, commit + deploy counts, and the last commit (who + message). */
 export interface BuildState { ok: boolean; n: number; dep: number; by: string; id: string; msg: string }
