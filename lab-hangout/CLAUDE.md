@@ -231,8 +231,10 @@ src/
     kef.ts             KEFLAVÍK (1400x614): GATE D4, the window (the jet, Iceland's sky, the aurora), the welcome posters, the travelator,
                        PASSPORT CONTROL (OFFICER GUNNI's booth), the baggage carousel (KEFW.bags), the skyr bar, the bus to Reykjavík
     reykjavik.ts       REYKJAVÍK (1900x614, outdoors on Iceland's clock): the bus stop and INFO kiosk (a map board), the painted houses,
-                       HALLGRÍMSKIRKJA up the rainbow street (THE TOWER), the shops (the PUFFIN SHOP, the bakery, the café), the elf
-                       house, the hot dog stand, HARPA, the SUN VOYAGER, the aurora bench and camera; the aurora live in the sky
+                       the view up SKÓLAVÖRÐUSTÍGUR (vista(): the rainbow street in one-point perspective, vs(z)/vgy(z), its shops, lamps
+                       and walkers) to HALLGRÍMSKIRKJA (THE TOWER; the church bench's `watch` frames it), the shops (the PUFFIN SHOP, the
+                       bakery, the café), the elf house, the hot dog stand, HARPA, the SUN VOYAGER, the aurora bench and camera; the
+                       aurora live in the sky; winter's bells over the street
   entities/
     critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;
                        what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)

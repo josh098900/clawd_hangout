@@ -726,3 +726,28 @@ scene, and brings everything else up to the same finish.
 - Checks: every spot's reach, and no NPC in the way (the scan from 717aaaa); golden (only Reykjavík changes); the phone;
   CPU ×4 with bots; a two-player look round.
 - **No SQL.**
+
+## As built: push 1b (Reykjavík, made beautiful)
+
+- **It came out as §16 says,** with these details:
+  - **The view up Skólavörðustígur** is drawn in one-point perspective into the gap where the church stood (x 402-598). Each
+    side has six buildings: painted iron or concrete walls, three windows a floor, a shop at street level (lit at night),
+    hanging signs, graffiti on two concrete walls, roofs with snow. Green lamps, bare birches, orange benches and
+    planters line the pavements. The six rainbow lanes narrow up to the plaza and fan out across the street you walk on.
+  - **HALLGRÍMSKIRKJA** stands at the top: the tower with its slit windows, clock, belfry and ribbed crown; nine columns
+    stepping down each side; the arched door under the stained glass; the explorer on his plinth; the black plaza with
+    white line markings. At night, warm uplights between the columns, and the belfry and stained glass glow.
+  - **The church bench** at the foot of the street (two seats, spots 14 and 15): sit, and the camera looks up to frame
+    the whole church (`watch` top 252). A phone sees it all anyway.
+  - **Life on the street:** six walkers in coats going up and down (smaller as they climb), two tourists photographing
+    the church (a flash now and then after dark), a dog walker along the street, gulls over the harbour.
+  - **The houses:** ribbed iron that catches the light, shade under the eaves, concrete footings, seams in the tin roofs
+    and snow along their bottom edge, dormers, lintels, curtains, snowy sills, framed doors with a window and a lamp.
+    Striped awnings over the three shops, the bakery's golden pretzel, the café's chalkboard.
+  - **The light:** the golden hour warms the buildings; the dawn and dusk sky fades violet to gold (fixed in 717aaaa).
+  - **Winter:** two big green bells on wires over the street, strings of lights along the wires, fairy lights in the
+    birches (the YULE CAT stays).
+  - **Esja** has snow running down its gullies.
+  - Not done: HARPA's extra facets and a new SUN VOYAGER (both already read well).
+- **Tested:** every spot's reach (the new seats included), no NPC in the way, golden (only Reykjavík's 13 changed), the
+  phone, CPU ×4 with bots (5.5-6 ms of work a frame), smoke.
