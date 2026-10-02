@@ -28,9 +28,10 @@ set role authenticated; select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-0
 reset role;
 do $$ declare i int; begin for i in 1..80 loop update private.claw_plays set at = at - interval '1 minute'; perform set_config('role', 'authenticated', true); perform public.play_claw(); perform set_config('role', 'postgres', true); end loop; end $$;
 select pg_temp.ok('in season the claw can give halloween prizes', exists (select 1 from private.claw_plays p join private.claw_prizes z using (item) where z.season = 'halloween'));
-select public.set_season(null);
+select public.set_season('winter'); -- (out of halloween's season, whatever today's date is)
 delete from private.claw_plays;
 select private.add_tokens('aaaaaaaa-0000-0000-0000-000000000001', 300);
 do $$ declare i int; begin for i in 1..80 loop update private.claw_plays set at = at - interval '1 minute'; perform set_config('role', 'authenticated', true); perform public.play_claw(); perform set_config('role', 'postgres', true); end loop; end $$;
 select pg_temp.ok('out of season it never does (80 plays)', (select count(*) from private.claw_plays) = 80 and not exists (select 1 from private.claw_plays p join private.claw_prizes z using (item) where z.season = 'halloween'));
+select public.set_season(null);
 select pg_temp.ok('season back to the date', public.current_season() is distinct from 'halloween' or to_char(now(), 'MM') = '10');

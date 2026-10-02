@@ -10,7 +10,7 @@ select pg_temp.ok('season by date: Dec 1 winter, Jan 6 winter, Jan 7 none, Oct h
     ((case when to_char('2027-01-07'::date, 'MM') = '10' then 'halloween' when to_char('2027-01-07'::date, 'MM') = '12' or to_char('2027-01-07'::date, 'MMDD') <= '0106' then 'winter' end) is null),
     ((case when to_char('2026-10-15'::date, 'MM') = '10' then 'halloween' when to_char('2026-10-15'::date, 'MM') = '12' or to_char('2026-10-15'::date, 'MMDD') <= '0106' then 'winter' end) = 'halloween'),
     ((case when to_char('2026-11-30'::date, 'MM') = '10' then 'halloween' when to_char('2026-11-30'::date, 'MM') = '12' or to_char('2026-11-30'::date, 'MMDD') <= '0106' then 'winter' end) is null)) v(x)));
-select pg_temp.ok('the migration''s own function agrees with the rule today (September: none)', private.season() is null);
+select pg_temp.ok('the migration''s own function agrees with the rule today', private.season() is not distinct from (case when to_char(now() at time zone 'utc', 'MM') = '10' then 'halloween' when to_char(now() at time zone 'utc', 'MM') = '12' or to_char(now() at time zone 'utc', 'MMDD') <= '0106' then 'winter' end));
 set role authenticated;
 select set_config('test.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false); select public.join_world('letmein'); select public.claim_seat('one');
 insert into public.profiles (id, name, look) values ('aaaaaaaa-0000-0000-0000-000000000001', 'ANNA', '{}');
