@@ -751,3 +751,28 @@ scene, and brings everything else up to the same finish.
   - Not done: HARPA's extra facets and a new SUN VOYAGER (both already read well).
 - **Tested:** every spot's reach (the new seats included), no NPC in the way, golden (only Reykjavík's 13 changed), the
   phone, CPU ×4 with bots (5.5-6 ms of work a frame), smoke.
+
+## As built: fixes from Josh's check of push 1b
+
+- **The plane:** no windows over the galley cupboards any more (`WINS` starts at 270, ends at 870). Door labels stay
+  on screen (`drawDoorHints` keeps them 42 px below the top of the view), so the gate sign in the plane and the train's
+  sign no longer sit off the top.
+- **The street up to the church:** each building now has a pitched roof (from the eave over the pavement to a ridge
+  set back from the street), seams, a snowy ridge and eave, and a chimney on some. The gable end shows on the side
+  nearest you. The fronts have a white eave trim, a footing, floor bands and corner boards. Windows are white-framed
+  and some are lit after dark. The shops have a fascia in their sign colour.
+- **The humpback mural** (`mural()`) is redrawn as a humpback rising through deep blue water, with light falling from
+  the surface, a knobbly head, a white grooved throat, long white flippers swept back, the flukes, and bubbles. Every
+  part is outlined so it reads against the sea.
+- **HARPA**, redrawn from Josh's photo:
+  - the tall block, its roof climbing to the right and its left side leaning out
+  - the long, low wing beside it
+  - both clad in honeycomb cells of glass (hexagons taller than wide) in steel frames. They catch the sky, with a
+    diagonal band of brighter reflection.
+  - the dark glass lobby underneath, and a reflecting pool in front with the building in it
+  - At night the same cells (`HARPA_CELLS`) light up in a slow rolling wave of colour.
+- **Tested:**
+  - reach: 0 stand points fail
+  - golden: only plane and Reykjavík changed (25 of 327)
+  - smoke, both fly runs and the phone pass
+  - perf: Reykjavík with snow takes 3.4 ms of work a frame

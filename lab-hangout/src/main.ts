@@ -1330,7 +1330,7 @@ function drawDoorHints(a: number): void {
     const dest = doorDest(d); if (!dest) continue;
     const cx = (d.trigger.x0 + d.trigger.x1) / 2, dist = Math.hypot(me.x - cx, me.y - d.trigger.y0);
     if (dist > 70) continue;
-    const k = 1 - seg(dist, 40, 70), bob = Math.round(Math.abs(Math.sin(a * 5)) * 3), y = d.area.y0 - 12 - bob;
+    const k = 1 - seg(dist, 40, 70), bob = Math.round(Math.abs(Math.sin(a * 5)) * 3), y = Math.max(d.area.y0 - 12, Math.round(R.cam.y + 42)) - bob; // (kept on screen, below the HUD and the banner, when the door's top is above the view: the plane's, the train's)
     PX.ctx.globalAlpha = k;
     lit(() => { for (let j = 0; j < 4; j++) r(Math.round(cx) - j, y + j, 1 + j * 2, 1, [255, 214, 90]); r(Math.round(cx) - 1, y + 4, 3, 3, [255, 214, 90]); });
     txtOutlined(dest.label, Math.round(cx - tw(dest.label) / 2 + (cx < 60 ? 22 : 0)), y - 9, [255, 236, 170]);

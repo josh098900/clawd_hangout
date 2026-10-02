@@ -233,7 +233,8 @@ src/
     reykjavik.ts       REYKJAVÍK (1900x614, outdoors on Iceland's clock): the bus stop and INFO kiosk (a map board), the painted houses,
                        the view up SKÓLAVÖRÐUSTÍGUR (vista(): the rainbow street in one-point perspective, vs(z)/vgy(z), its shops, lamps
                        and walkers) to HALLGRÍMSKIRKJA (THE TOWER; the church bench's `watch` frames it), the shops (the PUFFIN SHOP, the
-                       bakery, the café), the elf house, the hot dog stand, HARPA, the SUN VOYAGER, the aurora bench and camera; the
+                       bakery, the café), the elf house, the humpback mural (mural()), the hot dog stand, HARPA (HARPA_MAIN/WING volumes, honeycomb HARPA_CELLS
+                       baked by day and lit by a colour wave at night), the SUN VOYAGER, the aurora bench and camera; the
                        aurora live in the sky; winter's bells over the street
   entities/
     critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;

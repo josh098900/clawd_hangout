@@ -23,7 +23,8 @@ export const PLR = { lav: 34, galley: 120, rows: [260, 380, 500, 620, 740, 860],
 /** The seats: A (by the window) sits further back than C (the aisle). */
 export const SEAT_Y = { A: 494, C: 516 };
 /** The windows (their centres), one per row plus a couple by the galleys; the trip shows through all of them. */
-const WINS = [150, 270, 390, 510, 630, 750, 870, 990];
+/** (Not over the galleys' cupboards at either end.) */
+const WINS = [270, 390, 510, 630, 750, 870];
 const WIN_Y0 = 404, WIN_Y1 = 450, WIN_W = 24, WIN_CY = (WIN_Y0 + WIN_Y1) / 2, WIN_RX = WIN_W / 2, WIN_RY = (WIN_Y1 - WIN_Y0) / 2;
 /** What the features tell the cabin to show (features/air.ts). */
 export const PLANEW = {

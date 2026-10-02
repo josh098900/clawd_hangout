@@ -22,11 +22,20 @@ export const RKR = { bus: 70, info: 170, road0: 400, road1: 600, church: 500, pu
 export const REYKW = { view: { x0: 0, x1: W }, knock: -99, elfOpen: -99, pet: -99 };
 const seen = (x0: number, x1: number): boolean => x1 >= REYKW.view.x0 - 30 && x0 <= REYKW.view.x1 + 30;
 const now = (): number => performance.now() / 1000;
-/** HARPA's outline: its roof's height at x (planes rising to a peak towards the sea, the far corner cut off), and whether (x, y) is inside it (both its sides lean in as they rise). */
-const harpaTop = (x: number): number => { const P: [number, number][] = [[RKR.harpa0 + 16, 406], [1556, 394], [1624, 380], [RKR.harpa1 - 4, 388]]; if (x < P[0][0]) return 470; for (let i = 0; i < P.length - 1; i++) if (x <= P[i + 1][0]) return Math.round(P[i][1] + ((P[i + 1][1] - P[i][1]) * (x - P[i][0])) / (P[i + 1][0] - P[i][0])); return 470; };
-const inHarpa = (x: number, y: number): boolean => { const u = (y - 380) / (470 - 380); return y >= harpaTop(x) && x >= RKR.harpa0 + Math.round((1 - u) * 16) && x < RKR.harpa1 - Math.round((1 - u) * 6); };
-/** Each of HARPA's panes that's wholly inside its outline (x, y: the pane's corner; they're 8 x 5, laid like bricks). */
-const harpaPanes = (fn: (x: number, y: number) => void): void => { for (let y = 382; y < 468; y += 7) for (let x = RKR.harpa0 + 18 + (Math.floor(y / 7) % 2) * 5; x < RKR.harpa1 - 4; x += 10) if (inHarpa(x, y) && inHarpa(x + 8, y) && inHarpa(x, y + 5) && inHarpa(x + 8, y + 5)) fn(x, y); };
+/**
+ * HARPA, from the photo: the tall block whose roof climbs to the right and whose left side leans out over the lobby, and the long low wing
+ * beside it, both clad in honeycomb cells of glass (taller than wide) catching the sky, floating over a dark glass lobby; a
+ * reflecting pool in front. HARPA_CELLS lists every cell wholly inside a volume (its corner x, y), for the baked glass and the
+ * night's colour wave alike.
+ */
+const HARPA_MAIN: [number, number][] = [[1562, 392], [1680, 374], [1676, 456], [1580, 456]];
+const HARPA_WING: [number, number][] = [[1484, 421], [1574, 413], [1574, 447], [1494, 448]];
+const inPoly = (pts: [number, number][], x: number, y: number): boolean => { let inside = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside; } return inside; };
+const HARPA_CELLS: [number, number][] = [];
+for (let col = 0; col < 34; col++) for (let row = 0; row < 9; row++) { const x = 1480 + col * 6, y = 370 + row * 10 + (col % 2 ? 5 : 0); for (const v of [HARPA_MAIN, HARPA_WING]) if (inPoly(v, x + 1, y + 1) && inPoly(v, x + 5, y + 1) && inPoly(v, x + 1, y + 9) && inPoly(v, x + 5, y + 9)) { HARPA_CELLS.push([x, y]); break; } }
+/** A glass cell: a hexagon 5 wide, 10 tall (pointed top and bottom). */
+const HEX: [number, number][] = [[2, 1], [1, 3], [0, 5], [0, 5], [0, 5], [0, 5], [0, 5], [0, 5], [1, 3], [2, 1]];
+const hexCell = (x: number, y: number, c: RGB, hi?: RGB): void => { HEX.forEach(([dx, w], k) => r(x + dx, y + k, w, 1, c)); if (hi) { r(x + 1, y + 2, 1, 4, hi); r(x + 2, y + 1, 1, 1, hi); } };
 const RAINBOW: RGB[] = [[228, 60, 60], [240, 140, 50], [246, 214, 60], [80, 180, 90], [60, 120, 210], [140, 80, 190]];
 
 // ---------------------------------------------------------------- the sky (the backdrop) ----------------------------------------------------------------
@@ -74,6 +83,11 @@ const STREET: Record<-1 | 1, Facade[]> = {
 /** The street's lamps (green, as in the photo), its bare birches, benches and planters: [z, side]. */
 const V_LAMPS: [number, -1 | 1][] = [[0.08, 1], [0.3, -1], [0.34, 1], [0.6, -1], [0.62, 1]];
 const V_TREES: [number, -1 | 1][] = [[0.16, -1], [0.44, -1], [0.18, 1], [0.48, 1]];
+/** Fill a convex polygon with crisp pixels (row by row). */
+function fillPoly(pts: [number, number][], c: RGB): void {
+  const ys = pts.map((q) => q[1]), y0 = Math.floor(Math.min(...ys)), y1 = Math.ceil(Math.max(...ys));
+  for (let y = y0; y <= y1; y++) { const yc = y + 0.5, xs: number[] = []; for (let i = 0; i < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length]; if ((ay <= yc) !== (by <= yc)) xs.push(ax + ((yc - ay) / (by - ay)) * (bx - ax)); } if (xs.length < 2) continue; const a = Math.round(Math.min(...xs)), b = Math.round(Math.max(...xs)); if (b > a) r(a, y, b - a, 1, c); }
+}
 function vista(day: boolean, dk: (c: RGB) => RGB): void {
   const sky: RGB = day ? IS.SKY_LO : IS.SKY_NIGHT_LO, haze = (c: RGB, s: number): RGB => dk(M(c, sky, (1 - s) * 0.42));
   // ---- HALLGRÍMSKIRKJA at the top of the hill: the tall central tower, the wings of basalt columns stepping down either side ----
@@ -103,23 +117,47 @@ function vista(day: boolean, dk: (c: RGB) => RGB): void {
     for (let b = 0; b < 6; b++) { const xa = Math.round(VST.cx - road + (b * 2 * road) / 6), xb = Math.round(VST.cx - road + ((b + 1) * 2 * road) / 6); r(xa, y, xb - xa, 1, haze(RAINBOW[b], sc)); }
     r(Math.round(VST.cx - road) - 1, y, 1, 1, haze(IS.KERB, sc)); r(Math.round(VST.cx + road), y, 1, 1, haze(IS.KERB, sc));
   }
-  // ---- the buildings either side: walls of painted iron or concrete in perspective, their windows, shops at street level, hanging signs, roofs with snow ----
-  for (const side of [-1, 1] as const) for (const f of STREET[side]) {
+  // ---- the buildings either side, far ones first (so nearer ones stand in front): each a pitched roof in perspective (its ridge runs
+  // up the street, seams, snow on the ridge, a chimney on some), the gable end where it stands taller than the one in front, and its
+  // front: painted iron or concrete, floor trims, white-framed windows (lit at night), a shop at street level, a footing ----
+  const g = PX.ctx; g.save(); g.beginPath(); g.rect(VST.x0, 0, VST.x1 - VST.x0, WALL + 1); g.clip();
+  const P = (side: number, off: number, z: number, up: number): [number, number] => [VST.cx + side * off * vs(z), vgy(z) - up * vs(z)];
+  for (const side of [-1, 1] as const) for (const f of [...STREET[side]].reverse()) {
+    const wall = (sc: number) => haze(f.c, sc), endWall = (sc: number) => haze(M(f.c, [0, 0, 0], 0.22), sc), roofC = (sc: number) => haze(M(f.roof, [255, 255, 255], 0.06), sc), ridge = f.h + 24, back = VST.walk + 34, far = VST.walk + 68;
+    // the gable end facing us at the building's near end, and its end wall
+    { const s0 = vs(f.z0), [ex, ey] = P(side, VST.walk, f.z0, f.h), [rx, ry] = P(side, back, f.z0, ridge), [gx, gy] = P(side, far, f.z0, f.h), [bx, by] = P(side, far, f.z0, 0);
+      fillPoly([[ex, ey], [gx, gy], [bx, by], [ex, vgy(f.z0)]], endWall(s0)); fillPoly([[ex, ey], [rx, ry], [gx, gy]], endWall(s0)); fillPoly([[ex, ey - 1], [rx, ry - 1], [rx, ry + 1], [ex, ey + 1]], dk(IS.SNOW)); fillPoly([[rx, ry - 1], [gx, gy - 1], [gx, gy + 1], [rx, ry + 1]], dk(IS.SNOW));
+      if (s0 > 0.4 && Math.abs(gx - ex) > 8) { const wx = (ex + rx) / 2 + side * 3 * s0, wy = ry + (ey - ry) * 0.75; r(Math.round(wx - 2 * s0), Math.round(wy), Math.max(2, Math.round(4 * s0)), Math.max(2, Math.round(4 * s0)), day ? haze([110, 146, 176], s0) : [255, 206, 130]); } }
+    // the roof slope facing the street: from the eave up to the ridge, seams running up it, snow along the ridge and the eave
+    { const [e0x, e0y] = P(side, VST.walk, f.z0, f.h), [e1x, e1y] = P(side, VST.walk, f.z1, f.h), [r0x, r0y] = P(side, back, f.z0, ridge), [r1x, r1y] = P(side, back, f.z1, ridge), sm = vs((f.z0 + f.z1) / 2);
+      fillPoly([[e0x, e0y], [e1x, e1y], [r1x, r1y], [r0x, r0y]], roofC(sm));
+      for (let q = 1; q < 6; q++) { const zq = f.z0 + ((f.z1 - f.z0) * q) / 6, [ax, ay] = P(side, VST.walk, zq, f.h), [bx2, by2] = P(side, back, zq, ridge); line(Math.round(ax), Math.round(ay), Math.round(bx2), Math.round(by2), haze(M(f.roof, [0, 0, 0], 0.25), vs(zq))); }
+      line(Math.round(r0x), Math.round(r0y), Math.round(r1x), Math.round(r1y), dk(IS.SNOW)); line(Math.round(e0x), Math.round(e0y) - 1, Math.round(e1x), Math.round(e1y) - 1, dk(IS.SNOW));
+      if (h1(f.z0 * 13 + side) > 0.4) { const zc = f.z0 + (f.z1 - f.z0) * 0.6, sc = vs(zc), [cx2, cy2] = P(side, (VST.walk + back) / 2 + 4, zc, (f.h + ridge) / 2 + 4); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), Math.max(3, Math.round(12 * sc)), haze([150, 70, 60], sc)); r(Math.round(cx2 - 2 * sc), Math.round(cy2 - 10 * sc), Math.max(2, Math.round(4 * sc)), 1, dk(IS.SNOW)); } }
+    // the front, column by column
     const xa = VST.cx + side * VST.walk * vs(f.z0), xb = VST.cx + side * VST.walk * vs(f.z1);
     for (let x = Math.round(Math.min(xa, xb)); x <= Math.round(Math.max(xa, xb)); x++) {
       const sc = Math.abs(x - VST.cx) / VST.walk; if (sc <= 0.05) continue;
-      const z = clamp((1 / sc - 1) / 3, f.z0, f.z1), u = (z - f.z0) / (f.z1 - f.z0), bot = vgy(z), top = Math.round(bot - f.h * sc), wall = haze(f.c, sc);
-      r(x, top, 1, Math.ceil(bot - top), wall); if (f.wood && Math.floor(z * 300) % 3 === 0) r(x, top, 1, Math.ceil(bot - top), haze(M(f.c, [0, 0, 0], 0.16), sc));
-      r(x, top - Math.round(5 * sc), 1, Math.round(5 * sc), haze(f.roof, sc)); r(x, top - Math.round(5 * sc), 1, 1, dk(IS.SNOW)); r(x, top, 1, 1, haze(K.WHITE, sc)); // (the roof's edge, its snow, the white trim)
-      // the windows: three across each building, two floors up (lit at night); the shop window at street level
-      const wu = (u * 3) % 1, inWin = wu > 0.22 && wu < 0.78;
-      for (const [a, b] of [[0.56, 0.72], [0.8, 0.92]] as [number, number][]) if (inWin && f.h * sc * (b - a) >= 1) r(x, Math.round(bot - f.h * sc * b), 1, Math.max(1, Math.round(f.h * sc * (b - a))), day ? haze([110, 146, 176], sc) : M([255, 206, 130], [60, 50, 50], h1(Math.floor(u * 3) * 7.7 + f.z0 * 13 + side) > 0.35 ? 0 : 0.85));
-      if (f.shop && u > 0.12 && u < 0.88) r(x, Math.round(bot - f.h * sc * 0.4), 1, Math.max(1, Math.round(f.h * sc * 0.3)), day ? haze([180, 200, 210], sc) : M([255, 214, 150], [40, 40, 50], (1 - sc) * 0.5));
-      if (f.mural && u > 0.1 && u < 0.9) { const k = Math.floor(u * 7), mc = ([[230, 80, 120], [60, 170, 220], [250, 200, 60], [120, 200, 120], [160, 90, 200]] as RGB[])[(k + side + 5) % 5]; r(x, Math.round(bot - f.h * sc * (0.5 + 0.25 * Math.sin(u * 9))), 1, Math.max(1, Math.round(f.h * sc * 0.18)), haze(mc, sc)); } // (graffiti)
+      const z = clamp((1 / sc - 1) / 3, f.z0, f.z1), u = (z - f.z0) / (f.z1 - f.z0), bot = vgy(z), top = Math.round(bot - f.h * sc), hh = bot - top, yAt = (k: number) => Math.round(bot - f.h * sc * k);
+      r(x, top, 1, Math.ceil(hh), wall(sc)); if (f.wood && Math.floor(z * 300) % 3 === 0) r(x, top, 1, Math.ceil(hh), haze(M(f.c, [0, 0, 0], 0.16), sc));
+      r(x, top, 1, Math.max(1, Math.round(2 * sc)), haze(K.WHITE, sc)); // (the white trim under the eave)
+      r(x, yAt(0.07), 1, Math.max(1, Math.round(f.h * sc * 0.07)), haze(M(f.c, [60, 60, 66], 0.5), sc)); // (the footing)
+      for (const k of [0.48, 0.76]) r(x, yAt(k), 1, 1, haze(M(f.c, [0, 0, 0], 0.2), sc)); // (the floors' trims)
+      if (u < 0.02 || u > 0.98) { r(x, top, 1, Math.ceil(hh), haze(M(f.c, [0, 0, 0], 0.3), sc)); continue; } // (the corner)
+      // three windows a floor, white-framed, lit at night; the shop at street level
+      const wu = (u * 3) % 1, wi = Math.floor(u * 3);
+      for (const [a, b] of [[0.55, 0.7], [0.8, 0.93]] as [number, number][]) {
+        if (wu < 0.2 || wu > 0.8) continue; const y0 = yAt(b), y1 = yAt(a), edge = wu < 0.26 || wu > 0.74;
+        const lit2 = h1(wi * 7.7 + a * 3 + f.z0 * 13 + side) > 0.35, glass: RGB = day ? haze([110, 146, 176], sc) : lit2 ? [255, 206, 130] : [40, 40, 54];
+        r(x, y0, 1, Math.max(1, y1 - y0), edge && sc > 0.35 ? haze(K.WHITE, sc) : glass); if (sc > 0.35) { r(x, y0, 1, 1, haze(K.WHITE, sc)); r(x, y1, 1, 1, haze(K.WHITE, sc)); }
+      }
+      if (f.shop && u > 0.1 && u < 0.9) { const y0 = yAt(0.4), y1 = yAt(0.1), edge = u < 0.13 || u > 0.87; r(x, y0, 1, Math.max(1, y1 - y0), edge ? haze([60, 50, 46], sc) : day ? haze([170, 196, 210], sc) : M([255, 214, 150], [40, 40, 50], (1 - sc) * 0.5)); r(x, y0 - Math.max(1, Math.round(2 * sc)), 1, Math.max(1, Math.round(2 * sc)), haze(f.sign ?? [60, 60, 66], sc)); }
+      if (f.mural && u > 0.1 && u < 0.9) { const k = Math.floor(u * 7), mc = ([[230, 80, 120], [60, 170, 220], [250, 200, 60], [120, 200, 120], [160, 90, 200]] as RGB[])[(k + side + 5) % 5]; r(x, Math.round(bot - f.h * sc * (0.5 + 0.2 * Math.sin(u * 9))), 1, Math.max(1, Math.round(f.h * sc * 0.16)), haze(mc, sc)); } // (graffiti)
     }
     // a hanging sign on its iron bracket, sticking out over the pavement
-    if (f.sign) { const zm = (f.z0 + f.z1) / 2, sc = vs(zm), x = VST.cx + side * (VST.walk - 6) * sc, y = vgy(zm) - f.h * sc * 0.48; r(Math.round(x - (side > 0 ? 6 * sc : 0)), Math.round(y - 2), Math.max(1, Math.round(6 * sc)), 1, dk([40, 40, 46])); r(Math.round(x - (side > 0 ? 5 * sc : 1 * sc)), Math.round(y), Math.max(2, Math.round(5 * sc)), Math.max(2, Math.round(5 * sc)), haze(f.sign, sc)); }
+    if (f.sign) { const zm = (f.z0 + f.z1) / 2, sc = vs(zm), x = VST.cx + side * (VST.walk - 6) * sc, y = vgy(zm) - f.h * sc * 0.46; r(Math.round(x - (side > 0 ? 6 * sc : 0)), Math.round(y - 2), Math.max(1, Math.round(6 * sc)), 1, dk([40, 40, 46])); r(Math.round(x - (side > 0 ? 5 * sc : 1 * sc)), Math.round(y), Math.max(2, Math.round(5 * sc)), Math.max(2, Math.round(5 * sc)), haze(f.sign, sc)); }
   }
+  g.restore();
   // ---- the street's furniture: green lamps, bare birches, benches with orange slats, round planters ----
   for (const [z, side] of V_TREES) { const sc = vs(z), x = Math.round(VST.cx + side * (VST.walk - 6) * sc), y = vgy(z), hgt = 56 * sc, c = haze([70, 62, 56], sc);
     r(x, Math.round(y - hgt * 0.5), Math.max(1, Math.round(1.5 * sc)), Math.round(hgt * 0.5), c);
@@ -144,6 +182,28 @@ function house(x0: number, x1: number, col: RGB, roof: RGB, eave: number, peak: 
   r(Math.round(mid - 3), peak - 1, 6, 2, IS.SNOW);
   if (opts.chimney) { r(Math.round(mid + (x1 - x0) * 0.2), peak + 6, 6, 12, M([150, 70, 60], [20, 14, 20], k)); r(Math.round(mid + (x1 - x0) * 0.2), peak + 5, 6, 2, IS.SNOW); }
   r(x0 - 1, eave, x1 - x0 + 2, 2, M(K.WHITE, [40, 44, 56], k)); // (the white trim under the eaves)
+}
+/** THE MURAL on the gable end: a humpback rising through the deep blue, its long white flippers out, light from above, bubbles. */
+function mural(dk: (c: RGB) => RGB): void {
+  const x0 = 1104, x1 = 1144, y0 = 408, y1 = WALL - 2;
+  for (let y = y0; y < y1; y++) r(x0, y, x1 - x0, 1, dk(M([60, 150, 180], [16, 40, 86], (y - y0) / (y1 - y0))));
+  for (let k = 0; k < 4; k++) for (let y = y0; y < y1; y++) { const x = x0 + 4 + k * 10 + Math.round((y - y0) * 0.25); if (x < x1) alpha(0.18 * (1 - (y - y0) / (y1 - y0)), () => r(x, y, 3, 1, [210, 240, 250])); } // (light from the surface)
+  const back = dk([38, 50, 74]), backHi = dk([70, 88, 116]), belly = dk([226, 232, 236]), groove = dk([160, 172, 186]);
+  // the body: head up, tapering to the tail, dark on top with a pale mottle, the white grooved throat down the right
+  const outl = dk([18, 26, 44]);
+  for (let y = 410; y < 446; y++) { const t = (y - 410) / 36, c = 1125 - Math.round(t * 4), hw = Math.max(2, Math.round(t < 0.2 ? 4 + t * 30 : 10 - (t - 0.2) * 11)), tw2 = t < 0.55 ? Math.round(hw * (0.85 - t)) : 0;
+    r(c - hw - 1, y, hw * 2 + 2, 1, outl); r(c - hw, y, hw * 2, 1, back); r(c - hw + 1, y, 2, 1, backHi);
+    if (tw2 > 0) r(c + hw - tw2, y, tw2, 1, y % 2 ? belly : groove); if (t > 0.5 && y % 5 === 0) r(c - 2 + (y % 3), y, 2, 1, backHi); }
+  for (let k = 0; k < 9; k++) r(1119 + (k % 3) * 3, 412 + Math.floor(k / 3) * 3, 1, 1, dk([90, 106, 130])); // (the knobbly head)
+  r(1115, 421, 2, 2, dk(K.WHITE)); r(1115, 422, 1, 1, dk([10, 14, 24])); // (the eye)
+  // the long white flippers, swept back, outlined so they read against the sea
+  for (let k = 0; k < 15; k++) { const w = k < 9 ? 3 : k < 13 ? 2 : 1, ox = Math.round(k * 0.5);
+    r(1133 + ox - 1, 423 + k, w + 2, 1, outl); r(1133 + ox, 423 + k, w, 1, k % 3 ? belly : groove);
+    r(1116 - ox - w - 1, 425 + k, w + 2, 1, outl); r(1116 - ox - w, 425 + k, w, 1, k % 3 ? belly : groove); if (k % 4 === 1) { r(1133 + ox + w, 423 + k, 1, 1, belly); r(1116 - ox - w - 1, 425 + k, 1, 1, belly); } }
+  // the tail flukes, a wide notched wedge, white underneath
+  for (let k = 0; k < 7; k++) { const half = 3 + Math.round(k * 1.7), cx = 1121; r(cx - half - 1, 445 + k, half * 2 + 2, 1, outl); r(cx - half, 445 + k, half, 1, k < 2 ? back : belly); r(cx + 1, 445 + k, half, 1, k < 2 ? back : belly); }
+  r(1121, 446, 1, 6, outl); r(1110, 450, 2, 1, back); r(1131, 451, 2, 1, back);
+  for (let k = 0; k < 9; k++) { const bx = x0 + 3 + Math.floor(h1(k * 3.7) * (x1 - x0 - 6)), by = y0 + 4 + Math.floor(h1(k * 1.3) * (y1 - y0 - 10)); if (Math.abs(bx - 1124) > 10) { r(bx, by, 2, 2, dk([180, 230, 245])); r(bx, by, 1, 1, dk(K.WHITE)); } } // (bubbles)
 }
 function windowsOf(x0: number, x1: number, eave: number, day: boolean, skip: (x: number) => boolean = () => false): void {
   const k = day ? 0 : 0.5, fr = M(K.WHITE, [60, 64, 76], k), gl = day ? [110, 150, 180] as RGB : [30, 34, 50] as RGB;
@@ -189,7 +249,7 @@ function paintTown(g: CanvasRenderingContext2D, day: boolean): void {
       line(bx - 16, by + 4, bx - 4, by - 2, gold); line(bx - 4, by + 4, bx - 16, by - 2, gold); r(bx - 11, by - 5, 2, 2, gd); } // (a kringla)
     { const ax = 1086; line(ax - 5, WALL + 13, ax, WALL - 1, dk([90, 60, 40])); line(ax + 5, WALL + 13, ax, WALL - 1, dk([90, 60, 40])); r(ax - 4, WALL + 1, 8, 9, dk([40, 44, 40])); r(ax - 3, WALL + 3, 6, 1, dk(K.WHITE)); r(ax - 3, WALL + 6, 4, 1, dk([240, 200, 120])); }
     // a gable end with a humpback mural, the LAUGAVEGUR sign
-    { r(1102, 396, 44, WALL - 396, dk([220, 222, 226])); for (let y = 396; y < 406; y++) r(1102 + (y - 396), y, 44 - (y - 396) * 2, 1, dk(IS.ROOF_GREY)); oval(1124, 436, 16, 7, dk([60, 90, 140])); r(1106, 432, 6, 3, dk([60, 90, 140])); r(1138, 440, 6, 2, dk(K.WHITE)); r(1104, 422, 8, 5, dk([60, 90, 140])); r(1100, 384, 50, 8, dk([30, 70, 140])); txt('LAUGAVEGUR', 1125 - tw('LAUGAVEGUR') / 2, 386, dk(K.WHITE)); }
+    { r(1102, 396, 44, WALL - 396, dk([220, 222, 226])); for (let y = 396; y < 406; y++) r(1102 + (y - 396), y, 44 - (y - 396) * 2, 1, dk(IS.ROOF_GREY)); mural(dk); r(1100, 384, 50, 8, dk([30, 70, 140])); txt('LAUGAVEGUR', 1125 - tw('LAUGAVEGUR') / 2, 386, dk(K.WHITE)); }
     // the black house with white trim
     house(1150, 1240, IS.BLACK, IS.ROOF_BLACK, 400, 366, day, { chimney: true }); windowsOf(1150, 1240, 400, day); r(1188, WALL - 28, 14, 28, dk([200, 60, 50]));
     // the elf house: a tiny painted house with a red door, on its mossy rock by the gable
@@ -198,14 +258,15 @@ function paintTown(g: CanvasRenderingContext2D, day: boolean): void {
     house(1244, 1440, [150, 156, 164], IS.ROOF_GREY, 408, 382, day);
     { r(1262, 422, 44, 34, dk([60, 40, 30])); r(1264, 424, 40, 30, dk([240, 230, 200])); txt('HALL OF FAME', 1284 - tw('HALL OF FAME') / 2, 426, dk([160, 40, 40])); for (let q = 0; q < 6; q++) { r(1267 + (q % 3) * 12, 434 + Math.floor(q / 3) * 10, 10, 8, dk([200, 206, 214])); disc(1272 + (q % 3) * 12, 438 + Math.floor(q / 3) * 10, 2, dk([[80, 200, 180], [240, 180, 60], [200, 110, 200]][q % 3] as RGB)); } }
     { for (let x = 1320; x < 1436; x += 20) { r(x, 420, 12, 16, dk([90, 96, 104])); r(x + 1, 421, 10, 14, day ? [110, 140, 160] : [30, 34, 50]); } }
-    // ---- HARPA: the concert hall on the waterfront, a crystal of glass: its roof planes rise to a peak towards the sea, its sides lean
-    // in, and its panes (they light up at night: live) are laid like bricks, with the building's folds catching the light ----
-    { const x0 = RKR.harpa0, x1 = RKR.harpa1;
-      for (let x = x0; x < x1 + 2; x++) { const t = harpaTop(x); if (t >= WALL) continue; for (let y = t; y < WALL; y++) if (inHarpa(x, y)) r(x, y, 1, 1, dk(M(IS.HARPA, IS.HARPA_DK, ((y - t) / (WALL - t)) * 0.45))); }
-      harpaPanes((x, y) => { r(x, y, 8, 5, dk(M(IS.HARPA_HI, IS.HARPA, 0.3 + h1(x * y) * 0.4))); r(x, y, 8, 1, dk(IS.HARPA_DK)); });
-      for (const [fx0, fx1] of [[1540, 1512], [1618, 1590]] as [number, number][]) for (let y = harpaTop(fx0) + 1; y < WALL; y++) { const x = Math.round(fx0 + ((fx1 - fx0) * (y - harpaTop(fx0))) / (WALL - harpaTop(fx0))); if (inHarpa(x, y)) r(x, y, 1, 1, dk(M(IS.HARPA_HI, K.WHITE, 0.3))); } // (the folds)
-      for (let x = x0; x < x1 + 2; x++) { const t = harpaTop(x); if (t < WALL && inHarpa(x, t)) r(x, t, 1, 2, dk(IS.HARPA_DK)); } // the roof's edge
-      txt('HARPA', x1 - 40, WALL - 12, dk(K.WHITE)); }
+    // ---- HARPA (see HARPA_CELLS): the frames' dark steel, every glass cell catching the sky (brighter in a diagonal band of
+    // reflection), the dark lobby glass beneath, and the reflecting pool in front with the building upside down in it ----
+    { for (const v of [HARPA_WING, HARPA_MAIN]) fillPoly(v, dk([44, 58, 70]));
+      for (const [x, y] of HARPA_CELLS) { const band = ((x - y * 0.7) % 70 + 70) % 70 < 16, n = h1(x * 0.37 + y * 1.13), glass: RGB = band ? M([170, 204, 220], [214, 236, 244], n) : n > 0.86 ? [200, 226, 236] : M([84, 118, 140], [110, 146, 160], n);
+        hexCell(x, y, dk(glass), dk(M(glass, K.WHITE, 0.35))); }
+      for (const v of [HARPA_WING, HARPA_MAIN]) for (let i = 0; i < v.length; i++) { const [ax, ay] = v[i], [bx, by] = v[(i + 1) % v.length]; line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), dk([30, 40, 50])); }
+      r(1494, 448, 82, WALL - 448, dk([24, 34, 44])); r(1578, 456, 98, WALL - 456, dk([24, 34, 44])); for (let x = 1496; x < 1676; x += 9) r(x, 448, 1, WALL - 448, dk([60, 74, 86])); r(1494, 448, 182, 1, dk([90, 104, 116])); // (the lobby)
+      r(1490, WALL + 1, 180, 10, dk([30, 52, 70])); for (const [x, y] of HARPA_CELLS) { const ry = WALL + 1 + Math.round((456 - y) * 0.12); if (ry < WALL + 10 && ry >= WALL + 1) r(x, ry, 5, 1, dk([70, 104, 126])); } r(1490, WALL + 1, 180, 1, dk([90, 120, 140])); // (the pool, and Harpa in it)
+      txt('HARPA', 1660 - tw('HARPA'), 449, dk([210, 220, 228])); }
     // ---- the sea wall along the seafront: grey boulders at the water's edge ----
     for (let x = 1440; x < W; x += 14) { const hh = 8 + Math.floor(h1(x) * 6); oval(x + 6, WALL - hh / 2 + 2, 8, hh / 2 + 2, dk(M(IS.BASALT, IS.BASALT_HI, h1(x * 3)))); }
     // ---- THE SUN VOYAGER: the steel ship's skeleton on its granite base, pointing out to sea ----
@@ -270,10 +331,10 @@ function drawBack(a: number): void {
     const d = new Date(), hr = (d.getHours() % 12) + d.getMinutes() / 60, mn = d.getMinutes(), cy = base - 94, ink: RGB = [50, 50, 56];
     line(cx, cy, cx + Math.round(Math.sin((hr / 12) * Math.PI * 2) * 2), cy - Math.round(Math.cos((hr / 12) * Math.PI * 2) * 2), ink); line(cx, cy, cx + Math.round(Math.sin((mn / 60) * Math.PI * 2) * 3), cy - Math.round(Math.cos((mn / 60) * Math.PI * 2) * 3), ink);
   }
-  // ---- HARPA's glass: by night every pane lights up, a slow wave of colour rolling across it ----
-  if (seen(RKR.harpa0, RKR.harpa1) && night > 0.15) {
-    harpaPanes((x, y) => { const hue = (x * 0.012 + y * 0.02 - a * 0.25) % 1, c: RGB = hue < 0.33 ? M([60, 200, 255], [120, 90, 255], hue * 3) : hue < 0.66 ? M([120, 90, 255], [255, 90, 180], (hue - 0.33) * 3) : M([255, 90, 180], [60, 200, 255], (hue - 0.66) * 3); lit(() => alpha(night * (0.55 + 0.45 * h1(x + y)), () => r(x, y + 1, 8, 4, c))); });
-    G(RKR.harpa0, 384, RKR.harpa1 - RKR.harpa0, WALL - 384, [120, 140, 255], 0.12 * night);
+  // ---- HARPA's glass: by night every cell lights up, a slow wave of colour rolling across it (and its reflection in the pool) ----
+  if (seen(1480, 1684) && night > 0.15) {
+    for (const [x, y] of HARPA_CELLS) { const hue = (x * 0.012 + y * 0.02 - a * 0.25) % 1, c: RGB = hue < 0.33 ? M([60, 200, 255], [120, 90, 255], hue * 3) : hue < 0.66 ? M([120, 90, 255], [255, 90, 180], (hue - 0.33) * 3) : M([255, 90, 180], [60, 200, 255], (hue - 0.66) * 3); lit(() => alpha(night * (0.55 + 0.45 * h1(x + y)), () => hexCell(x, y + 1, c))); }
+    alpha(0.4 * night, () => r(1490, WALL + 2, 180, 8, [120, 110, 220]));
   }
   // ---- the harbour: the boats bobbing, the lighthouse's blink, the flag snapping in the wind ----
   if (seen(1440, W)) {
