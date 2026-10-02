@@ -55,6 +55,9 @@ export const QUESTS: Record<string, { text: string; goal: number }> = {
   fly: { text: 'Fly to Iceland (LAB AIR, from the AIRPORT on the Subway)', goal: 1 },
   hotdog: { text: 'Eat ONE WITH EVERYTHING at Reykjavik\'s hot dog stand', goal: 1 },
   aurora: { text: 'Photograph the northern lights over Reykjavik\'s bay', goal: 1 },
+  behind: { text: 'Walk behind a waterfall (SELJALANDSFOSS, by tour bus from Reykjavik)', goal: 1 },
+  steps: { text: 'Climb the 527 steps to the top of SKOGAFOSS', goal: 1 },
+  wave: { text: 'Outrun a sneaker wave at REYNISFJARA', goal: 1 },
 };
 export const BADGES: { id: string; name: string; hint: string; earned: (tokens: number) => boolean }[] = [
   { id: 'angler', name: 'ANGLER', hint: 'Catch all 12 kinds of fish', earned: () => save.data.fish.length >= 12 },
@@ -86,6 +89,7 @@ export const BADGES: { id: string; name: string; hint: string; earned: (tokens: 
   { id: 'biologist', name: 'MARINE BIOLOGIST', hint: 'Photograph all 20 kinds of sea life from SARDINE 1', earned: () => LOG.every((c) => save.data.sea.includes(c.id)) },
   { id: 'flyer', name: 'FREQUENT FLYER', hint: 'Fly LAB AIR 10 times (there and back counts twice)', earned: () => stat('planes') >= 10 },
   { id: 'aurora', name: 'AURORA HUNTER', hint: 'Photograph an aurora STORM (KP 7 or more) over Reykjavik', earned: () => stat('auroraStorm') >= 1 },
+  { id: 'treasure', name: 'TREASURE HUNTER', hint: 'Find THRASI\'S RING in the pool at SKOGAFOSS (it glints on a sunny day)', earned: () => stat('treasure') >= 1 },
 ];
 const stat = (k: string): number => save.data.stats[k] ?? 0;
 

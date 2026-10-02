@@ -33,7 +33,7 @@ await p.goto('http://localhost:5197/?local', { waitUntil: 'networkidle0' });
 const res = await p.evaluate(async () => {
   const jobs = []; const H = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const k = '#' + jobs.length; jobs.push(crypto.subtle.digest('SHA-1', d).then((b) => [k, [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('')])); return k; };
   const px = await import('/src/engine/pixel.ts'), season = await import('/src/world/season.ts'), W = await import('/src/world/winter.ts'), HW = await import('/src/world/halloween.ts');
-  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'], sub: ['sub', 'makeSub'], airport: ['airport', 'makeAirport'], plane: ['plane', 'makePlane'], kef: ['kef', 'makeKef'], reykjavik: ['reykjavik', 'makeReykjavik'] };
+  const mods = { lab: ['lab', 'makeLab'], plaza: ['plaza', 'makePlaza'], cinema: ['cinema', 'makeCinema'], den: ['den', 'makeDen'], roof: ['roof', 'makeRoof'], crypt: ['crypt', 'makeCrypt'], stage: ['stage', 'makeStage'], pier: ['pier', 'makePier'], arcade: ['arcade', 'makeArcade'], park: ['park', 'makePark'], diner: ['diner', 'makeDiner'], karts: ['karts', 'makeKarts'], lofts: ['lofts', 'makeLofts'], rocket: ['rocket', 'makeRocket'], station: ['station', 'makeSpaceStation'], spacewalk: ['spacewalk', 'makeSpacewalk'], lander: ['lander', 'makeLander'], moon: ['moon', 'makeMoon'], moonbase: ['moonbase', 'makeMoonBase'], wing: ['wing', 'makeWing'], reactor: ['reactor', 'makeReactor'], chem: ['chem', 'makeChem'], aquarium: ['aquarium', 'makeAquarium'], sub: ['sub', 'makeSub'], airport: ['airport', 'makeAirport'], plane: ['plane', 'makePlane'], kef: ['kef', 'makeKef'], reykjavik: ['reykjavik', 'makeReykjavik'], tourbus: ['tourbus', 'makeTourbus'], seljaland: ['seljaland', 'makeSeljaland'], gorge: ['seljaland', 'makeGorge'], skoga: ['skoga', 'makeSkoga'], skogatop: ['skoga', 'makeSkogaTop'], wreck: ['wreck', 'makeWreck'], beach: ['beach', 'makeBeach'] };
   const rooms = {};
   for (const [id, [f, fn]] of Object.entries(mods)) rooms[id] = (await import('/src/world/' + f + '.ts'))[fn]();
   const sub = await import('/src/world/subway.ts'), flat = await import('/src/world/flat.ts');
@@ -148,6 +148,30 @@ const res = await p.evaluate(async () => {
     let ws = 0, ks = 0; for (let s2 = 0; s2 < 3000; s2++) ws = (ws * 31 + iceW.iceRoll(s2)) >>> 0; for (let n = 0; n < 3000; n++) { const kp = iceW.kpOf(n); if (!(kp >= 0 && kp <= 9)) throw new Error('KP ' + kp); ks = (ks * 31 + kp) >>> 0; }
     out.ice = ws + ':' + ks;
     airG.AIR.skew = 0; iceW.ICE.skew = 0; iceW.forceIceWeather(null); }
+  // THE SOUTH COAST (step 19, push 2): each stop by night (under the lights), day, dusk, in a gale and in snow, with the bus waiting;
+  // the bus on the road both ways and at a stop; a sneaker wave running up the beach; the ring glinting; and the tour's timetable and
+  // the sneaker wave swept every second (one stop's doors at a time, never while driving; the road in bounds)
+  { const tg = await import('/src/game/tour.ts'), iceW = await import('/src/world/iceland.ts'), cw = await import('/src/world/coast.ts'), bw = await import('/src/world/beach.ts'), sw = await import('/src/world/skoga.ts'), tb = await import('/src/world/tourbus.ts');
+    const iceAt = (p, kp, sky) => { iceW.ICE.skew = 0; const p0 = iceW.iceP(); iceW.ICE.skew = ((p - p0 + 1) % 1) * 1200; if (kp !== undefined) for (let s = 0; s < 400 && iceW.kpOf(iceW.tonight()) !== kp; s++) iceW.ICE.skew += 1200; iceW.forceIceWeather(sky); };
+    const tourAt = (k) => { tg.TOUR.skew = 0; tg.TOUR.skew = k - (tg.tourT() % tg.TOUR_CYCLE); };
+    const sceneOf = (room) => () => { room.drawBack(A); for (const pr of [...room.props].sort((p, q) => p.y - q.y)) pr.draw(A); room.drawFront?.(A); };
+    const STOP_K = { seljaland: 105, gorge: 105, skoga: 165, skogatop: 165, wreck: 215, beach: 275 };
+    for (const id of ['seljaland', 'gorge', 'skoga', 'skogatop', 'wreck', 'beach']) { cw.COAST.view = { x0: 0, x1: rooms[id].w }; tourAt(STOP_K[id]);
+      for (const [name, p, kp, sky] of [['night', 0.2, 6, 'clear'], ['day', 0.7, undefined, 'clear'], ['dusk', 0.93, undefined, 'clear'], ['gale', 0.7, undefined, 'gale'], ['snow', 0.2, 0, 'snow']]) { iceAt(p, kp, sky); out[id + ':' + name] = draw(rooms[id], sceneOf(rooms[id])); } }
+    iceAt(0.7, undefined, 'clear'); tb.TBW.view = { x0: 0, x1: 1200 };
+    for (const k of [10, 60, 110, 230, 330]) { tourAt(k); out['tourbus:' + k] = draw(rooms.tourbus, sceneOf(rooms.tourbus)); }
+    iceAt(0.2, 6, 'clear'); tourAt(330); out['tourbus:night'] = draw(rooms.tourbus, sceneOf(rooms.tourbus));
+    iceAt(0.7, undefined, 'clear'); cw.COAST.view = { x0: 0, x1: 2000 }; bw.BEACH.skew = 0; bw.BEACH.skew = 3.5 - bw.waveP(); out['beach:wave'] = draw(rooms.beach, sceneOf(rooms.beach)); bw.BEACH.skew = 0;
+    sw.SKOW.glint = performance.now() / 1000 - 1; sw.SKOW.glintX = 800; out['skoga:ring'] = draw(rooms.skoga, sceneOf(rooms.skoga)); sw.SKOW.glint = -99;
+    let bad = 0, sig = '';
+    for (let k = 0; k < tg.TOUR_CYCLE; k++) { tourAt(k + 0.5); const t = tg.tour(), open = tg.STOPS.map((_, s2) => tg.busAt(s2, t)).filter(Boolean).length;
+      if (open > 1 || (t.phase === 'drive' && open) || (t.phase === 'stop' && open !== 1) || !(t.km >= 0 && t.km <= 182) || !(t.u >= 0 && t.u <= 1) || !(t.left > 0)) bad++;
+      sig += t.phase[0] + t.from + Math.round(t.km / 20); }
+    for (let s2 = 0; s2 < tg.STOPS.length; s2++) for (let k = 0; k < tg.TOUR_CYCLE; k += 7) { tourAt(k); const w = tg.nextBus(s2); if (!(w >= 0 && w <= tg.TOUR_CYCLE)) bad++; }
+    for (let q = 0; q < 1400; q++) { const y = bw.sneakerY(q / 10); if (!(y >= bw.SURF.calm - 0.01 && y <= bw.SURF.far + 0.01)) bad++; }
+    if (bad) throw new Error('the tour bus / the sneaker wave: ' + bad + ' bad seconds');
+    out.tour = sig.length + ':' + [...sig].reduce((x, ch) => (x * 31 + ch.charCodeAt(0)) >>> 0, 0);
+    tg.TOUR.skew = 0; iceW.ICE.skew = 0; iceW.forceIceWeather(null); cw.COAST.view = { x0: 0, x1: 2000 }; }
   season.setSeason('halloween');
   // pure maths
   const wx = await import('/src/world/weather.ts'), dn = await import('/src/game/diner.ts'), kt = await import('/src/game/kart.ts'), sp = await import('/src/world/space.ts'), ct = await import('/src/world/contest.ts'), gd = await import('/src/world/garden.ts'), fm = await import('/src/engine/format.ts');

@@ -15,6 +15,9 @@ import { AIR_ARRIVE } from '../game/air';
 import { ICE, iceDay, iceGold, iceSun, iceWeather, auroraNow, drawAurora, mountains, forecast } from './iceland';
 import type { Prop, Rect, Room, Spot, Talker } from './room';
 import { isWinter } from './season';
+import { busAt, busPose } from '../game/tour';
+import { COAST, busAtStop } from './coast';
+import { TB_ARRIVE } from './tourbus';
 
 const W = 1900, H = 614, WALL = 470, FL0 = 484, FL1 = 570, HORIZON = 424;
 export const RKR = { bus: 70, info: 170, road0: 400, road1: 600, church: 500, puffin: 845, bakery: 955, cafe: 1055, elf: 1132, stand: 1320, harpa0: 1478, harpa1: 1680, bench: 1592, churchBench: 446, cam: 1650, voyager: 1810, harbour: 1880 };
@@ -372,6 +375,8 @@ function drawBack(a: number): void {
   for (const [sx, sy, sp] of [[994, 380, 0.3], [726, 518, 0.5]] as [number, number, number][]) if (seen(sx - 20, sx + 20)) for (let q = 0; q < 4; q++) { const u = ((a * sp) + q / 4) % 1; alpha(0.45 * (1 - u), () => disc(sx + Math.round(Math.sin(u * 5 + q) * 3 + u * 6), Math.round(sy - u * 26), 2 + Math.round(u * 4), [236, 238, 244])); }
   // ---- the café window's cat, asleep (its tail flicks; it wakes up when someone's just petted it) ----
   if (seen(1020, 1080)) { const cx = 1046, cy = 452, awake = now() - REYKW.pet < 3; oval(cx, cy - 3, 8, 4, [240, 150, 60]); disc(cx + 7, cy - 6, 3, [240, 150, 60]); r(cx + 5, cy - 10, 2, 2, [240, 150, 60]); r(cx + 8, cy - 10, 2, 2, [240, 150, 60]); if (awake) { r(cx + 7, cy - 7, 1, 1, [40, 40, 40]); r(cx + 9, cy - 7, 1, 1, [40, 40, 40]); } else { r(cx + 6, cy - 6, 2, 1, [150, 90, 40]); r(cx + 9, cy - 6, 2, 1, [150, 90, 40]); } const flick = Math.round(Math.sin(a * (awake ? 6 : 1.5)) * 2); r(cx - 9, cy - 3 + flick, 5, 2, [240, 150, 60]); }
+  // ---- THE ICELAND EXPLORER: the tour bus pulls in along the kerb by the shelter (and its stop's sign, by the INFO kiosk) ----
+  if (seen(0, 260)) { const keep = COAST.view; COAST.view = REYKW.view; busAtStop(0, 4, FL0 - 2, a, 222); COAST.view = keep; }
   // ---- the elf house: a tiny light in its window at night; its door creaks open a crack now and then (and when you knock) ----
   if (seen(RKR.elf - 20, RKR.elf + 20)) { const ex = RKR.elf, ey = WALL + 2, knocked = now() - REYKW.knock < 2.5, open = now() - REYKW.elfOpen < 3;
     if (night > 0.4 || knocked) { lit(() => r(ex + 3, ey - 14, 2, 2, [255, 214, 120])); Gd(ex + 4, ey - 13, 6, [255, 200, 110], 0.5); }
@@ -483,7 +488,10 @@ export function makeReykjavik(): Room {
       { x0: RKR.cam - 8, y0: 526, x1: RKR.cam + 8, y1: 534 }, { x0: 1156, y0: 490, x1: 1186, y1: 500 }, // the tripod, the bike
     ],
     doors: [
-      { trigger: { x0: 44, y0: FL0, x1: 96, y1: FL0 + 10 }, to: 'kef', arrive: AIR_ARRIVE.kefExit, label: 'BUS TO THE AIRPORT', area: { x0: 28, y0: 404, x1: 112, y1: 470 } },
+      { trigger: { x0: 44, y0: FL0, x1: 96, y1: FL0 + 10 }, to: 'kef', arrive: AIR_ARRIVE.kefExit, label: 'BUS TO THE AIRPORT', area: { x0: 28, y0: 404, x1: 112, y1: 470 },
+        route: () => (busPose(0) === null ? { to: 'kef', arrive: AIR_ARRIVE.kefExit } : null) }, // (behind the tour bus while it's in)
+      { trigger: { x0: 176, y0: FL0, x1: 208, y1: FL0 + 10 }, to: 'tourbus', arrive: TB_ARRIVE, label: 'THE TOUR BUS', area: { x0: 4, y0: 410, x1: 216, y1: 482 },
+        route: () => (busAt(0) ? { to: 'tourbus', arrive: TB_ARRIVE, label: 'THE TOUR BUS: SOUTH COAST' } : null) },
     ],
     spots: REYKJAVIK_SPOTS, inUse: new Map(),
     spawn: { ...AIR_ARRIVE.reykjavik },

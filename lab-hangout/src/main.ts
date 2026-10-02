@@ -30,6 +30,11 @@ import { makeAirport } from './world/airport';
 import { makePlane } from './world/plane';
 import { makeKef } from './world/kef';
 import { makeReykjavik, RKR } from './world/reykjavik';
+import { makeSeljaland, makeGorge } from './world/seljaland';
+import { makeSkoga, makeSkogaTop } from './world/skoga';
+import { makeWreck } from './world/wreck';
+import { makeBeach } from './world/beach';
+import { makeTourbus } from './world/tourbus';
 import { FLIGHT, PAD_X, flight } from './world/space';
 import { skyThings } from './world/sky';
 import { makeStage, stageNote, INST_COL, STAGE_INFO } from './world/stage';
@@ -73,7 +78,7 @@ import { turnstileToken } from './ui/captcha';
 import { makeCinema, filmClock, filmPlaying } from './world/cinema';
 import { doorDest, inside, routeTo, walkable, ROOM_IDS, type Door, type Room, type RoomId, type Talker } from './world/room';
 import { DEFAULT_LOOK, itemName, type Look } from './entities/critter';
-import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, HOLDS, useEmote, HOLD_MUG, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, isPotion, type Avatar, type EmoteKind, type Using, POSE_BUGGY, HOLD_MOONROCK, JUMP_S, HOLD_PYLSA, HOLD_SKYR, HOLD_SWIRL } from './entities/avatar';
+import { drawAvatar, EMOTES, WHEEL, ALL_EMOTES, emoteDur, makeAvatar, pushSnap, stepRemote, USES, HOLDS, useEmote, HOLD_MUG, HOLD_SOUP, HOLD_POPCORN, HOLD_SODA, HOLD_MARSH, HOLD_TOAST, HOLD_BURNT, POSE_DANCE, POSE_FLOOR, POSE_GHOST, POSE_BOAT, POSE_FLOAT, FLOAT_S, ENV, HOLD_SNOWBALL, HOLD_COCOA, HOLD_KITE, HOLD_HOTDOG, isKitchen, isPotion, type Avatar, type EmoteKind, type Using, POSE_BUGGY, HOLD_MOONROCK, JUMP_S, HOLD_PYLSA, HOLD_SKYR, HOLD_SWIRL } from './entities/avatar';
 import { SupabaseTransport } from './net/supabase';
 import { allow } from './net/filter';
 import { LocalTransport } from './net/local';
@@ -116,9 +121,12 @@ import { CHEM } from './world/chem';
 import { aqDebug, aqEntered, aqStep, catchVsGallery, feedFish, onScoop, openDonate, openGiftShop, touchPool } from './features/aquarium';
 import { FEED, feeding } from './game/aquarium';
 import { SUB } from './game/sub';
-import { AQUA_TRACK, SUB_TRACK, LOUNGE_TRACK, ICE_TRACK } from './audio/music';
+import { AQUA_TRACK, SUB_TRACK, LOUNGE_TRACK, ICE_TRACK, ROAD_TRACK, COAST_TRACK } from './audio/music';
 import { horn as subHorn, onHelm, onSub, SUBPAD, subAction, subDebug, subEntered, subInput, subLabel, subLeft, subLine, subPeek, subSpace, subSpot, subStep, subStepOff, subTea, subTeleport } from './features/sub';
 import { airDebug, airEntered, airFilled, airLabel, airLine, airSpot, airStep } from './features/air';
+import { COAST_KINDS, coastDebug, coastEntered, coastLabel, coastLine, coastSpot, coastStep } from './features/coast';
+import { TOUR } from './game/tour';
+import { BEACH } from './world/beach';
 import { AIR } from './game/air';
 import { ICE, forceIceWeather } from './world/iceland';
 import { openPassport } from './ui/passport';
@@ -137,7 +145,7 @@ const CHAT_COOLDOWN = 0.9, EMOTE_COOLDOWN = 0.5;
 
 // ---------- boot ----------
 const R = new Renderer($<HTMLCanvasElement>('#view'), $<HTMLCanvasElement>('#glowv'), $('#stage'));
-const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem(), aquarium: makeAquarium(), sub: makeSub(), airportstn: makeStation(4), airport: makeAirport(), plane: makePlane(), kef: makeKef(), reykjavik: makeReykjavik() };
+const ROOMS: Record<RoomId, Room> = { lab: makeLab(), plaza: makePlaza(), cinema: makeCinema(), den: makeDen(), roof: makeRoof(), crypt: makeCrypt(), stage: makeStage(), pier: makePier(), arcade: makeArcade(), subway: makeStation(0), train: makeTrain(), park: makePark(), parkstn: makeStation(1), dinerstn: makeStation(2), diner: makeDiner(), kartstn: makeStation(3), karts: makeKarts(), lofts: makeLofts(), flat: makeFlatRoom('flat'), flatbed: makeFlatRoom('flatbed'), flatkit: makeFlatRoom('flatkit'), rocket: makeRocket(), station: makeSpaceStation(), spacewalk: makeSpacewalk(), lander: makeLander(), moon: makeMoon(), moonbase: makeMoonBase(), wing: makeWing(), reactor: makeReactor(), chem: makeChem(), aquarium: makeAquarium(), sub: makeSub(), airportstn: makeStation(4), airport: makeAirport(), plane: makePlane(), kef: makeKef(), reykjavik: makeReykjavik(), tourbus: makeTourbus(), seljaland: makeSeljaland(), gorge: makeGorge(), skoga: makeSkoga(), skogatop: makeSkogaTop(), wreck: makeWreck(), beach: makeBeach() };
 for (const id of ROOM_IDS) ROOMS[id].build();
 const input = new Input($<HTMLCanvasElement>('#view'));
 const params = new URLSearchParams(location.search);
@@ -167,7 +175,7 @@ let fillEnd = 0, told = new Set<number>();
 /** Photo booth run: when it started, which shot is next, the frames so far. */
 let booth: { t0: number; next: number; emoted: number; frames: HTMLCanvasElement[] } | null = null;
 let pendingShot = false;
-const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer(), aquaScore = new MusicPlayer(), subScore = new MusicPlayer(), airScore = new MusicPlayer(), iceScore = new MusicPlayer();
+const jukebox = new MusicPlayer(), filmScore = new MusicPlayer(), rain = new Rain(), partyScore = new MusicPlayer(), spaceScore = new MusicPlayer(), moonScore = new MusicPlayer(), reactorScore = new MusicPlayer(), chemScore = new MusicPlayer(), aquaScore = new MusicPlayer(), subScore = new MusicPlayer(), airScore = new MusicPlayer(), iceScore = new MusicPlayer(), coastScore = new MusicPlayer();
 let gameKey = '', slopToast = -1, fwHeard = 0;
 /** Server-owned tokens: coins we've picked up this 5-minute window, and "+1"s floating up. */
 const coinsGot = new Set<string>(), floaters: { x: number; y: number; t0: number; text: string }[] = [];
@@ -191,7 +199,7 @@ const mugs: { x0: number; y0: number; x1: number; y1: number; t0: number }[] = [
 let fixEnd = 0, lastFocus: boolean | null = null, lastFlash = 0;
 
 // ---------- room state (jukebox, arcade high score, whiteboard) ----------
-const roomState: Record<RoomId, Map<string, StateMsg>> = { lab: new Map(), plaza: new Map(), cinema: new Map(), den: new Map(), roof: new Map(), crypt: new Map(), stage: new Map(), pier: new Map(), arcade: new Map(), subway: new Map(), train: new Map(), park: new Map(), parkstn: new Map(), dinerstn: new Map(), diner: new Map(), kartstn: new Map(), karts: new Map(), lofts: new Map(), flat: new Map(), flatbed: new Map(), flatkit: new Map(), rocket: new Map(), station: new Map(), spacewalk: new Map(), lander: new Map(), moon: new Map(), moonbase: new Map(), wing: new Map(), reactor: new Map(), chem: new Map(), aquarium: new Map(), sub: new Map(), airportstn: new Map(), airport: new Map(), plane: new Map(), kef: new Map(), reykjavik: new Map() };
+const roomState = Object.fromEntries(ROOM_IDS.map((id) => [id, new Map()])) as Record<RoomId, Map<string, StateMsg>>;
 /** Keep the newest value per key; returns true if it changed anything. */
 function applyState(s: StateMsg): boolean {
   if (s.k === 'board') { if (room.id !== 'lab' || s.ts <= BOARD.ts) return false; BOARD.load(s.v, s.ts); return true; }
@@ -468,7 +476,7 @@ async function switchRoom(id: RoomId, at: { x: number; y: number } | null): Prom
   if (id === 'chem') chemEntered();
   if (id === 'aquarium') aqEntered();
   if (id === 'sub') subEntered(from);
-  airEntered(from);
+  airEntered(from); coastEntered(from);
   if (id === 'roof') GARDEN.dirty = true;
   if (id === 'pier') CONTEST.fetchedAt = 0;
   const p = at ?? room.spawn;
@@ -554,6 +562,8 @@ const FILL: Partial<Record<string, { hold: number; secs: number; msg: string }>>
   skyr: { hold: HOLD_SKYR, secs: 1.2, msg: 'A pot of skyr: Icelandic yogurt!' },
   pylsa: { hold: HOLD_PYLSA, secs: 1.6, msg: 'ONE WITH EVERYTHING: the best hot dog in town!' },
   bakery: { hold: HOLD_SWIRL, secs: 1.4, msg: 'A cinnamon swirl, warm from the oven!' },
+  kaffi: { hold: HOLD_MUG, secs: 1.6, msg: 'Coffee from the hut, and a KLEINA (a twisted Icelandic doughnut) on the side!' },
+  soup: { hold: HOLD_SOUP, secs: 1.6, msg: 'KJOTSUPA: Icelandic lamb soup. Warm right through! (it dries you off, too)' },
 };
 /** SARDINE 1's spots that features/sub.ts handles (it says whether you stay at them). */
 const SUB_KINDS = new Set(['helm', 'subcam', 'lights', 'sonar', 'subclaw', 'periscope', 'subfix', 'bin', 'sealog', 'escape']);
@@ -621,6 +631,7 @@ function useSpot(i: number): void {
   if (s.kind === 'feedfish') { feedFish(); return; }
   if (SUB_KINDS.has(s.kind) && !subSpot(s.kind, s.n ?? 0)) return; // (SARDINE 1: the stations you stay at go on to sit you there)
   if (AIR_KINDS.has(s.kind) && !airSpot(s.kind, s.n ?? 0, i)) return; // (the airport and Iceland: the ones you stay at go on to sit you there)
+  if (COAST_KINDS.has(s.kind) && !coastSpot(s.kind, s.n ?? 0)) return; // (the south coast: the same)
   if (s.kind === 'lift') { SFX.blip(); openLift({ people: () => lobby.map((p) => ({ id: p.id, name: p.name })), doors: (ids) => net.api.flats.doors(ids), home: () => void goHome(), visit: (id) => void visitFlat(id), knock: knockOn, myDoor: () => (FLAT.mine ? FLAT.door : 'locked'), setDoor: async (d) => { await net.api.flats.mine().then((f) => { FLAT.door = f.door; }).catch(() => {}); try { await net.api.flats.setDoor(d); if (FLAT.mine) FLAT.door = d; toast('Your door: ' + d.toUpperCase()); } catch (e) { toast(errText(e)); } }, onClose: () => input.clear() }); return; }
   if (s.kind === 'look' && isFlat(room.id)) { const it = roomLayout(room.id).items[s.n ?? -1]; if (it) openShow(it[0] === 'tank' ? 'tank' : 'trophy', FLAT.mine ? 'YOUR' : (FLAT.name || 'THEIR').toUpperCase(), FLAT.layout.show, () => input.clear()); return; }
   if (s.kind === 'flatparty') {
@@ -1023,7 +1034,7 @@ function currentAction(): Action | null {
   const tk = nearestTalker(26);
   if (tk) return { label: tk.verb ?? 'TALK', run: () => talkToTalker(tk), at: [tk.x, tk.y - 14] };
   const i = nearestSpot(22);
-  if (i >= 0) { const s = room.spots[i], sl = room.id === 'sub' ? subLabel(s.kind, s.n ?? 0) : airLabel(s.kind); return { label: sl ? sl : s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
+  if (i >= 0) { const s = room.spots[i], sl = room.id === 'sub' ? subLabel(s.kind, s.n ?? 0) : airLabel(s.kind) ?? coastLabel(s.kind); return { label: sl ? sl : s.kind === 'cook' ? stationLabel(DINER.tour ?? DINER.g, s.n ?? 0, me.hold) : s.kind === 'shift' && shiftLive(DINER.g) ? 'SHIFT ON' : s.kind === 'rfault' ? faultLabel(s.n ?? 0) : s.kind === 'rshift' && reactorLive(REACT.g) ? 'SHIFT ON' : s.kind === 'rstation' && s.n === RST.SCRAM && Date.now() - REACT.cover < 3000 ? 'SCRAM!' : s.kind === 'goggles' ? gogglesLabel() : s.kind === 'feedfish' ? (feeding().on ? 'FEED!' : 'FEED IN ' + mmss(feeding().next)) : s.label, run: () => useSpot(i), at: s.kind === 'sit' ? [s.x, s.y - s.lift - 44] : [(s.area.x0 + s.area.x1) / 2, s.y - s.area.y1 > 50 ? s.y - 64 : s.area.y0 - 8] }; } // (things up on the wall: just over your head, where you'll see it)
   if (isWinter() && !me.hold && onSnow(room, me.x, me.y) && !onIce(room.id, me.x, me.y)) return { label: 'SCOOP SNOW', run: scoopSnow, at: null };
   if (room.id === 'plaza' && ambient.pigeonNear(me.x + me.dir * 20, me.y, 110)) return { label: 'FEED', run: feed, at: null };
   if (room.id === 'park' && pondEdge(me.x, me.y) < 40) return { label: 'FEED DUCKS', run: feedDucks, at: null };
@@ -1520,7 +1531,7 @@ function frame(nowMs: number): void {
     const slopLine = sw && room.id === 'plaza' ? (sw.u < SLOP_DUR - 5 ? 'SLOP INVASION! ZAPPED ' + slopHits.size + ' · ESCAPED ' + slopGone.size + ' · ' + Math.ceil(SLOP_DUR - 5 - sw.u) + 's' : slopHits.size >= slopGone.size ? 'THE LAB IS SAFE! ' + slopHits.size + ' SLOP ZAPPED' : 'THE LAB GOT SLOPPED...') : '';
     hsFrame(); followStep(t); contestTick();
     if (room.id === 'stage' && me.pose === POSE_DANCE && !me.moving) { danceT += dt; if (danceT > 10) { danceT = 0; quests.bump('dance'); } } else danceT = 0;
-    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); aqStep(); subStep(dt); airStep(dt); karaokeStep(dt); winterStep();
+    crewStep(dt, t); weatherStep(t); dinerStep(dt, t); raceNews(); flatStep(); spaceStep(); moonStep(); mapStep(); reactorStep(dt); chemStep(); aqStep(); subStep(dt); airStep(dt); coastStep(dt); karaokeStep(dt); winterStep();
     if (room.id === 'lab' && playing && Date.now() - photosAt > 60000) refreshPhotos();
     if (room.id === 'roof' && playing && (GARDEN.dirty || Date.now() - GARDEN.fetchedAt > 15000)) refreshGarden();
     if (room.id === 'train' || STATIONS.some((st) => st.room === room.id)) subwaySounds();
@@ -1528,7 +1539,7 @@ function frame(nowMs: number): void {
     const hl = hsLive(hs, net.selfId);
     const cl = contestClock(), lead = CONTEST.board?.top[0];
     const contestLine = room.id === 'pier' && cl.live ? 'FISHING CONTEST · ' + mmss(cl.left) + ' LEFT' + (lead ? ' · LEADER: ' + lead.name + ' ' + lead.cm + 'CM' : ' · CAST A LINE!') : '';
-    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || moonLine() || reactorLine() || subLine() || airLine() || winterLine());
+    syncGameBar(g ? banner(g) : hl ? hsBanner(hl, net.selfId) : slopLine || contestLine || dinerLine() || spaceLine() || moonLine() || reactorLine() || subLine() || airLine() || coastLine() || winterLine());
     // music: the Lab's jukebox fades with distance; the film score fills the cinema while it plays
     const gm = (g && partyMusic(g)) || (isFlat(room.id) && partyOn());
     partyScore.set(gm ? PARTY_TRACK : null, g?.t0 ?? 0); partyScore.volume(gm ? 0.7 : 0); partyScore.tick();
@@ -1569,7 +1580,9 @@ function frame(nowMs: number): void {
     const deep = SUBW.depth; subScore.set(room.id === 'sub' ? SUB_TRACK[deep > 400 ? 2 : deep > 120 ? 1 : 0] : null, 0); subScore.volume(room.id === 'sub' && !g ? 0.4 : 0); subScore.tick(); // SARDINE 1's tune, deeper as you go down
     aquaScore.set(room.id === 'aquarium' ? AQUA_TRACK : null, 0); aquaScore.volume(room.id === 'aquarium' && !g ? (me.x > 1240 && me.x < 1420 ? 0.5 : 0.32) : 0); aquaScore.tick(); // THE CITY AQUARIUM's tune (louder in the jelly room)
     airScore.set(room.id === 'airport' ? LOUNGE_TRACK : null, 0); airScore.volume(room.id === 'airport' && !g ? 0.3 : 0); airScore.tick(); // THE AIRPORT's lounge music
-    iceScore.set(room.id === 'reykjavik' ? ICE_TRACK : null, 0); iceScore.volume(room.id === 'reykjavik' && !g ? (Math.abs(me.x - RKR.church) < 160 ? 0.12 : 0.35) : 0); iceScore.tick(); // REYKJAVÍK's (quieter by the church: its organ)
+    iceScore.set(room.id === 'reykjavik' ? ICE_TRACK : null, 0); iceScore.volume(room.id === 'reykjavik' && !g ? (Math.abs(me.x - RKR.church) < 160 ? 0.12 : 0.35) : 0); iceScore.tick();
+    { const coast = ['seljaland', 'gorge', 'skoga', 'skogatop', 'wreck', 'beach'].includes(room.id), bus = room.id === 'tourbus'; coastScore.set(bus ? ROAD_TRACK : coast ? COAST_TRACK : null, 0); coastScore.volume((bus || coast) && !g ? (bus ? 0.3 : room.id === 'gorge' ? 0.08 : 0.22) : 0); coastScore.tick(); } // the tour bus's road-trip tune, the coast's wide-open one (quiet under the roar)
+    // REYKJAVÍK's (quieter by the church: its organ)
     // seated somewhere with a view (the cinema), the camera pans up to frame it
     const view = (me.use >= 0 ? room.spots[me.use]?.watch : undefined) ?? (room.watch && (usingOf(me) === 'sit' || usingOf(me) === 'rstation') ? room.watch : null);
     // decorating: zoom out so the whole flat (wall pieces down to the front row: y 320-590) fits between the panel and the chat box
@@ -1710,6 +1723,7 @@ if (import.meta.env.DEV && params.has('debug')) {
     reactor: () => reactorDebug(), rset: (patch: Record<string, unknown>) => { const g = REACT.g; if (g) setState({ k: 'reactor', v: { ...g, ...patch } as typeof g }); }, badges: () => [...quests.mine], stats: () => save.data.stats, owns: (k: string) => save.has(k), rpress: (st: number, d: number) => reactorPress(st, d), rclock: () => reactorClockIn(), rfix: (k: number) => faultPress(k), scram: () => scramPress(),
     aq: () => aqDebug(), aqCatch: (fish: string, cm: number) => (net.api as unknown as { fakeCatch?(f: string, c: number): void }).fakeCatch?.(fish, cm), feedAt: (k: number) => { FEED.skew = 0; FEED.skew = k - (Date.now() / 1000) % 900; }, subAt: (k: number) => { SUB.skew = 0; SUB.skew = k - (Date.now() / 1000) % 480; },
     sub: () => subDebug(), subGo: (x: number, y: number) => subTeleport(x, y), subPeek: () => subPeek(), subHorn: () => subHorn(),
+    coast: () => coastDebug(), tourAt: (k: number) => { TOUR.skew = 0; TOUR.skew = k - (Date.now() / 1000) % 370; }, waveAt: (p: number) => { BEACH.skew = 0; BEACH.skew = p - (Date.now() / 1000) % 140; },
     air: () => airDebug(), airAt: (k: number) => { AIR.skew = 0; AIR.skew = k - (Date.now() / 1000) % 600; }, iceAt: (p: number) => { ICE.skew = 0; const now0 = ((Date.now() / 1000 + 420) / 1200) % 1; ICE.skew = ((p - now0 + 1) % 1) * 1200; }, iceSky: (k: string | null) => forceIceWeather(k), stamps: () => ({ ...save.data.stamps }), passport: () => openPassport(me.look, me.name, () => input.clear()),
     chem: () => chemDebug(), mix: (b: number, m: number) => chemForce(b, m), chemFrom: (id: string, b: number, m: number) => onChem(id, b, m, Date.now()), pick: (i: number) => chemPick(i), mixNow: () => chemMix(), drink: () => drinkPotion(), fxOf: (id: string) => (id === net.selfId ? me : others.get(id))?.fx ?? null, setFx: (k: number, s: number) => setFx(me, k, s), hold: (h: number) => { me.hold = h; forceSend = true; }, goggles: () => takeGoggles(),
     map: (b?: RoomId) => openMap(b ?? null), mapOpen: () => mapOpen(), mapRoute: (id: RoomId, pod?: boolean) => mapRoute(id, pod), zone: () => zoneNow(), places: () => save.data.places,

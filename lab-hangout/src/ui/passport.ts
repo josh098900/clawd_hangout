@@ -31,7 +31,11 @@ function icon(id: string, x: number, y: number, c: RGB): void {
     case 'tower': for (let s = 0; s < 5; s++) { r(x - 3 - (5 - s) * 2, y + 6 - s * 3, 2, s * 3 + 2, c); r(x + 1 + (5 - s) * 2, y + 6 - s * 3, 2, s * 3 + 2, c); } r(x - 2, y - 10, 4, 18, c); r(x - 1, y - 13, 2, 3, c); break; // (the church)
     case 'voyager': line(x - 9, y + 3, x + 9, y + 3, c); line(x + 9, y + 3, x + 12, y - 6, c); line(x - 9, y + 3, x - 12, y - 4, c); for (let q = -6; q <= 6; q += 4) line(x + q, y + 3, x + q + 2, y - 5, c); break; // (the ship)
     case 'aurora': for (let q = 0; q < 3; q++) for (let k = -10; k <= 10; k++) r(x + k, y - 6 + q * 4 + Math.round(Math.sin(k * 0.5 + q) * 2), 1, 3, c); break; // (the curtains)
-    case 'seljaland': case 'skoga': case 'gullfoss': r(x - 8, y - 8, 16, 3, c); r(x - 3, y - 5, 6, 14, c); r(x - 8, y + 8, 16, 2, c); break; // (a waterfall)
+    case 'seljaland': r(x - 8, y - 8, 16, 3, c); r(x - 1, y - 5, 3, 13, c); for (let k = -7; k <= 7; k++) r(x + k, y + 6 - Math.round(Math.sqrt(Math.max(0, 49 - k * k)) * 0.6), 1, 1, c); r(x - 8, y + 8, 16, 2, c); break; // (a thin fall, the path looping behind it)
+    case 'skoga': for (let k = 0; k < 2; k++) for (let q = -10; q <= 10; q++) r(x + q, y - 4 - k * 3 + Math.round((q * q) / 18), 1, 1, c); r(x - 6, y - 6, 12, 14, c); r(x - 10, y + 8, 20, 2, c); break; // (the great curtain, a double rainbow over it)
+    case 'gullfoss': r(x - 8, y - 8, 16, 3, c); r(x - 3, y - 5, 6, 14, c); r(x - 8, y + 8, 16, 2, c); break; // (a waterfall)
+    case 'wreck': r(x - 11, y - 2, 20, 6, c); r(x - 12, y - 1, 1, 4, c); r(x + 9, y - 1, 3, 4, c); for (let k = 0; k < 5; k++) r(x - 7 + k * 3, y - 1, 1, 1, [246, 240, 226]); r(x - 13, y + 6, 26, 1, c); break; // (the fuselage on the sand)
+    case 'beach': for (const [dx, hh] of [[-6, 12], [0, 9], [5, 6]] as [number, number][]) for (let q = 0; q < hh; q++) r(x + dx - Math.floor((hh - q) / 4), y + 4 - q, 1 + Math.floor((hh - q) / 2.5), 1, c); for (let k = -11; k <= 11; k++) r(x + k, y + 6 + Math.round(Math.sin(k * 0.8)), 1, 1, c); break; // (the troll stacks in the surf)
     case 'geysir': r(x - 2, y - 10, 4, 16, c); disc(x, y - 10, 4, c); r(x - 8, y + 6, 16, 2, c); break;
     default: for (let k = -9; k <= 9; k++) r(x + k, y + 4 - Math.round(Math.max(0, 8 - Math.abs(k)) * 1.2), 1, Math.round(Math.max(0, 8 - Math.abs(k)) * 1.2) + 1, c); // (a mountain)
   }
@@ -69,7 +73,7 @@ export function openPassport(look: Look, name: string, onClose: () => void, fres
       const hint = document.createElement('div'); hint.textContent = s.push <= PUSH_NOW ? s.hint : 'COMING SOON'; Object.assign(hint.style, { ...font(14, '#9A8E74'), textAlign: 'center', maxWidth: '140px' }); cell.append(q, hint); }
     page.appendChild(cell);
   });
-  const sub = document.createElement('div'); Object.assign(sub.style, { ...font(16, '#9FEFFF'), textAlign: 'center' }); sub.textContent = n >= STAMPS.length ? 'Every stamp. A true ICELANDER.' : 'More of Iceland to come: the tour bus, waterfalls, black beaches, the lagoon, a glacier...';
+  const sub = document.createElement('div'); Object.assign(sub.style, { ...font(16, '#9FEFFF'), textAlign: 'center' }); sub.textContent = n >= STAMPS.length ? 'Every stamp. A true ICELANDER.' : 'More of Iceland to come: the Golden Circle, the lagoon, a glacier...';
   m.body.append(top, page, sub, row(button('CLOSE', m.close, true)));
 }
 

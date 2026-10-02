@@ -11,10 +11,10 @@ export const STAMPS: Stamp[] = [
   { id: 'tower', name: 'THE TOWER', push: 1, ink: [110, 60, 150], shape: 'tall', hint: 'the view from the top of the big church' },
   { id: 'voyager', name: 'THE SUN VOYAGER', push: 1, ink: [30, 60, 110], shape: 'oval', hint: 'the steel ship on the seafront' },
   { id: 'aurora', name: 'THE NORTHERN LIGHTS', push: 1, ink: [30, 140, 90], shape: 'round', hint: 'photograph them over the bay, after dark' },
-  { id: 'seljaland', name: 'SELJALANDSFOSS', push: 2, ink: [40, 110, 170], shape: 'tall', hint: 'the tour bus: coming soon' },
-  { id: 'skoga', name: 'SKOGAFOSS', push: 2, ink: [40, 110, 170], shape: 'tall', hint: 'the tour bus: coming soon' },
-  { id: 'beach', name: 'REYNISFJARA', push: 2, ink: [40, 40, 50], shape: 'rect', hint: 'the tour bus: coming soon' },
-  { id: 'wreck', name: 'THE PLANE WRECK', push: 2, ink: [110, 110, 120], shape: 'oval', hint: 'the tour bus: coming soon' },
+  { id: 'seljaland', name: 'SELJALANDSFOSS', push: 2, ink: [40, 110, 170], shape: 'tall', hint: 'the tour bus from Reykjavik: the waterfall you walk behind' },
+  { id: 'skoga', name: 'SKOGAFOSS', push: 2, ink: [30, 90, 150], shape: 'tall', hint: 'the tour bus: the great curtain of water' },
+  { id: 'beach', name: 'REYNISFJARA', push: 2, ink: [40, 40, 50], shape: 'rect', hint: 'the tour bus: the black sand beach' },
+  { id: 'wreck', name: 'THE PLANE WRECK', push: 2, ink: [110, 110, 120], shape: 'oval', hint: 'the tour bus: the silver plane on the sand' },
   { id: 'thingvellir', name: 'THINGVELLIR', push: 3, ink: [90, 110, 60], shape: 'rect', hint: 'the tour bus: coming soon' },
   { id: 'geysir', name: 'GEYSIR', push: 3, ink: [60, 140, 180], shape: 'round', hint: 'the tour bus: coming soon' },
   { id: 'gullfoss', name: 'GULLFOSS', push: 3, ink: [190, 140, 40], shape: 'tall', hint: 'the tour bus: coming soon' },
@@ -25,7 +25,7 @@ export const STAMPS: Stamp[] = [
   { id: 'diamond', name: 'DIAMOND BEACH', push: 4, ink: [40, 40, 60], shape: 'rect', hint: 'the tour bus: coming soon' },
 ];
 /** The pushes built so far (the passport shows the rest as coming soon). */
-export const PUSH_NOW = 1;
+export const PUSH_NOW = 2;
 /** Today, as a day number (days since 1970). */
 export const dayNo = (ms = Date.now()): number => Math.floor(ms / 86400000);
 export const stamped = (id: string): boolean => !!save.data.stamps[id];

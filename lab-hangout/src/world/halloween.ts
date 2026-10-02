@@ -40,12 +40,13 @@ const PUMPKINS: Partial<Record<RoomId, [number, number, number][]>> = {
   aquarium: [[116, 490, 1], [1404, 488, 0], [1730, 530, 1]], sub: [[162, 494, 1], [236, 492, 0]],
   airportstn: [[300, 520, 1], [1100, 520, 0]], airport: [[196, 488, 1], [562, 490, 0], [1167, 490, 1], [1352, 490, 0]], plane: [[80, 490, 0]],
   kef: [[478, 488, 1], [760, 490, 0], [1256, 490, 1]], reykjavik: [[596, 494, 1], [905, 492, 1], [1004, 494, 0]],
+  tourbus: [[80, 490, 1]], seljaland: [[332, 488, 1], [474, 488, 0]], skoga: [[330, 488, 1], [610, 488, 0]], skogatop: [[690, 488, 1]], wreck: [[344, 488, 1], [1400, 492, 0]], beach: [[1488, 492, 1], [1700, 490, 0]],
 };
 /** No cobwebs out in space. */
 const NO_WEBS: RoomId[] = ['rocket', 'spacewalk'];
 const HALLOWEEN_LIGHTS: LightStyle = { bulbs: [[150, 90, 255], [255, 140, 40]], sag: 14, offEvery: 5, wire: null, off: () => [60, 50, 60], dy: 0 };
 /** Where bats fly: the band of sky the camera actually shows in each outdoor room. */
-const BATS: Partial<Record<RoomId, [number, number]>> = { plaza: [370, 470], roof: [120, 300], pier: [300, 370], park: [330, 420], reykjavik: [334, 390] };
+const BATS: Partial<Record<RoomId, [number, number]>> = { plaza: [370, 470], roof: [120, 300], pier: [300, 370], park: [330, 420], reykjavik: [334, 390], wreck: [330, 420] };
 const FOG: RoomId[] = ['plaza', 'pier', 'roof', 'park'];
 
 // ---------- trick-or-treat: which pumpkins you've knocked at today (this browser) ----------
@@ -142,7 +143,7 @@ export function halloweenBack(rm: Room, a: number): void {
     Gd(x, y + 18, 26, [160, 220, 200], 0.12 * fl);
   }
   const band = BATS[room];
-  if (band && (room === 'reykjavik' ? iceDay() : dayness()) < 0.6) { // (Reykjavík's night is on Iceland's clock)
+  if (band && (room === 'reykjavik' || room === 'wreck' ? iceDay() : dayness()) < 0.6) { // (Iceland's night is on Iceland's clock)
     const W = rm.w;
     for (let k = 0; k < 7; k++) {
       const sp = 26 + h1(k) * 22, x = ((a * sp + h1(k + 3) * W * 2) % (W + 200)) - 100, y = band[0] + h1(k + 9) * (band[1] - band[0]) + Math.sin(a * 1.7 + k) * 8, up = Math.floor(a * 9 + k) % 2, c: RGB = [4, 2, 8];

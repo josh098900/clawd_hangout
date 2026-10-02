@@ -78,7 +78,7 @@ const DEFS: NpcDef[] = [
     id: 'npc-hekla', name: 'HEKLA', room: 'reykjavik', speed: 30, cycle: 240,
     look: { c: 4, hat: 2, face: 0, fit: 13, sp: 0 },
     stops: [{ x: 250, y: 486, wait: 170, say: ['information! ask me anything', 'look north tonight'] }, { x: 110, y: 500, wait: 30, say: ['the airport bus goes from here'] }, { x: 250, y: 486, wait: 20 }],
-    chat: ['clear and dark? look north! the lights come out a minute after dark', 'the forecast board tells you tonight\'s KP. seven or more is a STORM', 'takk means thanks. bless means bye', 'i\'m named after a volcano. she\'s quiet. mostly', 'the tour bus starts soon: waterfalls, black beaches, glaciers...', 'see the church up the hill? take the lift up the tower'],
+    chat: ['clear and dark? look north! the lights come out a minute after dark', 'the forecast board tells you tonight\'s KP. seven or more is a STORM', 'takk means thanks. bless means bye', 'i\'m named after a volcano. she\'s quiet. mostly', 'the tour bus leaves from right here: waterfalls, black beaches, glaciers...', 'see the church up the hill? take the lift up the tower'],
   },
   {
     id: 'npc-sigga', name: 'SIGGA', room: 'reykjavik', speed: 20, cycle: 200,
@@ -91,6 +91,25 @@ const DEFS: NpcDef[] = [
     look: { c: 7, hat: 18, face: 4, fit: 13, sp: 0 },
     stops: [{ x: 1872, y: 524, wait: 220, say: ['mending nets. always mending nets'] }, { x: 1740, y: 528, wait: 50, say: ['whales out there today. i can feel it'] }, { x: 1872, y: 524, wait: 30 }],
     chat: ['if you don\'t like the weather, wait five minutes', 'the puffins come back in the spring. the whales never really leave', 'caught a cod this big once. no, BIGGER', 'the whale boat\'s going out soon. i\'ll believe it when i see it'],
+  },
+  // ---- THE SOUTH COAST (step 19, push 2): KATLA on the tour bus (STEFÁN drives: he's drawn at the wheel), the ranger at Reynisfjara, the café's cook ----
+  {
+    id: 'npc-katla', name: 'KATLA', room: 'tourbus', speed: 30, cycle: 280,
+    look: { c: 3, hat: 2, face: 0, fit: 13, sp: 0 },
+    stops: [{ x: 1030, y: 500, wait: 190, say: ['velkomin! sit anywhere', 'next stop coming up'] }, { x: 600, y: 552, wait: 40, say: ['anyone need anything?', 'window seats are the best seats'] }, { x: 1030, y: 500, wait: 20 }],
+    chat: ['i\'m named after the volcano under myrdalsjokull. she\'s overdue. so am i, for lunch', 'stay aboard and you go round the whole loop', 'get off anywhere: the bus comes back round in about six minutes', 'stefan has driven this road four thousand times. he still slows down for the sheep', 'tractor eggs. those white bales. ask me why'],
+  },
+  {
+    id: 'npc-ranger', name: 'RANGER', room: 'beach', speed: 26, cycle: 260,
+    look: { c: 1, hat: 2, face: 0, fit: 11, sp: 0 },
+    stops: [{ x: 1060, y: 532, wait: 150, say: ['keep back from the water', 'no, further'] }, { x: 1320, y: 544, wait: 70, say: ['the sea doesn\'t care how good the photo is'] }, { x: 1060, y: 532, wait: 20 }],
+    chat: ['keep well back from the sea. the big ones come without warning', 'the light\'s yellow most days. in a gale it goes red', 'never turn your back on the sea. never', 'the puffins are on the cliff at the end. bring your camera'],
+  },
+  {
+    id: 'npc-cook', name: 'THE COOK', room: 'beach', speed: 20, cycle: 300,
+    look: { c: 6, hat: 13, face: 0, fit: 0, sp: 0 },
+    stops: [{ x: 1642, y: 488, wait: 280, say: ['kjotsupa! hot!', 'soup\'s on'] }, { x: 1660, y: 492, wait: 20 }],
+    chat: ['kjotsupa: lamb, swede, carrots, potatoes. that\'s all. that\'s enough', 'your grandmother\'s recipe. if your grandmother was icelandic', 'got soaked by the sea? soup. it\'s always soup'],
   },
   {
     id: 'npc-fizz', name: 'PROF. FIZZ', room: 'lab', speed: 40,

@@ -44,6 +44,8 @@ export const HOLD_POTION = 19;
 export const isPotion = (hold: number): boolean => hold >= HOLD_POTION && hold < HOLD_POTION + 6;
 /** Iceland (step 19): Reykjavík's hot dog (ONE WITH EVERYTHING), a pot of skyr from Keflavík's bar, a cinnamon swirl from the bakery, and your suitcase off the carousel (it rolls behind you; Q puts it away). */
 export const HOLD_PYLSA = 25, HOLD_SKYR = 26, HOLD_SWIRL = 27, HOLD_SUITCASE = 28;
+/** The south coast (step 19, push 2): a mug of KJÖTSÚPA (lamb soup) from Reynisfjara's café, and THRASI'S RING from the pool at Skógafoss. */
+export const HOLD_SOUP = 29, HOLD_RING = 30;
 export const isKitchen = (hold: number): boolean => hold >= HOLD_PATTY && hold <= HOLD_SHAKE;
 /**
  * Everything you can hold (MoveMsg.hold): how many sips / bites it has, what the Q button says for it (Q sips it,
@@ -66,6 +68,8 @@ export const HOLDS: Record<number, { uses?: number; q: 'SIP' | 'EAT' | 'DROP' | 
   [HOLD_SKYR]: { uses: 4, q: 'EAT', done: 'Skyr finished. Very Icelandic of you' },
   [HOLD_SWIRL]: { uses: 3, q: 'EAT', done: 'Cinnamon swirl gone. Sticky fingers' },
   [HOLD_SUITCASE]: { q: 'PUT AWAY' },
+  [HOLD_SOUP]: { uses: 5, q: 'SIP', done: 'Kjotsupa finished. Warm all the way down' },
+  [HOLD_RING]: { q: 'PUT AWAY' },
   ...Object.fromEntries([0, 1, 2, 3, 4, 5].map((k) => [HOLD_POTION + k, { q: 'DRINK' as const }])),
 };
 /** Sips / bites in each thing you can finish. */
@@ -438,6 +442,11 @@ function drawPet(av: Avatar, a: number, now: number, kind: number): void {
     R(0, -8 + bob, 2, 3, K.WHITE); R(3, -8 + bob, 2, 3, K.WHITE); R(1, -7 + bob, 1, 2, K.EYE); R(4, -7 + bob, 1, 2, K.EYE);
     if ((a * 0.35 + av.seed) % 1 < 0.25) { const q = ((a * 0.35 + av.seed) % 1) / 0.25; alpha(1 - q, () => lit(() => ring(x + d2 * 5, Math.round(y - 12 - q * 10), 1 + Math.round(q), 1 + Math.round(q), [200, 236, 255]))); }
     if (av.emote && now - av.emote.t0 < 0.9) { const q = (now - av.emote.t0) / 0.9; for (let k = 0; k < 3; k++) alpha(0.55 * (1 - q), () => disc(Math.round(x - d2 * (6 + q * 8 + k * 3)), y - 5 - k, 1 + Math.round(q * 3), [30, 20, 40])); }
+  } else if (kind === 10) { // the PUFFIN: black back, white face, the big orange-and-red beak, orange feet; waddles, and growls now and then (puffins really do)
+    const bk: RGB = [26, 26, 32], wh: RGB = [244, 244, 240], wd = step ? 1 : 0;
+    R(-3, -10 - wd, 6, 9, bk); R(-2, -11 - wd, 5, 1, bk); R(0, -9 - wd, 3, 7, wh); R(1, -10 - wd, 2, 2, wh); R(2, -9 - wd, 1, 1, K.EYE);
+    R(3, -9 - wd + peck, 3, 2, [240, 110, 40]); R(3, -8 - wd + peck, 3, 1, [200, 50, 40]); R(5, -9 - wd + peck, 1, 1, [255, 200, 60]);
+    R(-4, -7 - wd, 1, 4, bk); R(-1, -1, 2, 1, [240, 120, 40]); R(1, -1, 2, 1, [240, 120, 40]);
   } else if (kind === 6) { // bat: always flapping, red eyes
     const c: RGB = [62, 44, 84], up = Math.floor(a * 14 + av.seed * 5) % 2;
     R(-2, -8, 5, 4, c); R(-1, -9, 1, 1, c); R(2, -9, 1, 1, c);
@@ -491,6 +500,16 @@ function drawPylsa(x: number, y: number, d: number): void {
 }
 /** A pot of skyr: a little white tub with a blue label and a spoon in it. */
 function drawSkyr(x: number, y: number): void { const X = Math.round(x) - 3, Y = Math.round(y) - 6; r(X, Y, 7, 7, [240, 242, 246]); r(X, Y + 2, 7, 3, [70, 110, 170]); r(X, Y, 7, 1, [255, 255, 255]); r(X + 5, Y - 3, 1, 4, [180, 184, 192]); }
+/** A mug of kjötsúpa: lamb soup, chunks of swede and carrot, steam curling up. */
+function drawSoup(x: number, y: number, a: number, seed: number): void {
+  const X = Math.round(x) - 3, Y = Math.round(y) - 6; r(X - 1, Y, 8, 7, OUTLINE); r(X, Y, 6, 6, [236, 232, 220]); r(X, Y, 6, 2, [196, 120, 60]); r(X + 1, Y, 1, 1, [240, 170, 70]); r(X + 4, Y, 1, 1, [130, 90, 70]); r(X + 6, Y + 2, 2, 3, [236, 232, 220]);
+  for (let k = 0; k < 2; k++) { const q = ((a * 0.8) + k / 2 + seed) % 1; alpha(0.5 * (1 - q), () => r(X + 1 + k * 3 + Math.round(Math.sin(q * 6 + k) * 1), Y - 2 - Math.round(q * 7), 1, 2, [240, 244, 248])); }
+}
+/** THRASI'S RING: a heavy old gold ring, glinting. */
+function drawRing(x: number, y: number, a: number): void {
+  const X = Math.round(x), Y = Math.round(y) - 4; r(X - 3, Y - 3, 7, 7, OUTLINE); r(X - 2, Y - 2, 5, 5, [226, 176, 60]); r(X - 1, Y - 1, 3, 3, OUTLINE); r(X - 2, Y - 2, 2, 1, [255, 230, 140]);
+  if ((a * 1.1) % 1 < 0.15) lit(() => { r(X + 2, Y - 5, 1, 3, [255, 248, 210]); r(X + 1, Y - 4, 3, 1, [255, 248, 210]); });
+}
 /** A cinnamon swirl, iced. */
 function drawSwirl(x: number, y: number): void { const X = Math.round(x), Y = Math.round(y) - 3; disc(X, Y, 3, [196, 132, 66]); r(X - 1, Y - 1, 2, 1, [150, 90, 40]); r(X, Y, 2, 1, [150, 90, 40]); r(X - 2, Y - 2, 3, 1, [250, 244, 230]); }
 /** Your suitcase off the carousel, on its wheels: its handle up to your hand, the case trailing behind you on the floor. */
@@ -567,7 +586,7 @@ function drawPotion(cx: number, cy: number, hold: number, a: number): void {
   Gd(x, y - 1, 6, c, 0.35);
 }
 /** An effect's colour: its potion's (the frazzle's is soot). */
-const fxCol = (k: number): RGB => (k === FX.FRAZZLED ? [96, 92, 100] : potionOf(k)?.c ?? K.WHITE);
+const fxCol = (k: number): RGB => (k === FX.FRAZZLED ? [96, 92, 100] : k === FX.SOAKED ? [120, 180, 230] : potionOf(k)?.c ?? K.WHITE);
 /**
  * An effect's pose, before the critter is drawn: TINY / HUGE scale you (in with a boing over half a second, out over the
  * last half), RAINBOW cycles your colour, FLOATY lifts you up, the frazzle opens your eyes wide. Returns the look to draw,
@@ -582,6 +601,7 @@ function fxPose(av: Avatar, fx: Fx, P: Pose, look: Look, hop: number, a: number,
   else if (fx.k === FX.FLOATY) { hop += (18 + Math.sin(a * 2.2 + av.seed * 5) * 3) * Math.max(0, Math.min(1, k)); P.lift = Math.floor(a * 1.5) % 2 ? 1 : 2; if (u < 1) { P.arm = 'up'; P.eyes = 'w'; P.mouth = 'O'; } else P.ant = Math.sin(a * 1.6) * 2; }
   else if (fx.k === FX.FRAZZLED) { if (u < 2) { P.eyes = 'w'; P.mouth = 'o'; } P.ant = Math.sin(a * 13) * 1.5; }
   else if (fx.k === FX.RING) { P.arm = 'up'; P.sy *= 1 + 0.03 * Math.sin(a * 4); hop += Math.abs(Math.sin(a * 2.2)) * 2; if (u < 1.2) { P.eyes = 'w'; P.mouth = 'O'; } }
+  else if (fx.k === FX.SOAKED) { const sh = (u + av.seed * 3) % 4; P.ant = -1.5; if (sh < 0.5 && !av.moving) { P.lean = Math.sin(sh * 70) * 3; P.eyes = 'b'; } } // (drooping, and now and then a shake like a dog)
   if (sc !== 1) { P.sy *= sc; P.sx *= sc * Math.sqrt(sc); hop *= sc; }
   return { look, hop, sc };
 }
@@ -595,7 +615,16 @@ function fxOver(av: Avatar, fx: Fx, TX: (x: number, y: number) => [number, numbe
   else if (fx.k === FX.BUBBLES) bubbleTrail(av, now, TX);
   else if (fx.k === FX.FRAZZLED) frazzle(av, TX, a);
   else if (fx.k === FX.RING) rubberRing(av, TX, a);
-  if (fx.k !== FX.RING && (u < 0.5 || left < 0.4)) { const q = u < 0.5 ? u / 0.5 : 1 - left / 0.4, [x, y] = TX(0, -14), col = fxCol(fx.k); lit(() => { for (let j = 0; j < 8; j++) { const an = j * 0.785 + a, d = (8 + q * 20) * Math.max(1, sc); star4(Math.round(x + Math.cos(an) * d), Math.round(y + Math.sin(an) * d * 0.7), 1, j % 2 ? K.WHITE : col); } }); }
+  else if (fx.k === FX.SOAKED) dripping(av, TX, a, now - fx.t0);
+  if (fx.k !== FX.RING && fx.k !== FX.SOAKED && (u < 0.5 || left < 0.4)) { const q = u < 0.5 ? u / 0.5 : 1 - left / 0.4, [x, y] = TX(0, -14), col = fxCol(fx.k); lit(() => { for (let j = 0; j < 8; j++) { const an = j * 0.785 + a, d = (8 + q * 20) * Math.max(1, sc); star4(Math.round(x + Math.cos(an) * d), Math.round(y + Math.sin(an) * d * 0.7), 1, j % 2 ? K.WHITE : col); } }); }
+}
+/** SOAKED: drips falling off you, a puddle where you stand, the light catching your wet fur; a spray of drops when you shake. */
+function dripping(av: Avatar, TX: (x: number, y: number) => [number, number], a: number, u: number): void {
+  const blue: RGB = [150, 200, 240];
+  if (!av.moving) alpha(0.3, () => oval(Math.round(av.x), Math.round(av.y), 9, 2, [110, 170, 220]));
+  for (let j = 0; j < 5; j++) { const q = ((a * 1.4) + j / 5 + av.seed) % 1, [x, y] = TX(-11 + j * 5.5, -18 + q * 18); alpha(0.85 * (1 - q * 0.5), () => r(Math.round(x), Math.round(y), 1, 2, blue)); }
+  lit(() => { const [x, y] = TX(-5, -24); if ((a * 0.9 + av.seed) % 1 < 0.6) { r(Math.round(x), Math.round(y), 2, 1, [236, 246, 255]); r(Math.round(x) + 8, Math.round(y) + 3, 1, 1, [236, 246, 255]); } });
+  const sh = (u + av.seed * 3) % 4; if (sh < 0.6 && !av.moving) { const q = sh / 0.6; for (let j = 0; j < 10; j++) { const an = (j / 10) * Math.PI * 2, [x, y] = TX(Math.cos(an) * (10 + q * 16), -14 + Math.sin(an) * (6 + q * 10)); alpha(1 - q, () => r(Math.round(x), Math.round(y), 1, 1, blue)); } }
 }
 /** BUBBLES: a bubble every 10 px you walk (and now and then standing still), floating up, wobbling, popping. */
 function bubbleTrail(av: Avatar, now: number, TX: (x: number, y: number) => [number, number]): void {
@@ -667,6 +696,8 @@ export function drawAvatar(av: Avatar, a: number, now: number, dim: number, usin
     else if (av.hold === HOLD_SKYR) drawSkyr(mx, my);
     else if (av.hold === HOLD_SWIRL) drawSwirl(mx, my);
     else if (av.hold === HOLD_SUITCASE) drawSuitcase(mx, my, av, P.dir > 0 ? 1 : -1);
+    else if (av.hold === HOLD_SOUP) drawSoup(mx, my, a, av.seed);
+    else if (av.hold === HOLD_RING) drawRing(mx, my, a);
     else if (isKitchen(av.hold)) drawKitchen(mx, my, av.hold, a);
     else if (isPotion(av.hold)) drawPotion(mx, my, av.hold, a);
     else if (av.hold >= HOLD_MARSH) drawMarsh(mx, my, av.hold, P.dir > 0 ? 1 : -1);

@@ -41,6 +41,11 @@ import { clamp } from '../engine/math';
 import { dayness } from '../world/plaza';
 import { weather } from '../world/weather';
 import { isHalloween, isWinter } from '../world/season';
+import { STOP_ARRIVE } from '../world/tourbus';
+import { nextBus } from '../game/tour';
+import { stamped } from '../game/passport';
+/** The south coast's rooms (and the bus): Iceland, as far as the map's concerned. */
+const COAST_ZONE = new Set<RoomId>(['tourbus', 'seljaland', 'gorge', 'skoga', 'skogatop', 'wreck', 'beach']);
 
 type At = { x: number; y: number };
 /** Where a pick takes you: `note` says how (WALK IN, or which ride and when), `ride` if it's to a ride's door, not the place. */
@@ -63,7 +68,7 @@ function podLanding(): At | null { return game.rooms.station.doors.find((d) => d
 export function zoneNow(): Zone | 'flying' {
   const id = game.room.id;
   if (id === 'plane') { const A = air(); return doorOpenAt('city', A) ? 'earth' : doorOpenAt('kef', A) ? 'iceland' : 'flying'; }
-  if (id === 'kef' || id === 'reykjavik') return 'iceland';
+  if (id === 'kef' || id === 'reykjavik' || COAST_ZONE.has(id)) return 'iceland';
   if (id === 'rocket') { const p = flight().phase; return p === 'pad' ? 'earth' : p === 'docked' ? 'orbit' : 'flying'; }
   if (id === 'lander') { const p = lander().phase; return p === 'docked' ? 'orbit' : p === 'landed' ? 'moon' : 'flying'; }
   if (id === 'station' || id === 'spacewalk') return 'orbit';
@@ -103,6 +108,12 @@ export function routeTo(id: RoomId, pod = false): Route {
   const why = blockedWhy(); if (why) return { ok: false, why };
   if (!pl.pick) return { ok: false, why: 'Suit up at the SPACE STATION\'s AIRLOCK to go out there' };
   const z = zoneNow(), here = game.room.id;
+  // the tour bus's stops, from in Iceland: a hop back to one you've been to, or the bus from Reykjavík to one you haven't
+  if (z === 'iceland' && STOP_ARRIVE[id] && id !== 'reykjavik') {
+    if (placeOfRoom(here) === id) return { ok: false, why: 'You\'re already here!' };
+    if (stamped(id)) return { ok: true, to: id, at: STOP_ARRIVE[id], note: 'HOP BACK (YOU\'VE BEEN)', ride: false };
+    const wait = nextBus(0); return { ok: true, to: 'reykjavik', at: STOP_ARRIVE.reykjavik, note: 'BY TOUR BUS FROM REYKJAVIK · ' + (wait <= 0 ? 'BOARDING NOW' : 'NEXT BUS IN ' + mmss(wait)), ride: true };
+  }
   if (pl.zone === z) {
     if (placeOfRoom(here) === id && !isFlat(here)) return { ok: false, why: 'You\'re already here!' };
     return { ok: true, to: id, at: frontDoor(id), note: 'WALK IN', ride: false };
@@ -126,6 +137,9 @@ export function placeForPerson(room: RoomId): RoomId {
   if (room === 'rocket') return flight().phase === 'pad' ? 'roof' : 'station';
   if (room === 'lander') return lander().phase === 'landed' ? 'moon' : 'station';
   if (room === 'sub') return 'aquarium';
+  if (room === 'tourbus') return 'reykjavik';
+  if (room === 'gorge') return 'seljaland';
+  if (room === 'skogatop') return 'skoga';
   if (room === 'plane') { const A = air(); return doorOpenAt('city', A) ? 'airport' : doorOpenAt('kef', A) ? 'kef' : A.to === 'kef' ? 'kef' : 'airport'; }
   return room;
 }

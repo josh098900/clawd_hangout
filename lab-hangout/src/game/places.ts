@@ -12,6 +12,8 @@ export const EXPLORE: RoomId[] = ['lab', 'den', 'roof', 'plaza', 'arcade', 'cine
  */
 export function placeOfRoom(id: RoomId): RoomId | null {
   if (id === 'flat' || id === 'flatbed' || id === 'flatkit') return 'lofts';
-  if (id === 'train' || id === 'rocket' || id === 'lander' || id === 'sub' || id === 'plane') return null;
+  if (id === 'train' || id === 'rocket' || id === 'lander' || id === 'sub' || id === 'plane' || id === 'tourbus') return null;
+  if (id === 'gorge') return 'seljaland';
+  if (id === 'skogatop') return 'skoga';
   return id;
 }

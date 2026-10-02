@@ -1133,3 +1133,69 @@ NPCs stand clear of every spot, and the golden test checks it.
   - Brighter colours (red, mustard, salmon, charcoal, deep blue, teal), with corrugated ribs that catch the light.
   - Shop windows have a dark frame, mullions, a door, goods on the shelves, a sky reflection by day and a warm glow at night.
   - The plaza is grey paving with steps up from the street (it read as a black wall before).
+
+## As built: push 2 (the south coast, by tour bus)
+
+Josh said "get working on push 2" before answering §17.12, so it's built with the recommendations: **puffins all year, one bus,
+and a new guide, KATLA** (HEKLA stays at her kiosk).
+
+- **It came out as §17 says,** with these details:
+  - **The bus (`game/tour.ts`):**
+    - A 370 s loop, as tabled. Its doors open only at a stop (the golden test sweeps every second of the loop).
+    - At each stop the coach pulls in from the left and pulls away again (`busPose`). The stop's sign counts down to the
+      next bus.
+    - **In Reykjavík** it pulls in along the kerb by the shelter. The airport bus's door is shut while it's in (30 s in
+      every 370 s).
+  - **The cabin's windows** follow the bus's km. Heading out they show the north side:
+    - Esja, Hellisheiði's lava and the power station's steam, Hveragerði's greenhouses (lit at night)
+    - farms, tractor eggs, horses and sheep
+    - Hekla, the cliffs under Eyjafjallajökull with waterfalls, the glaciers
+    - Near the window: snow poles, the fence, one-lane bridge signs, the ⌘ sign before each stop.
+    - The windscreen shows the road ahead.
+    - Heading home they show the south side: the sea, the Westman Islands, Dyrhólaey, the black sand flats.
+  - **KATLA** tells 14 stories at points along the route and calls out each stop as the bus pulls in (Þrasi's ring, the
+    trolls, the wreck). **STEFÁN** is drawn at the wheel.
+  - **SOAKED** goes out on the `fx` message (k 9), so others see you drip:
+    - drips, a puddle, a shake like a dog
+    - it lasts 40 s; on the bus it dries down to 10 s, and holding the soup dries it down to 12 s
+  - **Seljalandsfoss:** everyone on the path behind the falls is drawn behind the water (the `curtain` prop). The chain
+    goes up in a gale, but never with you behind it.
+  - **The ring** glints for 5 s in some of every 75 s on a sunny day. Grab it within reach of the glint.
+  - **The puffins** are twelve burrows, each in and out on its own clock. Three or more in the frame gets you the pet.
+  - **The sneaker wave:**
+    - a wave every 140 s, with a 3 s warning (a rumble, a darker swell, the sign flashing, the ranger shouting)
+    - it runs up to y 550
+    - caught: tumbled up the beach, SOAKED
+    - in the danger zone at the warning and not caught: the WAVE quest
+  - **The map:**
+    - The four stops are places on the ICELAND page.
+    - The bus's route is dotted along the coast, with the little bus on it.
+    - From Iceland, a stop you've been to is a hop. One you haven't been to is "by tour bus from Reykjavík" with the
+      countdown.
+  - **Art:** each room's land is baked once by day, with night laid over it (`landLayer`). It's painted with smooth noise
+    (`cliffPx`, `sandPx`, `grassPx`), so the rock, sand and moss don't look like static.
+  - **Local details changed from the brief:** Vík's church isn't drawn. From Reynisfjara the mountain is in the way, and a
+    local would notice.
+- **Also fixed on the way** (already pushed to main):
+  - Others couldn't see the hot dog, the skyr, the swirl or the suitcase in your hands. The move parser capped holds at 24;
+    it now takes its limit from the hold list.
+  - The airport's signs were showing in the plane (4fb7d92).
+- **SQL: `0026_southcoast.sql`** adds the three quests and the TREASURE HUNTER badge. Josh runs it, then this goes to main.
+- **Tested:**
+  - **A full run (28 checks):**
+    - on at Reykjavík, shut while driving, off and on at every stop with the stamps
+    - behind the falls (SOAKED and the quest), the gorge and its rock
+    - the ring found on a sunny moment, the steps up and down
+    - the shuttle both ways and the wreck's roof
+    - a sneaker wave caught and one outrun
+    - the puffin pet, the soup
+    - the map's hop and the bus route
+  - **Two players:** on the bus together, off together, B sees A SOAKED.
+  - **Reach:** every spot, 0 stand points fail. NPCs are clear of spots (the golden test).
+  - **Golden:** 393 fingerprints: the new rooms by night, day, dusk, gale and snow; the bus at 6 moments; a wave; the
+    glint. Elsewhere only Reykjavík (the bus stop), the ICELAND map and the pets sheet changed.
+  - **Performance at CPU ×4 with bots:** 2-6.3 ms of work a frame (the beach in a gale is the most). A room's first visit
+    bakes its land in 100-280 ms, during the door's fade.
+  - The phone layout, smoke, and the lists.
+- **Two SQL tests fail on today's date, not because of this:** they assume it's September (Halloween's "out of season",
+  winter's "September: none"). They fail the same on main.

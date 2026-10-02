@@ -299,6 +299,20 @@ export const ICE_TRACK: Track = {
   bass: 'E2 - - - - - - - D2 - - - - - - - C2 - - - - - - - B1 - - - - - - -',
   drums: 'k . . . . . . . . . . . h . . . k . . . . . . . . . . . h . h .',
 };
+/** THE TOUR BUS's music, RING ROAD: a light acoustic road-trip loop (a plucked lead over a steady walking bass). */
+export const ROAD_TRACK: Track = {
+  name: 'RING ROAD', bpm: 104, wave: 'triangle', leadVol: 0.035,
+  lead: 'G5 . B5 D6 . B5 A5 . G5 . E5 . D5 . . . G5 . B5 D6 . E6 D6 . B5 . A5 . G5 . . . C6 . B5 A5 . G5 E5 . D5 . E5 . G5 . . . A5 . B5 . A5 G5 . E5 . D5 . G5 . . . .',
+  bass: 'G2 . D3 . G2 . D3 . E2 . B2 . E2 . B2 . C3 . G2 . C3 . G2 . D2 . A2 . D2 . A2 .',
+  drums: 'k . h . s . h . k . h k s . h . k . h . s . h . k k h . s . h h',
+};
+/** THE SOUTH COAST's music, BLACK SAND: wide open and sparse, a few high notes over long low chords (the falls and the sea do the rest). */
+export const COAST_TRACK: Track = {
+  name: 'BLACK SAND', bpm: 60, wave: 'sine', leadVol: 0.035,
+  lead: 'E6 . . . B5 . . . . . . . D6 . . . A5 . . . . . . . C6 . . . G5 . . . E5 . . . B5 . . . . . . . . . . .',
+  bass: 'E2 - - - - - - - - - - - D2 - - - - - - - - - - - C2 - - - - - - - - - - - B1 - - - - - - - - - - -',
+  drums: 'k . . . . . . . . . . . . . . . . . . . . . . . k . . . . . . . . . . . . . . . . . . . . . . .',
+};
 /** SARDINE 1's music, TWENTY THOUSAND BEEPS: slow and pinging, a sonar blip on the beat. Lower and slower as you go deeper (the shallows, the blue, the deep). */
 export const SUB_TRACK: Track[] = [
   { name: 'TWENTY THOUSAND BEEPS', bpm: 84, wave: 'triangle', leadVol: 0.03,

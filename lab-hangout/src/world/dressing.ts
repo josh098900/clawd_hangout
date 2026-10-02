@@ -31,6 +31,8 @@ export const LIGHT_LINES: Partial<Record<RoomId, Line[]>> = {
   plane: [[204, 360, 580, 360], [580, 360, 956, 360]],
   kef: [[480, 366, 760, 366], [770, 366, 1160, 366], [1166, 366, 1276, 366]],
   reykjavik: [[230, 388, 400, 388], [604, 388, 1000, 388], [1004, 388, 1240, 388]],
+  // THE TOUR BUS: along its luggage racks
+  tourbus: [[104, 352, 540, 352], [540, 352, 976, 352]],
 };
 
 /** How a season's lights look: bulb colours (in turn), how far they sag, every nth bulb blinks off, the wire. */

@@ -7,6 +7,7 @@
 // the towns' lights, the northern lights over the north when they're out, Iceland's weather, LAB AIR coming in from the south
 // (the city's that way) and going back, a geyser, the lagoon's steam, the people, and the panel with tonight's forecast.
 
+import { tour } from '../game/tour';
 import { K, IS, AP, type RGB } from '../engine/palette';
 import { r, line, disc, oval, txt, tw, lit, alpha, G, Gd, M, shade, bake } from '../engine/pixel';
 import { h1, clamp } from '../engine/math';
@@ -70,6 +71,16 @@ export const ICE_PLACES: MapPlace[] = [
   { id: 'kef', name: 'KEFLAVIK AIRPORT', hits: [R_(KEF[0] - 10, KEF[1] - 7, KEF[0] + 8, KEF[1] + 6)], at: [KEF[0] + 1, KEF[1] + 5], zone: 'iceland', pick: true, tag: [KEF[0] - 16, KEF[1] - 12], page: 'iceland' },
   { id: 'reykjavik', name: 'REYKJAVIK', hits: [R_(RVK[0] - 8, RVK[1] - 10, RVK[0] + 11, RVK[1] + 6)], at: [RVK[0] + 1, RVK[1] + 5], zone: 'iceland', pick: true, tag: [RVK[0] + 12, RVK[1] - 14], page: 'iceland' },
 ];
+/** The tour bus's stops (push 2): places now, on the sights' spots. */
+const COASTP: [RoomId, string, number, number, [number, number]][] = [['seljaland', 'SELJALANDSFOSS', 63.62, -19.99, [3, -11]], ['skoga', 'SKOGAFOSS', 63.53, -19.51, [4, -11]], ['wreck', 'THE PLANE WRECK', 63.46, -19.36, [-4, 3]], ['beach', 'REYNISFJARA', 63.40, -19.04, [5, -2]]];
+for (const [id, name, la, lo, tag] of COASTP) { const [x, y] = iceXY(la, lo); ICE_PLACES.push({ id, name, hits: [R_(x - 4, y - 5, x + 5, y + 3)], at: [x, y + 1], zone: 'iceland', pick: true, tag: [x + tag[0], y + tag[1]], page: 'iceland' }); }
+/** The tour bus's route on the page: Reykjavík, then each stop (by km along the Ring Road), for drawing it and the bus on it. */
+const BUS_ROUTE: [number, number, number][] = [[0, RVK[0] + 2, RVK[1] + 4], [40, ...iceXY(64.0, -21.2)], [57, ...iceXY(63.93, -21.0)], [100, ...iceXY(63.78, -20.3)], [128, ...iceXY(63.62, -19.99)], [156, ...iceXY(63.53, -19.51)], [168, ...iceXY(63.46, -19.36)], [182, ...iceXY(63.40, -19.04)]] as [number, number, number][];
+/** Where the bus is on the page, at km along the road. */
+export function busXY(km: number): [number, number] {
+  for (let i = 1; i < BUS_ROUTE.length; i++) { const [k0, x0, y0] = BUS_ROUTE[i - 1], [k1, x1, y1] = BUS_ROUTE[i]; if (km <= k1) { const u = Math.max(0, (km - k0) / (k1 - k0)); return [x0 + (x1 - x0) * u, y0 + (y1 - y0) * u]; } }
+  const l = BUS_ROUTE[BUS_ROUTE.length - 1]; return [l[1], l[2]];
+}
 /** Where Iceland's map boards stand: KEF's arrivals hall map, Reykjavík's INFO kiosk (the YOU ARE HERE star). */
 export const ICE_BOARDS: Partial<Record<RoomId, [number, number]>> = { kef: [KEF[0] + 3, KEF[1] - 3], reykjavik: [RVK[0] - 4, RVK[1] + 1] };
 
@@ -89,7 +100,7 @@ const SIGHTS: { id: string; at: [number, number]; kind: SightKind; t: [number, n
 const soon = (id: string): boolean => (STAMPS.find((s) => s.id === id)?.push ?? 9) > PUSH_NOW;
 const sightBox = (s: { at: [number, number] }) => R_(s.at[0] - 4, s.at[1] - 5, s.at[0] + 5, s.at[1] + 3);
 /** The sight under map pixel (x, y) (its stamp id), for the hover's label. */
-export function sightAt(x: number, y: number): string | null { return SIGHTS.find((s) => inR(sightBox(s), x, y))?.id ?? null; }
+export function sightAt(x: number, y: number): string | null { return SIGHTS.find((s) => soon(s.id) && inR(sightBox(s), x, y))?.id ?? null; }
 
 // =====================================================================================
 // THE LAND AND THE SEA (worked out once)
@@ -255,6 +266,8 @@ function iceJet(): { x: number; y: number; ang: number; up: boolean } | null {
 /** Where someone in room `id` is drawn on this page (null: not in Iceland). */
 export function iceSpotOf(id: RoomId): [number, number] | null {
   if (id === 'plane') { const j = iceJet(); return j ? [Math.round(j.x), Math.round(j.y)] : flying(air()) ? [206, 294] : null; }
+  if (id === 'tourbus') { const [x, y] = busXY(tour().km); return [Math.round(x), Math.round(y)]; }
+  if (id === 'gorge') return iceSpotOf('seljaland'); if (id === 'skogatop') return iceSpotOf('skoga');
   const p = ICE_PLACES.find((q) => q.id === id); return p ? p.at : null;
 }
 /** A little plane seen from above, nose along `ang`. */
@@ -289,6 +302,9 @@ export function drawIcelandLive(L: MapLive, hoverSight: string | null): void {
     if (w.kind === 'drizzle') alpha(w.k * 0.4, () => { for (let i = 0; i < 70; i++) { const x = (h1(i * 1.3) * (MAP_W + 40) + a * 20) % (MAP_W + 40) - 20, y = (h1(i * 2.9) * MAP_H + a * 120) % MAP_H; line(Math.round(x), Math.round(y), Math.round(x) - 1, Math.round(y) + 3, [170, 190, 220]); } });
     if (w.kind === 'gale') alpha(w.k * 0.5, () => { for (let i = 0; i < 26; i++) { const x = (h1(i * 4.3) * (MAP_W + 80) + a * 90) % (MAP_W + 80) - 40, y = Math.floor(h1(i * 6.1) * MAP_H); r(Math.round(x), y, 8, 1, [220, 230, 240]); } });
   }
+  // ---- THE ICELAND EXPLORER: its route along the coast (dotted), the little bus on it ----
+  for (let km = 2; km < 182; km += 5) { const [x, y] = busXY(km); alpha(0.5, () => r(Math.round(x), Math.round(y), 1, 1, [250, 214, 80])); }
+  { const T = tour(), [x, y] = busXY(T.km), d = T.dir; r(Math.round(x) - 2, Math.round(y) - 2, 5, 3, K.WHITE); r(Math.round(x) - 2, Math.round(y) - 1, 5, 1, [36, 132, 140]); r(Math.round(x) + (d > 0 ? 2 : -2), Math.round(y) - 1, 1, 1, [255, 230, 150]); }
   // ---- LAB AIR: its route in (faint), then the jet, with its shadow on the sea while it's up ----
   for (let k = 0; k < 14; k++) { const u = (k + (a * 0.6) % 1) / 14, [x, y] = qb(ROUTE[0], ROUTE[1], ROUTE[2], u); alpha(0.35, () => r(Math.round(x), Math.round(y), 1, 1, [230, 236, 250])); }
   { const j = iceJet(); if (j) { if (j.up) alpha(0.3, () => topJet(j.x + 2, j.y + 3, j.ang, [0, 0, 0])); topJet(j.x, j.y, j.ang, M(K.WHITE, [170, 180, 210], night * 0.4)); if ((a * 1.4) % 1 < 0.3) { lit(() => r(Math.round(j.x), Math.round(j.y), 1, 1, [255, 70, 60])); Gd(j.x, j.y, 3, [255, 70, 60], 0.4); } } }

@@ -101,7 +101,10 @@ src/
                        sonar, lights, claw + CLAW CAM, periscope, tea, the fixes), the troubles and visitors, CAP'N BARNACLE's lines, the
                        report and the pay), air (THE AIRPORT and ICELAND: check-in's boarding pass, the X-ray, the arch, the plane's
                        crew and announcements on the flight's clock, the seatbelt sign, PENNY's trolley, the carousel's bags, the stamps,
-                       the hot dog, the tower view, the aurora photo, the cat, the elf door). Each owns its state; main calls what it
+                       the hot dog, the tower view, the aurora photo, the cat, the elf door), coast (THE SOUTH COAST: KATLA's stories and the stops
+                       called out on the bus's clock, SOAKED (fx 9, from the spray, behind Seljalandsfoss, a sneaker wave; dries in 40 s, faster on
+                       the bus or with soup), the gale's chain, THRASI'S RING's glint (glintNow), the sneaker waves (caught / outrun), the puffin
+                       camera (the PUFFIN pet), the wreck's shuttle, the falls' roar and the surf). Each owns its state; main calls what it
                        exports (spots, per-frame steps, banners, net events)
   engine/
     pixel.ts           THE drawing kit: r(), line, disc, oval, txt, spr, glow G/Gd/Gline, lit(), outline()
@@ -235,7 +238,28 @@ src/
                        and walkers) to HALLGRÍMSKIRKJA (THE TOWER; the church bench's `watch` frames it), the shops (the PUFFIN SHOP, the
                        bakery, the café), the elf house, the humpback mural (mural()), the hot dog stand, HARPA (HARPA_MAIN/WING volumes, honeycomb HARPA_CELLS
                        baked by day and lit by a colour wave at night), the SUN VOYAGER, the aurora bench and camera; the
-                       aurora live in the sky; winter's bells over the street
+                       aurora live in the sky; winter's bells over the street; THE TOUR BUS's stop (the coach pulls in by the shelter;
+                       the airport bus's door is shut while it's in)
+    coast.ts           THE SOUTH COAST's shared kit: the sky (paintSky, skyLive: the low sun, clouds, the aurora), weatherFront, landLayer
+                       (a room's land baked by day, night laid over it, cross-faded), the pixel painters (pixels, vnoise/fbm, cliffPx,
+                       sandPx, grassPx), THE ICELAND EXPLORER from outside (drawCoach, busAtStop: pulling in and away on the clock, the
+                       stop's countdown), sight signs (the ⌘ loop), snow poles, sheep, waterfalls (fallTex/drawFall: a scrolling
+                       texture), mist, rainbows; COAST.view (the part in view)
+    tourbus.ts         THE TOUR BUS (1200x614): seats in pairs, STEFÁN at the wheel, the route strip, the door (open at stops: off
+                       where it is, STOP_ARRIVE); the windows show the Ring Road from the bus's km (heading out the north side: Esja,
+                       Hellisheiði's lava and steam, Hveragerði's greenhouses, farms, tractor eggs, horses, Hekla, the cliffs and their
+                       falls, the glaciers; heading home the south: the sea, the Westman Islands), the windscreen's road
+    seljaland.ts       SELJALANDSFOSS (1700x614): the car park (the bus, the pay machine, the coffee hut), the falls (the path BEHIND
+                       them: anyone on it is drawn behind the `curtain` prop), the pool, the rainbow, floodlit at night, the gale's
+                       CHAINS, the bench that frames it, sheep; and GLJÚFRABÚI (makeGorge, 760x614): the chamber, the fall, the rock
+    skoga.ts           SKÓGAFOSS (1700x614): the curtain, the pool (THRASI'S RING glints in it: SKOW), the double rainbow, fulmars,
+                       the campsite, the 527 STEPS (a door up); THE TOP (makeSkogaTop, 1200x614): the platform over the drop, the
+                       spray boiling up beyond the lip, the plain far below, the river and the trail sign
+    wreck.ts           THE PLANE WRECK (1900x614): the car park, the signs, the shuttle (spots: SHUTTLE_TO), the marker posts, the
+                       DC-3's fuselage (a baked sprite: climb on top, sit in the door), green under the aurora
+    beach.ts           REYNISFJARA (2000x614, looking out to sea): the headland's puffins (BURROWS, puffinsInFrame) and their camera,
+                       GARÐAR's columns (the staircase: sit at three heights) and the cave, the troll stacks, Dyrhólaey, the surf and
+                       THE SNEAKER WAVES (waveP / sneakerY on the clock; BEACH.skew), the warning sign's light, THE BEACH CAFE (soup)
   entities/
     critter.ts         the player character sprite: Look options, Pose, composeCritter/stampCritter;
                        what's earned (EARNED) and the claw prize list with weights (CLAW, must match 0006_arcade.sql)
@@ -254,6 +278,9 @@ src/
   game/air.ts          LAB AIR's timetable (pure): a 10-minute loop of two legs, LA101 to Keflavík and LA102 home (air(): the phase,
                        the route, the height), which end's door is open, bumpy air and the masks, your seat; AIR_ARRIVE (every door's
                        arrival point); AIR.skew for tests
+  game/tour.ts         THE ICELAND EXPLORER's timetable (pure): one bus on a 370 s loop, Reykjavík → Seljalandsfoss → Skógafoss → the
+                       wreck → Reynisfjara → home (tour(): the phase, the stop, the km along the road and which way), busAt, nextBus,
+                       busPose (pulling in / away); TOUR.skew for tests
   game/passport.ts     THE PASSPORT's 17 stamps (which push opens each) and stampIt (your first visit's day, in your save)
   game/places.ts       the places on the map the EXPLORER badge counts (EXPLORE), and placeOfRoom (flats are THE LOFTS; rides are no place)
   game/quests.ts       daily quests + badges: QUESTS/BADGES (keep in step with 0009_quests.sql); game code calls
@@ -435,6 +462,7 @@ only the database sends there via `realtime.send`, so sender ids on it are real)
 | submarine | room state `dive` (the skipper's, the lowest id aboard: the dive n, a snapshot of where the sub is at `at`, the lights, when each trouble was fixed, the visitor, finds taken, kinds photographed, mission bits, the octopus; merged, not replaced: bits OR'd, the earliest fix, the newest snapshot; re-sent every 3 s) + broadcast `helm` `{ x, y, vx, vy, sx, sy, off? }` (whoever's at the helm, on each stick change and every 0.5 s; everyone else flies the sub on from it) and `sub` `{ e, v, x?, y? }` (snap / ping / grab / fix / lights / tea / horn / claw / bonk: every browser applies it the same way); RPCs `dive_pay(finds, mission)` at surfacing, `found_boot()` | see game/sub.ts |
 | aquarium | RPCs `aquarium_tanks()` (the plaques, your biggest catch of each kind, what you've donated), `donate_fish(fish)`, `gift_shop(item)` (and `buy_furniture` for its furniture); room state `aq` `{ n }` ("the gallery changed: look again"); broadcast `scoop` `{ id, x }` (a scoop of food thrown into the ocean tank at feeding time); feeding time and SARDINE 1's dives from the clock | `{ plaque, cm, first, paid, tokens, prev }` |
 | chem lab | broadcast `chem` `{ id, b, m, at }` ("I mixed m, a bitmask of 2-3 reagents, at bench b": every browser works out the same reaction with `outcome`; the same discovery at both benches within 3 s by two players = a two-chemist reaction) + `fx` `{ id, k, s }` ("I'm under potion / frazzle k for s more seconds": sent when you drink, and again whenever anyone arrives); room state `chemlog` (the EXPERIMENTS board); no server calls | see game/chem.ts |
+| the south coast | `fx` with k 9 (SOAKED), as the potions send it; everything else (the bus, the waves, the ring's glint, the puffins) is the clock |
 | airport / iceland | none: LAB AIR (`air()`), Iceland's clock, weather and each night's aurora are all from the clock; the X-ray shows the `hold` you already send, the arch reads your `look`; your passport's stamps are in your save; the souvenirs are `gift_shop` / `buy_furniture` | see game/air.ts, world/iceland.ts |
 | pong | broadcast `pong`, ~15/s per side, only during a match | `{ id, s, p, b?, sc?, ph? }` |
 | hide and seek | broadcast `world` on the lobby channel; only the seeker's updates count mid-round | `{ id, seeker, phase, t0, ids, names, found, ts }` |
