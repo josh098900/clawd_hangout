@@ -41,7 +41,7 @@ export function sneakerY(p = waveP()): number {
 /** The little everyday waves: how far up each one runs (they come every 9 s). */
 const smallY = (t: number): number => { const u = (t % 9) / 9; return SURF.calm - 8 + Math.max(0, Math.sin(u * Math.PI)) * 10; };
 /** THE PUFFINS: their burrows on the slope; each one's in or out on its own clock. */
-export const BURROWS: [number, number][] = [[136, 268], [172, 282], [210, 262], [236, 298], [270, 286], [306, 304], [338, 296], [372, 318], [404, 326], [180, 312], [252, 324], [440, 334]];
+export const BURROWS: [number, number][] = [[122, 398], [150, 420], [176, 392], [204, 432], [228, 404], [256, 440], [140, 446], [190, 456], [240, 372], [270, 418], [300, 262], [340, 284]];
 export const puffinOut = (i: number, t = Date.now() / 1000): boolean => ((t * (0.021 + (i % 5) * 0.004) + h1(i * 3.7)) % 1) < 0.62;
 /** How many puffins are standing out where the camera sees them right now. */
 export const puffinsInFrame = (t = Date.now() / 1000): number => BURROWS.filter((_, i) => puffinOut(i, t)).length;
@@ -57,8 +57,8 @@ function paintLand(day: boolean, dk: (c: RGB) => RGB): void {
   r(1268, HZ - 30, 4, 8, dk([236, 236, 230])); r(1267, HZ - 32, 6, 2, dk([60, 60, 66]));
   // REYNISDRANGAR: the troll stacks, dark spires out in the surf
   for (const [cx, hgt, w] of [[BHR.stacks - 56, 150, 30], [BHR.stacks + 4, 104, 24], [BHR.stacks + 58, 74, 18]] as [number, number, number][]) {
-    for (let x = cx - w; x < cx + w; x++) { const u = (x - cx) / w, top = Math.round(HZ + 10 - hgt * (1 - u * u) - h1(Math.floor(x / 3) * 4.1) * 10); r(x, top, 1, HZ + 12 - top, dk(u < -0.2 ? [36, 36, 40] : u > 0.3 ? [56, 56, 60] : [46, 46, 50])); if (h1(x * 0.7) > 0.8) r(x, top + Math.floor(h1(x) * 40), 1, 6, dk([220, 220, 210])); }
-    r(cx - w - 6, HZ + 10, w * 2 + 12, 3, dk([220, 232, 238]));
+    for (let x = cx - w; x < cx + w; x++) { const u = (x - cx) / w, top = Math.round(HZ + 10 - hgt * (1 - u * u) - h1(Math.floor(x / 3) * 4.1) * 10); for (let y = top; y < HZ + 12; y++) r(x, y, 1, 1, dk(M(u < -0.2 ? [36, 36, 40] : u > 0.3 ? [58, 58, 62] : [46, 46, 50], [30, 30, 34], vnoise(x, y, 5, 4) * 0.5))); if (h1(x * 0.7) > 0.93) r(x, top + 4 + Math.floor(h1(x) * 30), 1, 2, dk([200, 200, 190])); }
+    for (let x = cx - w - 8; x < cx + w + 8; x++) if (vnoise(x, 0, 4, 9) > 0.35) r(x, HZ + 10 + Math.round(vnoise(x, 1, 6, 2) * 2), 1, 2, dk([220, 232, 238])); // (the surf round their feet)
   }
   // ---- REYNISFJALL: the headland, its grassy slope (the puffins' burrows), GARÐAR's columns, the cave ----
   pixels(0, 100, 800, WALL - 100, (x, y) => {
@@ -72,7 +72,7 @@ function paintLand(day: boolean, dk: (c: RGB) => RGB): void {
       return dk(seam ? [22, 22, 26] : cap ? [104, 106, 112] : joint ? [34, 34, 38] : M(M([82, 84, 90], [40, 40, 46], k), [60, 60, 66], vnoise(col, y, 40) * 0.4));
     }
     if (y < top + 3) return dk(IS.SNOW);
-    return dk(grassPx(x, y, 0.1));
+    return dk(grassPx(x, y));
   });
   for (const [bx, by] of BURROWS) oval(bx, by + 3, 3, 2, dk([30, 28, 26])); // (the burrows)
   // ---- THE LAND on the right: dunes and grass, the café (built like the columns: dark, upright), the sight sign ----

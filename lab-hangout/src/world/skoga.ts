@@ -87,7 +87,7 @@ function drawBack(a: number): void {
     if (gt >= 0 && gt < 5) { const k = Math.sin((gt / 5) * Math.PI), gx = SKOW.glintX, gy = SPOOL.cy + 4; lit(() => { r(gx - 1, gy, 3, 1, [255, 220, 90]); if ((a * 6) % 1 < 0.6) { r(gx, gy - 3, 1, 7, [255, 240, 170]); r(gx - 3, gy, 7, 1, [255, 240, 170]); } }); Gd(gx, gy, 10, [255, 210, 90], 0.6 * k); }
     // the double rainbow in the spray (it faces south: the sun's behind you)
     if (sunny()) { rainbow(SKR.fall, 560, 150, day, 500); rainbow(SKR.fall, 560, 178, day * 0.5, 500); }
-    if (night > 0.3) Gd(SKR.fall, 470, 90, [220, 236, 255], 0.12 * night);
+    if (night > 0.3) Gd(SKR.fall, 480, 30, [220, 236, 255], 0.06 * night);
   }
   // fulmars gliding along the cliff, riding the updraft
   if (seen(500, 1100)) for (let q = 0; q < 4; q++) { const t = a * (0.05 + q * 0.01) + q * 0.3, gx = 520 + ((t * 300) % 520), gy = 250 + Math.round(Math.sin(t * 5 + q) * 30 + q * 30), c = nite([240, 242, 246], night); r(Math.round(gx) - 3, gy, 7, 1, c); r(Math.round(gx), gy - 1, 1, 1, c); }
@@ -168,7 +168,7 @@ function paintTop(day: boolean, dk: (c: RGB) => RGB): void {
   pixels(0, WALL - 12, TW, 12, (x, y) => (x < TOP.lip1 + 4 ? (y > WALL - 4 ? dk(cliffPx(x, y, 0.3, 4)) : null) : null));
   // ---- the cliff top where you walk: the river running along the back to the lip, the grass, the path ----
   pixels(TOP.lip0, WALL - 12, TW - TOP.lip0, 14, (x, y) => dk(M([96, 140, 162], [190, 214, 226], vnoise(x * 0.6 - y, y, 3) > 0.72 ? 1 : vnoise(x, y, 5) * 0.3)));
-  pixels(EDGE, WALL + 2, TW - EDGE, H - WALL - 2, (x, y) => dk(y > 500 && y < 540 && x > 420 ? M([128, 120, 106], [148, 140, 126], vnoise(x, y, 3)) : grassPx(x, y)));
+  pixels(EDGE, WALL + 2, TW - EDGE, H - WALL - 2, (x, y) => { const mid = 518 + (vnoise(x, 0, 60, 2) - 0.5) * 16, half = 7 + vnoise(x, 0, 25, 3) * 4, d = Math.abs(y - mid) - half; return dk(x > 430 && d < 0 ? M([128, 120, 106], [148, 140, 126], vnoise(x, y, 3)) : x > 430 && d < 2 && vnoise(x, y, 2) > 0.5 ? [120, 128, 92] : grassPx(x, y)); }); // (the path along the cliff top: trodden, its edges ragged)
   // the steel platform out over the drop: its grating (you stand on it), the cliff face dropping away under its front edge
   pixels(TOP.platform0, WALL - 2, EDGE - TOP.platform0, 566 - WALL + 2, (x, y) => dk(((x - TOP.platform0) % 4 === 0 && (y % 3) === 0) ? [96, 102, 110] : (y % 12) === 0 ? [104, 110, 118] : M([126, 132, 140], [146, 152, 160], vnoise(x, y, 20))));
   pixels(0, 566, EDGE, H - 566, (x, y) => dk(cliffPx(x, y, 0.2, 4)));

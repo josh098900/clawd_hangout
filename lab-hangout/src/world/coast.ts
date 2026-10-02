@@ -40,8 +40,10 @@ export function skyLive(a: number, W: number, horizon: number, sunX: number): vo
   { const lid = w.kind === 'cloudy' || w.kind === 'snow' || w.kind === 'drizzle', n = Math.round((lid ? 22 : 7) * W / 1900), cc = M(M([40, 46, 66], [236, 240, 246], day), [150, 156, 166], lid ? 0.4 : 0);
     if (lid) alpha(0.55 * w.k, () => r(vx0, 0, vx1 - vx0, horizon, M([60, 66, 80], [170, 178, 190], day)));
     for (let q = 0; q < n; q++) { const cx = ((h1(q * 5.3) * (W + 400) + a * (2 + (q % 3))) % (W + 400)) - 200, cy = 30 + Math.floor(h1(q * 2.1) * 230), cw = 30 + Math.floor(h1(q * 7) * 50); if (!seen(cx - cw, cx + cw)) continue; alpha(lid ? 0.9 : 0.7, () => { oval(Math.round(cx), cy, cw, 8, cc); oval(Math.round(cx - cw / 2), cy - 5, cw / 2, 7, cc); oval(Math.round(cx + cw / 3), cy - 4, cw / 3, 6, cc); }); } }
-  drawAurora(vx0, vx1, 0, horizon - 8, au.kp, au.vis, a, 1.6);
+  noGlow(() => drawAurora(vx0, vx1, 0, horizon - 8, au.kp, au.vis, a, 1.6)); // (its glow would shine through the cliffs in front of it)
 }
+/** Draw without the soft glow layer (for things the land covers: the glow layer isn't covered by anything). */
+export function noGlow(fn: () => void): void { const g = PX.glow; PX.glow = null as unknown as CanvasRenderingContext2D; try { fn(); } finally { PX.glow = g; } }
 /** Iceland's weather over everything: snow, sideways snow in a gale, drizzle, a grey wash when it's overcast. */
 export function weatherFront(a: number, H: number): void {
   const w = iceWeather(), vx0 = COAST.view.x0, vx1 = COAST.view.x1, n = w.kind === 'snow' ? 140 : w.kind === 'gale' ? 110 : w.kind === 'drizzle' ? 90 : 0;

@@ -13,6 +13,7 @@ import { clamp, h1 } from '../engine/math';
 import { iceDay, iceGold, iceSun, iceWeather, auroraNow, drawAurora } from './iceland';
 import { tour, busAt, STOPS, STOP_NAMES, STOP_KM, type Tour } from '../game/tour';
 import { basePose, stampCritter } from '../entities/critter';
+import { noGlow } from './coast';
 import { SEL_ARRIVE } from './seljaland';
 import { SKO_ARRIVE } from './skoga';
 import { WRK_ARRIVE } from './wreck';
@@ -95,7 +96,7 @@ function roadView(a: number, T: Tour): void {
   if (gold > 0.01) alpha(gold * 0.4, () => r(100, HOR - 20, 880, 20, [255, 180, 120]));
   if (night > 0.5) for (let k = 0; k < 40; k++) r(100 + Math.floor(h1(k * 3.3) * 880), WIN_Y0 + Math.floor(h1(k * 1.7) * 30), 1, 1, [220, 225, 250]);
   { const s = iceSun(); if (s > 0 && w.kind !== 'cloudy' && w.kind !== 'snow' && !north) { const sx = 300 + Math.round(T.km * 2) % 600; disc(sx, HOR - 12 - Math.round(s * 30), 4, M([255, 250, 220], [255, 170, 90], gold)); } }
-  const au = auroraNow(); if (au.vis > 0.05 && north) drawAurora(100, 980, WIN_Y0 - 6, HOR - 4, au.kp, au.vis, a, 0.45);
+  const au = auroraNow(); if (au.vis > 0.05 && north) noGlow(() => drawAurora(100, 980, WIN_Y0 - 6, HOR - 4, au.kp, au.vis, a, 0.45)); // (its glow isn't clipped to the windows)
   if (w.kind === 'cloudy' || w.kind === 'snow' || w.kind === 'drizzle') alpha(0.6 * w.k, () => r(100, WIN_Y0, 880, HOR - WIN_Y0, M([50, 56, 70], [176, 184, 194], day)));
   // ---- far: the mountains (north) or the sea and its islands (south), barely moving ----
   if (!north) { const sea = T.km > 40 && T.km < 190; if (sea) { r(100, HOR - 2, 880, 6, nt(IS.SEA)); for (let x = 100; x < 980; x += 9) r(x + ((Math.floor(a * 3) * 3) % 9), HOR, 4, 1, nt([200, 220, 232])); } }
