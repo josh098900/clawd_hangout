@@ -776,3 +776,347 @@ scene, and brings everything else up to the same finish.
   - golden: only plane and Reykjavík changed (25 of 327)
   - smoke, both fly runs and the phone pass
   - perf: Reykjavík with snow takes 3.4 ms of work a frame
+
+---
+## 17. Push 2: THE SOUTH COAST, by tour bus (for Josh to check before it's built)
+
+**In one line:** a tour bus leaves Reykjavík's bus stop on a timetable and runs the Ring Road east along the south coast.
+It stops at **Seljalandsfoss** (walk behind the waterfall, and squeeze into the hidden one in its gorge), **Skógafoss**
+(the great curtain, the 527 steps to the top, the legend of the treasure chest), **the plane wreck** alone on the black
+sand plain, and **Reynisfjara** (the basalt columns, the troll stacks, the sneaker waves and the puffins). Then it heads
+back to town.
+
+**The bar is Josh's:** *"perfect to the point a local feels they are home."* So every room gets the little true
+things an Icelander would notice: road signs, poles, car parks, the jokes locals tell. They're listed in each room's
+**Local details** and checked in the close-up review.
+
+**7 new rooms** (37 → 44):
+- THE TOUR BUS
+- SELJALANDSFOSS and GLJÚFRABÚI (its hidden waterfall)
+- SKÓGAFOSS and THE TOP OF SKÓGAFOSS
+- THE PLANE WRECK
+- REYNISFJARA
+
+All are outdoors on Iceland's clock and weather, with the aurora at night (§7), apart from the bus, which sees it
+through the windows.
+
+### 17.1 The timetable: THE ICELAND EXPLORER
+- **One bus, a 6-minute loop, on the clock** (like the Subway and the plane), so everyone sees the same bus.
+
+  | Leg | Time |
+  |---|---|
+  | Reykjavík stop | 30 s at the stop |
+  | → Seljalandsfoss | 70 s drive |
+  | stop | 20 s |
+  | → Skógafoss | 40 s |
+  | stop | 20 s |
+  | → the plane wreck | 30 s |
+  | stop | 20 s |
+  | → Reynisfjara | 40 s |
+  | stop | 20 s |
+  | → Reykjavík | 80 s (the long drive home) |
+
+  That's 370 s a lap.
+- **Getting on and off:**
+  - The doors open only while the bus is at a stop.
+  - Stay aboard and you ride the whole loop.
+  - Get off, explore, and catch it next time round. Every stop has a sign: *NEXT BUS m:ss*.
+  - Or hop back with the map (§17.8).
+- **In Reykjavík:** the *TOUR BUS · COMING SOON* sign at the bus stop becomes the real stop. It has:
+  - a timetable board with the four stops and the bus's position
+  - the bus pulling in and leaving on the clock
+  - the door *THE ICELAND EXPLORER*, which only opens while it's in
+- **A pure `tour()`** (like `air()` and `train()`) returns where the bus is, its phase, and the time to the next stop.
+  It has a `skew` for tests.
+
+### 17.2 THE TOUR BUS — 1200 × 620
+```
+ ┌ big windows: the Ring Road going by (parallax: near verges and snow poles, fields, mountains, the sky) ───────────┐
+ │ DRIVER  ▣ ▣  ▣ ▣  ▣ ▣  ▣ ▣  ▣ ▣   (seats in pairs, headrest covers, the aisle down the middle)        ▣ ▣ ▣ back row │
+ └ KATLA at the front with the mic · the door (opens at stops) · the route strip over the windscreen: ●──●──●──●──● ┘
+```
+- **The look:**
+  - A big coach with grey-blue moquette seats and white headrest covers.
+  - Curtains tied back, overhead racks with coats and a backpack, a little screen showing the route.
+  - Fogged corners on the windows, and a heater's warm glow by the floor.
+  - Seen from outside at the stops: a big white coach with the ICELAND EXPLORER stripe and chunky tyres.
+- **The window view runs on the bus's place on the route** (like the plane's), so two players see the same field
+  going by. In order out of town:
+  1. Reykjavík's edge, then the moss-covered lava of **Hellisheiði**.
+  2. The geothermal power station's steam plumes and pipes.
+  3. Down the hill to **Hveragerði's** steaming greenhouses.
+  4. The bridge over the **Ölfusá** at Selfoss.
+  5. Flat farmland with **round white hay bales in plastic**.
+  6. Horses, sheep, red-roofed farms.
+  7. **Hekla** in the distance.
+  8. The **Westman Islands** offshore.
+  9. **Eyjafjallajökull's** ice cap, with waterfalls threading down the cliffs.
+  - At night it's dark fields, the odd farm light, and the aurora over everything.
+- **KATLA, the guide** (named after the volcano under Mýrdalsjökull, the next one along), talks on the mic. A ding-dong
+  plays, then a line, at set points of the route:
+  - Eyjafjallajökull: *"In 2010 that one stopped every plane in Europe. Nobody abroad could say its name either."*
+  - Katla: *"My namesake's under that glacier. She's overdue. Don't tell her I said."*
+  - The hay bales: *"Those are tractor eggs. If you see one hatch, tell me."*
+  - The hidden folk: *"Roads here go round some rocks. Ask the elves."*
+  - The troll stacks, the treasure chest, the wreck. Each stop gets its story as you pull in.
+  - **The bus doesn't wait:** *"Bus leaves in one minute!"*
+- **Spots:** every seat (window and aisle), and a seatbelt nudge borrowed from the plane. KATLA's line about it:
+  *"Seatbelts on. The Ring Road has sheep on it."*
+- **Local details:**
+  - The yellow snow poles with reflectors flicking past on the verge.
+  - A one-lane bridge sign, **EINBREID BRU**, before each river.
+  - The square-loop sight sign (⌘) before each stop.
+  - A gas station stop sign: *HOT DOG STOP · 5 MIN* (KATLA: *"Ignore it. The best ones are back in town."*).
+
+### 17.3 SELJALANDSFOSS — 1700 × 640
+```
+ sky · Eyjafjallajökull's cliffs, a line of green moss ledges ............................................. more cliff
+          ║ SELJALANDSFOSS: one thin, tall fall off the cliff edge, into its pool ║            the cliff's crack: GLJUFRABUI
+  BUS     ║   the path loops BEHIND the water (steps, wet rock, a rope rail)      ║   moss, a stream →  (stepping stones in)
+  STOP    ═══ the pool · spray drifting downwind · a rainbow on sunny afternoons ═══   ═══ the path along the cliff foot ═══
+  0-260                      260-1100                                                 1100-1500                 1500-1700
+```
+- **The look:**
+  - A dark basalt cliff of old sea cliffs, moss bright green on every ledge. Snow on top in winter.
+  - The fall is one long thin ribbon of white water, about 60 m tall, the tallest thing on screen.
+  - It's drawn in layers: the falling sheet, its edges breaking into spray, a churning pool with foam rings, the mist
+    cloud drifting with the wind.
+- **The path behind the falls:**
+  - Rocky steps climb round the pool and pass **behind the water** into the alcove, then down the other side.
+  - Behind, the falling water is drawn in front of you, so you see out through it: the sky turned silver, the drops
+    lit up.
+  - Anyone on the path stays drawn behind the curtain, so others watch you walk through it.
+- **SOAKED** (§17.7) builds up while you're in the spray. Behind the falls you're soaked through.
+- **Rainbows** form in the spray on clear afternoons (the sun low in the west, behind you). They follow the sun and the
+  wind.
+- **In a gale:** a chain across the steps, *PATH CLOSED · ICE* (locals know it shuts in winter). It reopens when the
+  weather slot changes.
+- **A viewing bench** whose `watch` frames the whole fall, like the church bench.
+- **GLJÚFRABÚI** (*"the one who lives in the gorge"*): a few hundred metres along the cliff foot, a black crack with a
+  stream running out. Stepping stones lead in: the door is *SQUEEZE IN*.
+- **Local details:**
+  - The car park's pay machine: *PARKING 1000 KR*. KATLA: *"Locals still complain about it."*
+  - A sign with real advice: *SLIPPERY. WATERPROOFS RECOMMENDED.*
+  - Sheep grazing along the slope.
+  - A trail of tourists in rain ponchos.
+  - A seasonal coffee hut with a hand-written menu.
+- **Stamp:** SELJALANDSFOSS, given when you get off the bus here.
+
+### 17.4 GLJÚFRABÚI — 700 × 640 (the hidden waterfall)
+- **A narrow mossy chamber** open to the sky high above. The waterfall drops into it from a slot in the roof, with a
+  shaft of light (golden in the low sun, the aurora's green at night, glimpsed through the slot).
+- Wet stones, a stream running out, ferns and moss everywhere, drips catching the light.
+- **The big rock in the middle:** climb up and stand on it, face to face with the falling water (a spot with `lift`).
+- It's loud in here: the roar fills the room. And you get soaked.
+- The door back out is the crack.
+
+### 17.5 SKÓGAFOSS — 1700 × 640, and THE TOP — 1200 × 640
+```
+ sky · the cliff's top edge, a fence, the 527 STEPS zigzagging up the right-hand slope (the door at their foot: CLIMB)
+  BUS    │ SKOGAFOSS: a wide white curtain, 25 m across, thundering into the pool. A DOUBLE RAINBOW on sunny days │ steps
+  STOP   ═══ black shingle · the river Skógá running out to the sea · the pool (Thrasi's ring glints here, sometimes) ═══
+  0-260               300-1200                                                                                1200-1700
+```
+- **The look:**
+  - A huge curtain of white water off a sheer cliff, wider than it is tall, with deep mist billowing forward.
+  - Grassy slopes either side, the river running out over black shingle.
+  - Gulls and fulmars on the cliff ledges.
+  - A row of tiny people at the foot shows the scale.
+- **The spray:** walk close and you're soaked. The pool's edge is as far as you can go.
+- **The double rainbow** stands in the spray on sunny days. Skógafoss faces south, so rainbows here are famous.
+- **THE LEGEND (KATLA tells it as the bus pulls in):**
+  - The Viking Þrasi hid his chest of gold behind the falls.
+  - Boys found it and pulled on its ring. The ring came off, and the chest sank back.
+  - The ring is in the museum down the road.
+- **The treasure hunt:**
+  - On sunny days, now and then, a glint shows in the pool, at a place set by the weather slot.
+  - **E there within a few seconds:** *"You grab something gold... it comes away in your hand. Something big sinks back
+    into the deep."*
+  - You get **ÞRASI'S RING** (a new hold to admire) and the **TREASURE HUNTER** badge, given the way AURORA HUNTER is.
+- **THE 527 STEPS:**
+  - E at the foot: CLIMB.
+  - A short climb plays: a step counter ticking up, puffs of breath, a *"puff... puff..."* emote.
+  - You come out on THE TOP.
+- **THE TOP OF SKÓGAFOSS:**
+  - A steel viewing platform hangs out over the drop. Looking down: the curtain pouring away beneath you, the tiny
+    bus in the car park, the river winding to the sea.
+  - Behind, the river runs down from the highlands in more little waterfalls: the start of the Fimmvörðuháls trail,
+    with a trail sign: *THORSMORK 25 KM*.
+  - Sheep up here too.
+  - The way back down is the steps door.
+- **Local details:**
+  - The museum sign: *SKOGAR MUSEUM 1 KM*.
+  - Turf-roofed buildings in the distance.
+  - The camping field with a couple of tents, even in the snow.
+  - The *SKOGAFOSS* brown sight sign with the ⌘ loop.
+- **Stamp:** SKOGAFOSS.
+
+### 17.6 THE PLANE WRECK — 1900 × 640, and REYNISFJARA — 2000 × 640
+
+**THE PLANE WRECK** (Sólheimasandur):
+- **The real story, told straight:** a US Navy DC-3 ran out of fuel in 1973 and came down on the sand. Everyone
+  walked away. Its shell has sat there since.
+- **The room** is mostly emptiness, which is the point:
+  - Flat black sand to the horizon.
+  - A marker post every so often along a track.
+  - The silver fuselage with no wings or tail, battered and dented, at the far end.
+  - Mýrdalsjökull's ice cap low on the skyline.
+- **The car park and shuttle** at the left:
+  - The walk is 4 km for real. Here it's compressed, but a sign says *4 KM · ABOUT 1 HOUR*.
+  - KATLA: *"Or take the shuttle. Nobody judges."*
+  - The shuttle is a door to the wreck's end of the room.
+- **Climb on top** (a spot with `lift`), sit in the doorway, or walk through the inside: torn panels, light through the
+  holes.
+- **At night** it's eerie: the silhouette under the aurora, the wind, nothing else. That's the shot everyone wants.
+- **Local details:** the marker posts, the fence and the farmer's gate at the car park, and a hand-painted sign:
+  *NO DRIVING ON THE SAND*.
+- **Stamp:** THE PLANE WRECK.
+
+**REYNISFJARA** (the black sand beach):
+```
+ sky · DYRHOLAEY's arch and lighthouse far to the west .............. REYNISDRANGAR: the troll stacks out to sea (east)
+  BUS · BLACK BEACH  │ GARDAR: the basalt column cliff, a giant staircase of hexagon columns │ the cave │  the puffin cliff
+  STOP  CAFE + soup  │ (climb and sit on the steps)                                         │ HALSANEFSHELLIR │ (camera)
+  ═══ black sand · the warning sign's light · THE SNEAKER WAVE ZONE: big surf, foam running far up the beach ═══
+  0-380                380-1100                                                        1100-1400      1400-2000
+```
+- **The look:**
+  - Jet-black sand, shiny where it's wet.
+  - Huge Atlantic rollers in white rows.
+  - **GARÐAR**, the basalt column cliff: tall grey hexagon columns stepping down like a pipe organ. The stepped ones
+    in front form a giant staircase. The cliff above is green and snowy.
+  - The cave **HÁLSANEFSHELLIR**, with columns for a roof.
+  - **REYNISDRANGAR**, the sea stacks: dark spikes standing in the surf.
+  - **DYRHÓLAEY** far to the west: the arch and its lighthouse.
+- **The columns:** climb the steps and sit at three heights (spots with `lift`). The top one's `watch` frames the stacks.
+- **THE TROLLS:** KATLA tells it. Two trolls dragged a ship to shore in the night, the sun came up, and they turned to
+  stone, ship and all. At dawn (Iceland's clock) the stacks catch the first light.
+- **THE SNEAKER WAVES:**
+  - Every couple of minutes, on the clock (so everyone sees the same one), a big wave runs much further up the beach
+    than the rest.
+  - A rumble and a darker swell give a second's warning.
+  - **Caught in it:** you're swept back up the sand in a tumble (cartoon), dumped at the high-tide line and SOAKED.
+    *"NEVER TURN YOUR BACK ON THE SEA."*
+  - It never hurts, but the beach's real warning sign is here, because locals take it seriously:
+    - the light shows YELLOW most of the time, and RED in a gale
+    - *DANGER · SNEAKER WAVES · KEEP WELL BACK FROM THE SEA*
+- **THE PUFFINS:**
+  - On the cliff at the east end: little burrows, puffins popping in and out, flying in with fish.
+  - **A camera on a tripod:** E takes a photo. If at least three puffins are in the frame, you've got it:
+    - the **PUFFIN** pet (*"ARRR"*: puffins really growl)
+    - earned like the pigeon, written into EARNED
+- **THE BLACK BEACH CAFÉ:**
+  - A dark building in the style of the basalt columns, with big windows and a soup pot.
+  - E: **KJÖTSÚPA** (Icelandic lamb soup), a new hold. Sip it to warm up, and it dries you off faster.
+- **Local details:**
+  - Round black pebbles worn smooth.
+  - Tourists in a line for the same photo.
+  - The ⌘ sight sign.
+  - The village of Vík's red-roofed church on its hill, seen past the stacks.
+- **Stamp:** REYNISFJARA.
+
+### 17.7 SOAKED, and the other rewards
+- **SOAKED:**
+  - **How you get it:** builds up in a waterfall's spray (faster the closer you are), all at once behind Seljalandsfoss,
+    in Gljúfrabúi, or from a sneaker wave.
+  - **How it looks:**
+    - your critter darkens, its outline turns glossy
+    - drips fall from you, and a little puddle forms when you stand still
+    - every few seconds you shake off like a dog: a spray of drops
+  - **How it goes:** it dries over about 40 s, faster near the bus's heater or with kjötsúpa.
+  - **Others see it.** It's the existing `fx` message (the potion one) with a new kind, sent when it changes and when
+    anyone arrives. No new message type.
+- **Stamps:** SELJALANDSFOSS, SKOGAFOSS, THE PLANE WRECK and REYNISFJARA. The passport shows 9 of 16, and their hints
+  get real wording.
+- **The PUFFIN pet:** from the puffin camera.
+- **ÞRASI'S RING** (a hold) and the **TREASURE HUNTER** badge.
+- **Daily quests** (in the pool):
+  - *Walk behind a waterfall*
+  - *Climb the 527 steps*
+  - *Outrun a sneaker wave* (be on the beach when one comes, and don't get caught)
+- **Holds:** KJÖTSÚPA and ÞRASI'S RING, added to the hold list (the lists test checks the game and the database
+  agree).
+
+### 17.8 The map
+- **The ICELAND page switches on the four stops** (PUSH_NOW = 2), each with its little picture.
+- **The bus's route is drawn on it,** a dotted line along the coast, with a tiny moving bus at its place in the loop.
+- **Getting around:**
+  - From anywhere in Iceland, a stop **you've been to** (you have its stamp) is a hop, like Reykjavík.
+  - A stop you **haven't** says *BY TOUR BUS · NEXT BUS m:ss* and takes you to Reykjavík's bus stop.
+- From the city, all of them say *BY PLANE*, as now.
+
+### 17.9 The characters
+
+| Who | Where | Lines |
+|---|---|---|
+| **KATLA** (the guide) | the bus, and at each stop's bus while it waits | the route stories (§17.2) · *"Bus leaves in one minute!"* · *"Count heads... one, two, ...a puffin?"* |
+| **STEFÁN** (the driver) | the bus | doesn't talk. He waves. KATLA: *"Stefán's driven this road four thousand times. He still slows for the sheep."* |
+| **A ranger** (no name, in an orange jacket) | Reynisfjara, by the warning sign | *"Keep back from the water."* · *"No, further."* · *"The sea doesn't care how good the photo is."* |
+| **The café cook** | the Black Beach café | *"Kjötsúpa. Lamb, swede, carrots, potatoes. Your grandmother's recipe, if your grandmother was Icelandic."* |
+
+NPCs stand clear of every spot, and the golden test checks it.
+
+### 17.10 Sounds, music and seasons
+- **Sounds:**
+  - The waterfalls: a roar that grows as you get close, deep for Skógafoss and hissing for Seljalandsfoss. It echoes
+    in the gorge.
+  - The sea: the rollers' boom and hiss, and the sneaker wave's rumble.
+  - Wind, gulls and fulmars, sheep.
+  - On the bus: the engine, the indicator, the doors' hiss, KATLA's ding-dong and mic crackle.
+- **Music:**
+  - **On the bus:** a road-trip track, a light acoustic loop.
+  - **On the coast:** wide open, sparse piano and pads under the roar.
+  - **At night:** the aurora chime.
+- **Winter:**
+  - Icicles and frozen spray-ice down the falls' sides.
+  - Snow on the cliffs and the wreck.
+  - Fairy lights along the bus's luggage racks.
+  - KATLA wears a Christmas jumper.
+- **Halloween:** the usual dressing: string lights, pumpkins at each stop, and a bat over the wreck.
+
+### 17.11 How it's built and checked
+- **Build order, each with close-up screenshots and the local-details list ticked:**
+  1. the timetable, the bus stop and the bus
+  2. Seljalandsfoss, then the gorge
+  3. Skógafoss, then the top
+  4. the wreck
+  5. Reynisfjara
+  6. SOAKED, the waves, the puffins and the ring
+  7. the map
+  8. a polish pass
+- **New files:**
+  - `game/tour.ts` (the timetable, pure)
+  - `world/tourbus.ts`, `world/seljaland.ts`, `world/skoga.ts`, `world/wreck.ts`, `world/beach.ts` (each with its
+    side room)
+  - `features/coast.ts`: SOAKED, the waves, the ring, the puffin camera
+- **Network: nothing new** except the `fx` kind. The bus, the waves, the glint and the puffins all run on the clock.
+- **SQL: `0026_southcoast.sql`.** Josh runs it before the push.
+  - the three quests
+  - the TREASURE HUNTER badge
+  - the two new holds, if the database keeps the hold list
+- **Checks:**
+  - **The timetable:** the bus swept over thousands of loops (the doors only open at stops); the Reykjavík stop's door.
+  - **Doors, walked both ways:**
+    - the bus at every stop
+    - the gorge's crack
+    - the steps up and down
+    - the wreck's shuttle
+  - **The waterfall path:** walking behind it (drawn behind the curtain, from both sides), and the gale chain.
+  - **The waves:** caught and outrun, at every point of the beach.
+  - **SOAKED:** builds, dries and shows on a second player; the fx message arrives for anyone joining.
+  - **The puffin camera** and **the ring**, swept over many slots (fair, not too rare).
+  - **The rest:**
+    - every spot's reach, and NPCs clear of spots
+    - golden fingerprints for each new room by day and night, in each weather, with the aurora
+    - the old rooms unchanged, except Reykjavík's bus stop and the map
+    - the phone, CPU ×4 with bots, two players on the same bus
+
+### 17.12 Decisions for Josh
+1. **The puffins.** Real puffins are only on the cliffs from about April to August. Iceland's clock already runs its
+   own long-night season, so:
+   - **(recommended)** they're there all year in the game, so the pet is always gettable, or
+   - realism: from October to March a sign says *THE PUFFINS ARE AT SEA UNTIL APRIL*.
+2. **One bus or two.** With one bus, the wait at a stop is up to about 6 minutes. **(Recommended)** keep one: you can
+   always hop back by map once you've visited. Two buses, half a lap apart, halve the wait but mean two bus rooms.
+3. **The guide.** §14 had HEKLA on the mic, but she runs Reykjavík's info kiosk. **(Recommended)** a new guide, KATLA,
+   so HEKLA stays at her kiosk.
